@@ -1,49 +1,187 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import { useEffect } from 'react';
+import { Dimensions, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useSharedValue,
+  withSpring,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+// ── Config ─────────────────────────────────────────────────────────────────────
+type IoniconName = keyof typeof Ionicons.glyphMap;
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+const TABS: { name: string; icon: IoniconName }[] = [
+  { name: 'index',     icon: 'home' },
+  { name: 'analytics', icon: 'bar-chart-outline' },
+  { name: 'transfer',  icon: 'swap-horizontal-outline' },
+  { name: 'budget',    icon: 'layers-outline' },
+  { name: 'profile',   icon: 'person-outline' },
+];
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TAB_WIDTH       = SCREEN_WIDTH / TABS.length;
+const INDICATOR_SIZE  = 46;
+const BAR_HEIGHT      = 70;
+const PAD_TOP         = 8;
+const PAD_BOTTOM      = 10;
+const INDICATOR_TOP   = PAD_TOP + (BAR_HEIGHT - PAD_TOP - PAD_BOTTOM - INDICATOR_SIZE) / 2;
+
+const indicatorLeft = (index: number) =>
+  index * TAB_WIDTH + (TAB_WIDTH - INDICATOR_SIZE) / 2;
+
+// ── TabItem ────────────────────────────────────────────────────────────────────
+function TabItem({
+  icon,
+  isFocused,
+  onPress,
+  onLongPress,
+}: {
+  icon: IoniconName;
+  isFocused: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
+  const scale = useSharedValue(isFocused ? 1 : 0.82);
+
+  useEffect(() => {
+    scale.value = withSpring(isFocused ? 1 : 0.82, { damping: 14, stiffness: 260 });
+  }, [isFocused]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   return (
+    <TouchableOpacity
+      style={styles.tabItem}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      activeOpacity={1}
+      accessibilityRole="button"
+      accessibilityState={isFocused ? { selected: true } : {}}
+    >
+      <Animated.View style={animStyle}>
+        <Ionicons name={icon} size={22} color={isFocused ? '#fff' : '#9AA5B4'} />
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+// Screens inside (tabs) that must NOT show the nav bar
+const AUTH_SCREENS = new Set(['login', 'register']);
+
+// ── CustomTabBar ───────────────────────────────────────────────────────────────
+function CustomTabBar({ state, navigation }: BottomTabBarProps) {
+  // Hide on auth/launch screens
+  if (AUTH_SCREENS.has(state.routes[state.index].name)) return null;
+
+  const insets = useSafeAreaInsets();
+
+  // Only render the 5 declared tabs (exclude href:null screens)
+  const visibleRoutes = state.routes.filter(r => TABS.some(t => t.name === r.name));
+
+  const activeIndex = Math.max(
+    0,
+    visibleRoutes.findIndex(r => r.key === state.routes[state.index].key),
+  );
+
+  const indicatorX = useSharedValue(indicatorLeft(activeIndex));
+
+  useEffect(() => {
+    indicatorX.value = withSpring(indicatorLeft(activeIndex), {
+      damping: 18,
+      stiffness: 200,
+    });
+  }, [activeIndex]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: indicatorX.value }],
+  }));
+
+  return (
+    <View style={[styles.tabBar, { paddingBottom: PAD_BOTTOM + insets.bottom, height: BAR_HEIGHT + insets.bottom }]}>
+      {/* Sliding teal pill */}
+      <Animated.View style={[styles.indicator, indicatorStyle]} />
+
+      {visibleRoutes.map((route, index) => {
+        const tab = TABS.find(t => t.name === route.name)!;
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (index !== activeIndex && !event.defaultPrevented) {
+            navigation.navigate(route.name, route.params);
+          }
+        };
+
+        const onLongPress = () =>
+          navigation.emit({ type: 'tabLongPress', target: route.key });
+
+        return (
+          <TabItem
+            key={route.key}
+            icon={tab.icon}
+            isFocused={index === activeIndex}
+            onPress={onPress}
+            onLongPress={onLongPress}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+// ── Layout ─────────────────────────────────────────────────────────────────────
+export default function TabLayout() {
+  return (
     <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="login"
-        options={{
-          href: null,
-          tabBarStyle: { display: 'none' },
-        }}
-      />
-      <Tabs.Screen
-        name="register"
-        options={{
-          href: null,
-          tabBarStyle: { display: 'none' },
-        }}
-      />
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false, animation: 'shift' }}
+    >
+      <Tabs.Screen name="index" />
+      <Tabs.Screen name="analytics" />
+      <Tabs.Screen name="transfer" />
+      <Tabs.Screen name="budget" />
+      <Tabs.Screen name="profile" />
+      <Tabs.Screen name="explore"  options={{ href: null }} />
+      <Tabs.Screen name="login"    options={{ href: null }} />
+      <Tabs.Screen name="register" options={{ href: null }} />
     </Tabs>
   );
 }
+
+// ── Styles ─────────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    height: BAR_HEIGHT,
+    paddingTop: PAD_TOP,
+    paddingBottom: PAD_BOTTOM,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 20,
+  },
+  indicator: {
+    position: 'absolute',
+    top: INDICATOR_TOP,
+    left: 0,
+    width: INDICATOR_SIZE,
+    height: INDICATOR_SIZE,
+    borderRadius: INDICATOR_SIZE / 2,
+    backgroundColor: '#3ECBA8',
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

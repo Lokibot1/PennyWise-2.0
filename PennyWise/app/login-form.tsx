@@ -12,6 +12,7 @@ import {
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
 
 import { FormInput } from '@/components/form-input';
 import { Font } from '@/constants/fonts';
@@ -19,6 +20,9 @@ import { Font } from '@/constants/fonts';
 export default function LoginFormScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  const btnScale = useSharedValue(1);
+  const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: btnScale.value }] }));
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -61,9 +65,17 @@ export default function LoginFormScreen() {
           </View>
 
           {/* Log In */}
-          <TouchableOpacity style={styles.primaryButton} activeOpacity={0.85}>
-            <Text style={styles.primaryButtonText}>Log In</Text>
-          </TouchableOpacity>
+          <Animated.View style={btnStyle}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              activeOpacity={1}
+              onPressIn={() => { btnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
+              onPressOut={() => { btnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+              onPress={() => router.replace('/(tabs)')}
+            >
+              <Text style={styles.primaryButtonText}>Log In</Text>
+            </TouchableOpacity>
+          </Animated.View>
 
           {/* Forgot Password */}
           <TouchableOpacity
