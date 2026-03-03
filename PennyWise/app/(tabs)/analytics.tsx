@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -15,6 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Font } from '@/constants/fonts';
+import Animated, {
+  useSharedValue,
+  withSpring,
+  withTiming,
+  withDelay,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type IoniconName = keyof typeof Ionicons.glyphMap;
@@ -113,6 +120,57 @@ function groupByMonth(items: Expense[]) {
 }
 
 const FREQUENCIES: Frequency[] = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
+
+// ── Animation Helpers ─────────────────────────────────────────────────────────
+function useEntranceAnim() {
+  const opacity = useSharedValue(0);
+  const ty      = useSharedValue(20);
+  useEffect(() => {
+    opacity.value = withTiming(1, { duration: 280 });
+    ty.value      = withSpring(0, { damping: 22, stiffness: 180 });
+  }, []);
+  return useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: ty.value }],
+  }));
+}
+
+function AnimCard({
+  delay = 0,
+  style,
+  onPress,
+  children,
+}: {
+  delay?: number;
+  style?: object;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  const opacity = useSharedValue(0);
+  const ty      = useSharedValue(18);
+  const scale   = useSharedValue(1);
+  useEffect(() => {
+    opacity.value = withDelay(delay, withTiming(1, { duration: 260 }));
+    ty.value      = withDelay(delay, withSpring(0, { damping: 22, stiffness: 180 }));
+  }, []);
+  const anim = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: ty.value }, { scale: scale.value }],
+  }));
+  return (
+    <Animated.View style={anim}>
+      <TouchableOpacity
+        style={style}
+        onPressIn={() => { scale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
+        onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+        onPress={onPress}
+        activeOpacity={1}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
 
 // ── ConfirmModal ──────────────────────────────────────────────────────────────
 function ConfirmModal({ state, onCancel }: { state: ConfirmState; onCancel: () => void }) {
@@ -325,10 +383,12 @@ function CategoriesScreen({
   onViewArchived: () => void;
 }) {
   const active = categories.filter(c => !c.isArchived);
+  const bodyAnim = useEntranceAnim();
 
   return (
     <>
-      <BalanceHeader title="Categories" />
+      <BalanceHeader title="Expenses" />
+      <Animated.View style={[{ flex: 1 }, bodyAnim]}>
       <ScrollView
         style={s.white}
         contentContainerStyle={s.whiteContent}
@@ -367,6 +427,7 @@ function CategoriesScreen({
           <Text style={s.archivedLinkTxt}> View Archived Expenses</Text>
         </TouchableOpacity>
       </ScrollView>
+      </Animated.View>
     </>
   );
 }
@@ -387,11 +448,14 @@ function CategoryDetailScreen({
 }) {
   const active  = expenses.filter(e => e.categoryId === category.id && !e.isArchived);
   const grouped = groupByMonth(active);
+  const bodyAnim    = useEntranceAnim();
+  const addBtnScale = useSharedValue(1);
+  const addBtnAnim  = useAnimatedStyle(() => ({ transform: [{ scale: addBtnScale.value }] }));
 
   return (
     <>
       <BalanceHeader title={category.label} onBack={onBack} />
-      <View style={[s.white, { flex: 1 }]}>
+      <Animated.View style={[s.white, { flex: 1 }, bodyAnim]}>
         <ScrollView
           contentContainerStyle={[s.whiteContent, { paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
@@ -432,11 +496,19 @@ function CategoryDetailScreen({
         </ScrollView>
 
         <View style={s.addBtnWrapper}>
-          <TouchableOpacity style={s.addBtn} onPress={onAdd} activeOpacity={0.9}>
-            <Text style={s.addBtnTxt}>Add Expenses</Text>
-          </TouchableOpacity>
+          <Animated.View style={addBtnAnim}>
+            <TouchableOpacity
+              style={s.addBtn}
+              onPressIn={() => { addBtnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
+              onPressOut={() => { addBtnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+              onPress={onAdd}
+              activeOpacity={1}
+            >
+              <Text style={s.addBtnTxt}>Add Expenses</Text>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
-      </View>
+      </Animated.View>
     </>
   );
 }
@@ -462,6 +534,9 @@ function ExpenseFormScreen({
   const [vals, setVals]           = useState<ExpenseFormValues>(initial);
   const [showCatPicker, setCat]   = useState(false);
   const [showFreqPicker, setFreq] = useState(false);
+  const bodyAnim = useEntranceAnim();
+  const btnScale = useSharedValue(1);
+  const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: btnScale.value }] }));
 
   const set = <K extends keyof ExpenseFormValues>(key: K, value: ExpenseFormValues[K]) =>
     setVals(prev => ({ ...prev, [key]: value }));
@@ -472,6 +547,7 @@ function ExpenseFormScreen({
   return (
     <>
       <FormHeader title={screenTitle} onBack={onBack} />
+      <Animated.View style={[{ flex: 1 }, bodyAnim]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -582,11 +658,20 @@ function ExpenseFormScreen({
           )}
 
           {/* Save */}
-          <TouchableOpacity style={s.saveBtn} onPress={() => onSave(vals)} activeOpacity={0.9}>
-            <Text style={s.saveBtnTxt}>Save</Text>
-          </TouchableOpacity>
+          <Animated.View style={btnStyle}>
+            <TouchableOpacity
+              style={s.saveBtn}
+              onPressIn={() => { btnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
+              onPressOut={() => { btnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+              onPress={() => onSave(vals)}
+              activeOpacity={1}
+            >
+              <Text style={s.saveBtnTxt}>Save</Text>
+            </TouchableOpacity>
+          </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+      </Animated.View>
 
       {/* Category picker */}
       <PickerSheet
@@ -708,10 +793,12 @@ function ArchivedScreen({
   onRestore: (id: string) => void;
 }) {
   const archived = categories.filter(c => c.isArchived);
+  const bodyAnim = useEntranceAnim();
 
   return (
     <>
       <BalanceHeader title="Archived Expenses" onBack={onBack} />
+      <Animated.View style={[{ flex: 1 }, bodyAnim]}>
       <ScrollView
         style={s.white}
         contentContainerStyle={s.whiteContent}
@@ -733,12 +820,13 @@ function ArchivedScreen({
               <Ionicons name={cat.icon} size={20} color="#fff" />
             </View>
             <Text style={[s.expTitle, { flex: 1 }]}>{cat.label}</Text>
-            <TouchableOpacity style={s.restoreBtn} onPress={() => onRestore(cat.id)} activeOpacity={0.8}>
+            <TouchableOpacity style={s.restoreBtn} onPress={() => onRestore(cat.id)} activeOpacity={0.75}>
               <Text style={s.restoreTxt}>Restore</Text>
             </TouchableOpacity>
           </View>
         ))}
       </ScrollView>
+      </Animated.View>
     </>
   );
 }

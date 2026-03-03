@@ -16,8 +16,8 @@ type IoniconName = keyof typeof Ionicons.glyphMap;
 const TABS: { name: string; icon: IoniconName }[] = [
   { name: 'index',     icon: 'home' },
   { name: 'analytics', icon: 'bar-chart-outline' },
-  { name: 'transfer',  icon: 'swap-horizontal-outline' },
   { name: 'budget',    icon: 'layers-outline' },
+  { name: 'transfer',  icon: 'swap-horizontal-outline' },
   { name: 'profile',   icon: 'person-outline' },
 ];
 
@@ -146,8 +146,8 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="analytics" />
-      <Tabs.Screen name="transfer" />
       <Tabs.Screen name="budget" />
+      <Tabs.Screen name="transfer" />
       <Tabs.Screen name="profile" />
       <Tabs.Screen name="explore"  options={{ href: null }} />
       <Tabs.Screen name="login"    options={{ href: null }} />
