@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   FlatList,
   Keyboard,
@@ -18,6 +18,14 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Font } from '@/constants/fonts';
+import Animated, {
+  useSharedValue,
+  withSpring,
+  withTiming,
+  withSequence,
+  useAnimatedStyle,
+  interpolateColor,
+} from 'react-native-reanimated';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type FilterType = 'All' | 'Income' | 'Expense' | 'Archived';
@@ -95,6 +103,51 @@ const INITIAL: Transaction[] = [
   { id: '10', icon: 'trending-up-outline', title: 'Dividends',     description: 'Quarterly payout', time: '12:00', date: 'March 25',  category: 'Investment',  value:  583,    archived: false, recurring: false },
 ];
 
+// ── FilterChip ────────────────────────────────────────────────────────────────
+function FilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const scale = useSharedValue(1);
+  const anim  = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return (
+    <Animated.View style={anim}>
+      <TouchableOpacity
+        style={[styles.filterTab, active && styles.filterTabActive]}
+        onPress={() => {
+          scale.value = withSequence(
+            withSpring(0.88, { damping: 6,  stiffness: 600 }),
+            withSpring(1,    { damping: 10, stiffness: 400 }),
+          );
+          onPress();
+        }}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ── Animation Helpers ─────────────────────────────────────────────────────────
+function useEntranceAnim() {
+  const opacity = useSharedValue(0);
+  const ty      = useSharedValue(20);
+  useEffect(() => {
+    opacity.value = withTiming(1, { duration: 280 });
+    ty.value      = withSpring(0, { damping: 22, stiffness: 180 });
+  }, []);
+  return useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: ty.value }],
+  }));
+}
+
 // ── TransactionItem ────────────────────────────────────────────────────────────
 function TransactionItem({
   item,
@@ -106,11 +159,16 @@ function TransactionItem({
   onPress: () => void;
 }) {
   const isExpense = item.value < 0;
+  const scale     = useSharedValue(1);
+  const scaleAnim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
+    <Animated.View style={scaleAnim}>
     <TouchableOpacity
       style={[styles.txItem, !isLast && styles.txItemBorder]}
       onPress={onPress}
-      activeOpacity={0.75}
+      onPressIn={() => { scale.value = withSpring(0.98, { damping: 15, stiffness: 300 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+      activeOpacity={1}
     >
       <View>
         <View style={[
@@ -139,6 +197,7 @@ function TransactionItem({
         {fmt(item.value)}
       </Text>
     </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -348,10 +407,32 @@ export default function TransactionScreen() {
   const editingTx = editingId ? transactions.find(t => t.id === editingId) : null;
   const liveTx    = detailTx ? (transactions.find(t => t.id === detailTx.id) ?? detailTx) : null;
 
+  // ── Animations ──────────────────────────────────────────────────────────────
+  const bodyAnim    = useEntranceAnim();
+  const addBtnScale = useSharedValue(1);
+  const addBtnAnim  = useAnimatedStyle(() => ({ transform: [{ scale: addBtnScale.value }] }));
+
+  // Type toggle sliding indicator
+  const [typeTabWidth, setTypeTabWidth] = useState(0);
+  const typeTabWidthRef  = useRef(0);
+  const typeIndicatorX   = useSharedValue(0);
+  const typeProgress     = useSharedValue(0); // 0 = income, 1 = expense
+  const typeIndicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: typeIndicatorX.value }],
+    backgroundColor: interpolateColor(typeProgress.value, [0, 1], ['#3ECBA8', '#4B78E0']),
+  }));
+  useEffect(() => {
+    if (typeTabWidthRef.current === 0) return;
+    const idx = formType === 'income' ? 0 : 1;
+    typeIndicatorX.value = withSpring(idx * typeTabWidthRef.current, { damping: 18, stiffness: 200 });
+    typeProgress.value   = withTiming(idx, { duration: 200 });
+  }, [formType]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
 
+      <Animated.View style={[{ flex: 1 }, bodyAnim]}>
       {/* ── Green Header ──────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <View style={styles.headerSpacer} />
@@ -421,20 +502,26 @@ export default function TransactionScreen() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.filterRow}>
               {FILTERS.map((f) => (
-                <TouchableOpacity
+                <FilterChip
                   key={f}
-                  style={[styles.filterTab, activeFilter === f && styles.filterTabActive]}
+                  label={f}
+                  active={activeFilter === f}
                   onPress={() => setActiveFilter(f)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.filterText, activeFilter === f && styles.filterTextActive]}>{f}</Text>
-                </TouchableOpacity>
+                />
               ))}
             </View>
           </ScrollView>
-          <TouchableOpacity style={styles.addBtn} onPress={openCreate} activeOpacity={0.85}>
-            <Ionicons name="add" size={22} color="#fff" />
-          </TouchableOpacity>
+          <Animated.View style={addBtnAnim}>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={openCreate}
+              onPressIn={() => { addBtnScale.value = withSpring(0.9, { damping: 15, stiffness: 300 }); }}
+              onPressOut={() => { addBtnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+              activeOpacity={1}
+            >
+              <Ionicons name="add" size={22} color="#fff" />
+            </TouchableOpacity>
+          </Animated.View>
         </View>
 
         {filtered.length === 0 ? (
@@ -458,6 +545,7 @@ export default function TransactionScreen() {
           />
         )}
       </View>
+      </Animated.View>
 
       {/* ── Form Modal ───────────────────────────────────────────────────── */}
       <Modal
@@ -482,9 +570,19 @@ export default function TransactionScreen() {
             </Text>
 
             {/* ── Step 1: Type ─────────────────────────────────────────── */}
-            <View style={styles.typeToggle}>
+            <View
+              style={styles.typeToggle}
+              onLayout={(e) => {
+                const w = (e.nativeEvent.layout.width - 8) / 2;
+                typeTabWidthRef.current = w;
+                setTypeTabWidth(w);
+                typeIndicatorX.value = (formType === 'income' ? 0 : 1) * w;
+                typeProgress.value   = formType === 'income' ? 0 : 1;
+              }}
+            >
+              <Animated.View style={[styles.typeIndicator, { width: typeTabWidth }, typeIndicatorStyle]} />
               <TouchableOpacity
-                style={[styles.typeBtn, formType === 'income' && styles.typeBtnIncome]}
+                style={styles.typeBtn}
                 onPress={() => { setFormType('income'); setFormIcon('cash-outline'); }}
                 activeOpacity={0.8}
               >
@@ -492,7 +590,7 @@ export default function TransactionScreen() {
                 <Text style={[styles.typeBtnText, formType === 'income' && styles.typeBtnTextActive]}> Income</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.typeBtn, formType === 'expense' && styles.typeBtnExpense]}
+                style={styles.typeBtn}
                 onPress={() => { setFormType('expense'); setFormIcon('receipt-outline'); }}
                 activeOpacity={0.8}
               >
@@ -974,6 +1072,13 @@ const styles = StyleSheet.create({
   typeToggle: {
     flexDirection: 'row', backgroundColor: '#F5F5F5',
     borderRadius: 14, padding: 4, marginBottom: 24, gap: 4,
+  },
+  typeIndicator: {
+    position: 'absolute',
+    left: 4,
+    top: 4,
+    bottom: 4,
+    borderRadius: 10,
   },
   typeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10 },
   typeBtnIncome: { backgroundColor: '#3ECBA8' },
