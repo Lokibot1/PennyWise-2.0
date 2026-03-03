@@ -14,11 +14,11 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
 const TABS: { name: string; icon: IoniconName }[] = [
-  { name: 'index',     icon: 'home' },
-  { name: 'analytics', icon: 'bar-chart-outline' },
-  { name: 'budget',    icon: 'layers-outline' },
-  { name: 'transfer',  icon: 'swap-horizontal-outline' },
-  { name: 'profile',   icon: 'person-outline' },
+  { name: 'index',       icon: 'home' },
+  { name: 'analytics',  icon: 'bar-chart-outline' },
+  { name: 'budget',     icon: 'layers-outline' },
+  { name: 'transaction', icon: 'swap-horizontal-outline' },
+  { name: 'profile',    icon: 'person-outline' },
 ];
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -147,11 +147,12 @@ export default function TabLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="analytics" />
       <Tabs.Screen name="budget" />
-      <Tabs.Screen name="transfer" />
+      <Tabs.Screen name="transaction" />
       <Tabs.Screen name="profile" />
       <Tabs.Screen name="explore"  options={{ href: null }} />
       <Tabs.Screen name="login"    options={{ href: null }} />
       <Tabs.Screen name="register" options={{ href: null }} />
+      <Tabs.Screen name="transfer" options={{ href: null }} />
     </Tabs>
   );
 }
