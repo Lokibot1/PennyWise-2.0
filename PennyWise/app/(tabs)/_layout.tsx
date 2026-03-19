@@ -9,6 +9,7 @@ import Animated, {
   useAnimatedStyle,
 } from 'react-native-reanimated';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useAppTheme } from '@/contexts/AppTheme';
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 type IoniconName = keyof typeof Ionicons.glyphMap;
@@ -36,11 +37,13 @@ const indicatorLeft = (index: number) =>
 function TabItem({
   icon,
   isFocused,
+  inactiveColor,
   onPress,
   onLongPress,
 }: {
   icon: IoniconName;
   isFocused: boolean;
+  inactiveColor: string;
   onPress: () => void;
   onLongPress: () => void;
 }) {
@@ -64,7 +67,7 @@ function TabItem({
       accessibilityState={isFocused ? { selected: true } : {}}
     >
       <Animated.View style={animStyle}>
-        <Ionicons name={icon} size={22} color={isFocused ? '#fff' : '#9AA5B4'} />
+        <Ionicons name={icon} size={22} color={isFocused ? '#fff' : inactiveColor} />
       </Animated.View>
     </TouchableOpacity>
   );
@@ -78,6 +81,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   // Hide on auth/launch screens
   if (AUTH_SCREENS.has(state.routes[state.index].name)) return null;
 
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
 
   // Only render the 5 declared tabs (exclude href:null screens)
@@ -102,7 +106,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   }));
 
   return (
-    <View style={[styles.tabBar, { paddingBottom: PAD_BOTTOM + insets.bottom, height: BAR_HEIGHT + insets.bottom }]}>
+    <View style={[styles.tabBar, { paddingBottom: PAD_BOTTOM + insets.bottom, height: BAR_HEIGHT + insets.bottom, backgroundColor: theme.tabBarBg }]}>
       {/* Sliding teal pill */}
       <Animated.View style={[styles.indicator, indicatorStyle]} />
 
@@ -128,6 +132,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
             key={route.key}
             icon={tab.icon}
             isFocused={index === activeIndex}
+            inactiveColor={theme.tabBarInactive}
             onPress={onPress}
             onLongPress={onLongPress}
           />

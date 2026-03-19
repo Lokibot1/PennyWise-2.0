@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AppThemeProvider } from '@/contexts/AppTheme';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,6 +38,7 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
+    <AppThemeProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={{ animation: 'slide_from_right' }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -48,5 +50,6 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
+    </AppThemeProvider>
   );
 }

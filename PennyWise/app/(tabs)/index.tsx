@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
 
 import { Font } from '@/constants/fonts';
+import { useAppTheme } from '@/contexts/AppTheme';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Period = 'Daily' | 'Weekly' | 'Monthly';
@@ -59,6 +60,7 @@ const PERIODS: Period[] = ['Daily', 'Weekly', 'Monthly'];
 
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
+  const { theme } = useAppTheme();
   const [activePeriod, setActivePeriod] = useState<Period>('Monthly');
 
   // Sliding period indicator — same technique as the bottom tab bar
@@ -87,24 +89,24 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]}>
+      <StatusBar style={theme.statusBar} />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* ── Green Header Section ──────────────────────────────────────── */}
-        <View style={styles.greenSection}>
+        <View style={[styles.greenSection, { backgroundColor: theme.headerBg }]}>
 
           {/* Greeting */}
           <View style={styles.greetingRow}>
             <View>
-              <Text style={styles.greetingTitle}>Hi, Welcome Back</Text>
+              <Text style={[styles.greetingTitle, { color: theme.iconBtnColor }]}>Hi, Welcome Back</Text>
               <Text style={styles.greetingSubtitle}>Good Morning</Text>
             </View>
-            <TouchableOpacity style={styles.bellButton} activeOpacity={0.8}>
-              <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
+            <TouchableOpacity style={[styles.bellButton, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
+              <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
             </TouchableOpacity>
           </View>
 
@@ -117,7 +119,7 @@ export default function HomeScreen() {
                   <Ionicons name="wallet-outline" size={11} color="#666" />
                   <Text style={styles.balanceLabel}> Total Balance</Text>
                 </View>
-                <Text style={styles.balanceAmount}>₱7,783.00</Text>
+                <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>₱7,783.00</Text>
               </View>
               <View style={styles.balanceDivider} />
               <View style={[styles.balanceItem, { alignItems: 'flex-end' }]}>
@@ -180,7 +182,7 @@ export default function HomeScreen() {
         </View>
 
         {/* ── White Content Section ─────────────────────────────────────── */}
-        <View style={styles.whiteSection}>
+        <View style={[styles.whiteSection, { backgroundColor: theme.cardBg }]}>
 
           {/* Period Tabs */}
           <View
@@ -199,7 +201,7 @@ export default function HomeScreen() {
                 onPress={() => selectPeriod(p)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.periodTabText, activePeriod === p && styles.periodTabTextActive]}>
+                <Text style={[styles.periodTabText, activePeriod === p && styles.periodTabTextActive, { color: activePeriod === p ? '#fff' : theme.textSecondary }]}>
                   {p}
                 </Text>
               </TouchableOpacity>
@@ -211,18 +213,18 @@ export default function HomeScreen() {
             {TRANSACTIONS.map((tx, index) => (
               <View
                 key={tx.id}
-                style={[styles.txItem, index < TRANSACTIONS.length - 1 && styles.txItemBorder]}
+                style={[styles.txItem, index < TRANSACTIONS.length - 1 && styles.txItemBorder, index < TRANSACTIONS.length - 1 && { borderBottomColor: theme.divider }]}
               >
                 <View style={styles.txIconCircle}>
                   <Ionicons name={tx.icon} size={20} color="#fff" />
                 </View>
                 <View style={styles.txInfo}>
-                  <Text style={styles.txTitle}>{tx.title}</Text>
-                  <Text style={styles.txMeta}>{tx.time} - {tx.date}</Text>
+                  <Text style={[styles.txTitle, { color: theme.textPrimary }]}>{tx.title}</Text>
+                  <Text style={[styles.txMeta, { color: theme.textSecondary }]}>{tx.time} - {tx.date}</Text>
                 </View>
-                <Text style={styles.txCategory}>{tx.category}</Text>
+                <Text style={[styles.txCategory, { color: theme.textSecondary }]}>{tx.category}</Text>
                 <View style={styles.txAmtDivider} />
-                <Text style={[styles.txAmount, tx.isNegative && styles.txAmountBlue]}>
+                <Text style={[styles.txAmount, tx.isNegative && styles.txAmountBlue, !tx.isNegative && { color: theme.textPrimary }]}>
                   {tx.amount}
                 </Text>
               </View>

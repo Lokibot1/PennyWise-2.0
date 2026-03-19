@@ -15,6 +15,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Font } from '@/constants/fonts';
+import { useAppTheme } from '@/contexts/AppTheme';
+import type { Theme } from '@/contexts/AppTheme';
 import Animated, {
   useSharedValue,
   withSpring,
@@ -169,12 +171,12 @@ function AnimCard({
 }
 
 // ── ConfirmModal ──────────────────────────────────────────────────────────────
-function ConfirmModal({ state, onCancel }: { state: ConfirmState; onCancel: () => void }) {
+function ConfirmModal({ state, onCancel, theme }: { state: ConfirmState; onCancel: () => void; theme: Theme }) {
   return (
     <Modal visible={state.visible} transparent animationType="fade" statusBarTranslucent>
       <Pressable style={ms.overlay} onPress={onCancel}>
-        <Pressable style={ms.card} onPress={() => {}}>
-          <Text style={ms.msg}>{state.message}</Text>
+        <Pressable style={[ms.card, { backgroundColor: theme.confirmBg }]} onPress={() => {}}>
+          <Text style={[ms.msg, { color: theme.textPrimary }]}>{state.message}</Text>
           <View style={ms.row}>
             <TouchableOpacity style={ms.cancel}  onPress={onCancel}    activeOpacity={0.8}>
               <Text style={ms.cancelTxt}>Cancel</Text>
@@ -205,22 +207,24 @@ function BalanceHeader({
   title,
   totalIncome,
   onBack,
+  theme,
 }: {
   title: string;
   totalIncome: number;
   onBack?: () => void;
+  theme: Theme;
 }) {
   return (
-    <View style={bh.wrap}>
+    <View style={[bh.wrap, { backgroundColor: theme.headerBg }]}>
       <View style={bh.nav}>
-        <TouchableOpacity style={bh.iconBtn} onPress={onBack} activeOpacity={0.8}>
+        <TouchableOpacity style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} onPress={onBack} activeOpacity={0.8}>
           {onBack
-            ? <Ionicons name="chevron-back" size={22} color="#1A1A1A" />
+            ? <Ionicons name="chevron-back" size={22} color={theme.iconBtnColor} />
             : <View style={{ width: 22 }} />}
         </TouchableOpacity>
-        <Text style={bh.title}>{title}</Text>
-        <TouchableOpacity style={bh.iconBtn} activeOpacity={0.8}>
-          <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
+        <Text style={[bh.title, { color: theme.iconBtnColor }]}>{title}</Text>
+        <TouchableOpacity style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
+          <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
         </TouchableOpacity>
       </View>
 
@@ -280,16 +284,16 @@ const bh = StyleSheet.create({
 });
 
 // ── FormHeader ────────────────────────────────────────────────────────────────
-function FormHeader({ title, onBack }: { title: string; onBack: () => void }) {
+function FormHeader({ title, onBack, theme }: { title: string; onBack: () => void; theme: Theme }) {
   return (
-    <View style={fh.wrap}>
+    <View style={[fh.wrap, { backgroundColor: theme.headerBg }]}>
       <View style={fh.nav}>
-        <TouchableOpacity style={fh.iconBtn} onPress={onBack} activeOpacity={0.8}>
-          <Ionicons name="chevron-back" size={22} color="#1A1A1A" />
+        <TouchableOpacity style={[fh.iconBtn, { backgroundColor: theme.iconBtnBg }]} onPress={onBack} activeOpacity={0.8}>
+          <Ionicons name="chevron-back" size={22} color={theme.iconBtnColor} />
         </TouchableOpacity>
-        <Text style={fh.title}>{title}</Text>
-        <TouchableOpacity style={fh.iconBtn} activeOpacity={0.8}>
-          <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
+        <Text style={[fh.title, { color: theme.iconBtnColor }]}>{title}</Text>
+        <TouchableOpacity style={[fh.iconBtn, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
+          <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
         </TouchableOpacity>
       </View>
     </View>
@@ -312,6 +316,7 @@ function PickerSheet<T extends string>({
   renderItem,
   onSelect,
   onClose,
+  theme,
 }: {
   visible: boolean;
   title: string;
@@ -320,12 +325,13 @@ function PickerSheet<T extends string>({
   renderItem?: (opt: T) => React.ReactNode;
   onSelect: (opt: T) => void;
   onClose: () => void;
+  theme: Theme;
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide">
       <Pressable style={pk.overlay} onPress={onClose}>
-        <Pressable style={pk.sheet} onPress={() => {}}>
-          <Text style={pk.heading}>{title}</Text>
+        <Pressable style={[pk.sheet, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
+          <Text style={[pk.heading, { color: theme.textPrimary }]}>{title}</Text>
           <ScrollView>
             {options.map(opt => (
               <TouchableOpacity
@@ -368,10 +374,12 @@ function NewCategoryModal({
   visible,
   onClose,
   onCreate,
+  theme,
 }: {
   visible: boolean;
   onClose: () => void;
   onCreate: (label: string, icon: IoniconName) => void;
+  theme: Theme;
 }) {
   const [label, setLabel] = useState('');
   const [icon, setIcon]   = useState<IoniconName>('star-outline');
@@ -391,8 +399,8 @@ function NewCategoryModal({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <Pressable style={ncm.overlay} onPress={onClose}>
-          <Pressable style={ncm.card} onPress={() => {}}>
-            <Text style={pk.heading}>New Income Category</Text>
+          <Pressable style={[ncm.card, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
+            <Text style={[pk.heading, { color: theme.textPrimary }]}>New Income Category</Text>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={s.label}>Category Name</Text>
               <Text style={s.hint}>e.g. Remittance, Gift, 13th Month Pay, Prize…</Text>
@@ -441,23 +449,25 @@ function MainScreen({
   onNew,
   onUpdate,
   onViewArchived,
+  theme,
 }: {
   totalIncome: number;
   onNew: () => void;
   onUpdate: () => void;
   onViewArchived: () => void;
+  theme: Theme;
 }) {
   const bodyAnim = useEntranceAnim();
   return (
     <>
-      <BalanceHeader title="Income Sources" totalIncome={totalIncome} />
+      <BalanceHeader title="Income Sources" totalIncome={totalIncome} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
         <ScrollView
-          style={s.white}
+          style={[s.white, { backgroundColor: theme.cardBg }]}
           contentContainerStyle={[s.whiteContent, { paddingBottom: 48 }]}
           showsVerticalScrollIndicator={false}
         >
-          <Text style={s.sectionTitle}>What would you like to do?</Text>
+          <Text style={[s.sectionTitle, { color: theme.textPrimary }]}>What would you like to do?</Text>
 
           {/* New Income Source */}
           <AnimCard delay={0} style={main.optionCard} onPress={onNew}>
@@ -465,8 +475,8 @@ function MainScreen({
               <Ionicons name="add-circle-outline" size={30} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={main.optionTitle}>New Income Source</Text>
-              <Text style={main.optionDesc}>Add a new income entry to a category</Text>
+              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>New Income Source</Text>
+              <Text style={[main.optionDesc, { color: theme.textSecondary }]}>Add a new income entry to a category</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#aaa" />
           </AnimCard>
@@ -477,8 +487,8 @@ function MainScreen({
               <Ionicons name="pencil-outline" size={28} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={main.optionTitle}>Update Income Source</Text>
-              <Text style={main.optionDesc}>Edit or archive an existing income entry</Text>
+              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>Update Income Source</Text>
+              <Text style={[main.optionDesc, { color: theme.textSecondary }]}>Edit or archive an existing income entry</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#aaa" />
           </AnimCard>
@@ -489,8 +499,8 @@ function MainScreen({
               <Ionicons name="archive-outline" size={28} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={main.optionTitle}>Archived Income Sources</Text>
-              <Text style={main.optionDesc}>View and restore archived categories</Text>
+              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>Archived Income Sources</Text>
+              <Text style={[main.optionDesc, { color: theme.textSecondary }]}>View and restore archived categories</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#aaa" />
           </AnimCard>
@@ -516,6 +526,7 @@ function CategoriesScreen({
   onBack,
   onSelectCategory,
   onAddCategory,
+  theme,
 }: {
   categories: Category[];
   income: IncomeSource[];
@@ -524,6 +535,7 @@ function CategoriesScreen({
   onBack: () => void;
   onSelectCategory: (id: string) => void;
   onAddCategory: () => void;
+  theme: Theme;
 }) {
   const active = categories.filter(c => !c.isArchived);
   const headerTitle = mode === 'new' ? 'Select Category' : 'Update Income Source';
@@ -531,10 +543,10 @@ function CategoriesScreen({
 
   return (
     <>
-      <BalanceHeader title={headerTitle} totalIncome={totalIncome} onBack={onBack} />
+      <BalanceHeader title={headerTitle} totalIncome={totalIncome} onBack={onBack} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
       <ScrollView
-        style={s.white}
+        style={[s.white, { backgroundColor: theme.cardBg }]}
         contentContainerStyle={s.whiteContent}
         showsVerticalScrollIndicator={false}
       >
@@ -557,8 +569,8 @@ function CategoriesScreen({
                 <View style={s.catIcon}>
                   <Ionicons name={cat.icon} size={28} color="#fff" />
                 </View>
-                <Text style={s.catLabel}>{cat.label}</Text>
-                {count > 0 && <Text style={s.catCount}>{count} item{count !== 1 ? 's' : ''}</Text>}
+                <Text style={[s.catLabel, { color: theme.textPrimary }]}>{cat.label}</Text>
+                {count > 0 && <Text style={[s.catCount, { color: theme.textMuted }]}>{count} item{count !== 1 ? 's' : ''}</Text>}
               </TouchableOpacity>
             );
           })}
@@ -568,7 +580,7 @@ function CategoriesScreen({
             <View style={[s.catIcon, s.catIconMore]}>
               <Ionicons name="add" size={32} color="#1E9C70" />
             </View>
-            <Text style={s.catLabel}>More</Text>
+            <Text style={[s.catLabel, { color: theme.textPrimary }]}>More</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -585,6 +597,7 @@ function CategoryDetailScreen({
   onBack,
   onAdd,
   onEditIncome,
+  theme,
 }: {
   category: Category;
   income: IncomeSource[];
@@ -592,6 +605,7 @@ function CategoryDetailScreen({
   onBack: () => void;
   onAdd: () => void;
   onEditIncome: (id: string) => void;
+  theme: Theme;
 }) {
   const active  = income.filter(i => i.categoryId === category.id && !i.isArchived);
   const grouped = groupByMonth(active);
@@ -601,8 +615,8 @@ function CategoryDetailScreen({
 
   return (
     <>
-      <BalanceHeader title={category.label} totalIncome={totalIncome} onBack={onBack} />
-      <Animated.View style={[s.white, { flex: 1 }, bodyAnim]}>
+      <BalanceHeader title={category.label} totalIncome={totalIncome} onBack={onBack} theme={theme} />
+      <Animated.View style={[s.white, { flex: 1, backgroundColor: theme.cardBg }, bodyAnim]}>
         <ScrollView
           contentContainerStyle={[s.whiteContent, { paddingBottom: 100 }]}
           showsVerticalScrollIndicator={false}
@@ -632,8 +646,8 @@ function CategoryDetailScreen({
                     <Ionicons name={category.icon} size={20} color="#fff" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.expTitle}>{inc.title}</Text>
-                    <Text style={s.expMeta}>
+                    <Text style={[s.expTitle, { color: theme.textPrimary }]}>{inc.title}</Text>
+                    <Text style={[s.expMeta, { color: theme.textMuted }]}>
                       {inc.time} · {fmtDateShort(inc.date)}
                       {inc.isRecurring ? ` · ${inc.frequency}` : ''}
                     </Text>
@@ -672,6 +686,7 @@ function IncomeFormScreen({
   onBack,
   onSave,
   onArchive,
+  theme,
 }: {
   initial: IncomeFormValues;
   categories: Category[];
@@ -680,6 +695,7 @@ function IncomeFormScreen({
   onBack: () => void;
   onSave: (vals: IncomeFormValues) => void;
   onArchive?: () => void;
+  theme: Theme;
 }) {
   const [vals, setVals]           = useState<IncomeFormValues>(initial);
   const [showCatPicker, setCat]   = useState(false);
@@ -696,23 +712,23 @@ function IncomeFormScreen({
 
   return (
     <>
-      <FormHeader title={screenTitle} onBack={onBack} />
+      <FormHeader title={screenTitle} onBack={onBack} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          style={s.formScroll}
+          style={[s.formScroll, { backgroundColor: theme.cardBg }]}
           contentContainerStyle={s.formContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           {/* Date */}
-          <Text style={s.label}>Date</Text>
-          <View style={s.fieldRow}>
+          <Text style={[s.label, { color: theme.textPrimary }]}>Date</Text>
+          <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
             <TextInput
-              style={[s.fieldTxt, { flex: 1 }]}
+              style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
               value={vals.date}
               onChangeText={v => set('date', v)}
               placeholder="YYYY-MM-DD"
@@ -722,23 +738,23 @@ function IncomeFormScreen({
           </View>
 
           {/* Category */}
-          <Text style={s.label}>Category</Text>
+          <Text style={[s.label, { color: theme.textPrimary }]}>Category</Text>
           <TouchableOpacity
-            style={[s.fieldRow, s.selectRow]}
+            style={[s.fieldRow, s.selectRow, { backgroundColor: theme.inputBg }]}
             onPress={() => setCat(true)}
             activeOpacity={0.8}
           >
-            <Text style={[s.fieldTxt, { flex: 1, color: selectedCat ? '#1A1A1A' : '#aaa' }]}>
+            <Text style={[s.fieldTxt, { flex: 1, color: selectedCat ? theme.textPrimary : '#aaa' }]}>
               {selectedCat ? selectedCat.label : 'Select the category'}
             </Text>
             <Ionicons name="chevron-down" size={18} color="#aaa" />
           </TouchableOpacity>
 
           {/* Amount */}
-          <Text style={s.label}>Amount</Text>
-          <View style={s.fieldRow}>
+          <Text style={[s.label, { color: theme.textPrimary }]}>Amount</Text>
+          <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
             <TextInput
-              style={[s.fieldTxt, { flex: 1 }]}
+              style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
               value={vals.amount}
               onChangeText={v => set('amount', v)}
               keyboardType="decimal-pad"
@@ -748,10 +764,10 @@ function IncomeFormScreen({
           </View>
 
           {/* Title */}
-          <Text style={s.label}>Income Title</Text>
-          <View style={s.fieldRow}>
+          <Text style={[s.label, { color: theme.textPrimary }]}>Income Title</Text>
+          <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
             <TextInput
-              style={[s.fieldTxt, { flex: 1 }]}
+              style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
               value={vals.title}
               onChangeText={v => set('title', v)}
               placeholder="e.g. Monthly Salary"
@@ -760,10 +776,10 @@ function IncomeFormScreen({
           </View>
 
           {/* Description */}
-          <Text style={s.label}>Description</Text>
-          <View style={[s.fieldRow, { alignItems: 'flex-start', minHeight: 100 }]}>
+          <Text style={[s.label, { color: theme.textPrimary }]}>Description</Text>
+          <View style={[s.fieldRow, { alignItems: 'flex-start', minHeight: 100, backgroundColor: theme.inputBg }]}>
             <TextInput
-              style={[s.fieldTxt, { flex: 1, textAlignVertical: 'top', paddingTop: 2, minHeight: 80 }]}
+              style={[s.fieldTxt, { flex: 1, textAlignVertical: 'top', paddingTop: 2, minHeight: 80, color: theme.textPrimary }]}
               value={vals.description}
               onChangeText={v => set('description', v)}
               placeholder="Enter description"
@@ -781,19 +797,19 @@ function IncomeFormScreen({
             <View style={[s.checkbox, vals.isRecurring && s.checkboxOn]}>
               {vals.isRecurring && <Ionicons name="checkmark" size={14} color="#fff" />}
             </View>
-            <Text style={s.recurTxt}>Recurring Income</Text>
+            <Text style={[s.recurTxt, { color: theme.textPrimary }]}>Recurring Income</Text>
           </TouchableOpacity>
 
           {/* Frequency (only when recurring) */}
           {vals.isRecurring && (
             <>
-              <Text style={s.label}>Frequency</Text>
+              <Text style={[s.label, { color: theme.textPrimary }]}>Frequency</Text>
               <TouchableOpacity
-                style={[s.fieldRow, s.selectRow]}
+                style={[s.fieldRow, s.selectRow, { backgroundColor: theme.inputBg }]}
                 onPress={() => setFreq(true)}
                 activeOpacity={0.8}
               >
-                <Text style={[s.fieldTxt, { flex: 1 }]}>{vals.frequency}</Text>
+                <Text style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}>{vals.frequency}</Text>
                 <Ionicons name="chevron-down" size={18} color="#aaa" />
               </TouchableOpacity>
             </>
@@ -836,12 +852,13 @@ function IncomeFormScreen({
               <View style={s.pickerIcon}>
                 <Ionicons name={cat.icon} size={20} color="#fff" />
               </View>
-              <Text style={[pk.itemTxt, { marginLeft: 12 }]}>{cat.label}</Text>
+              <Text style={[pk.itemTxt, { marginLeft: 12, color: theme.textPrimary }]}>{cat.label}</Text>
             </>
           );
         }}
         onSelect={id => set('categoryId', id)}
         onClose={() => setCat(false)}
+        theme={theme}
       />
 
       {/* Frequency picker */}
@@ -852,6 +869,7 @@ function IncomeFormScreen({
         selected={vals.frequency}
         onSelect={f => set('frequency', f)}
         onClose={() => setFreq(false)}
+        theme={theme}
       />
     </>
   );
@@ -863,21 +881,23 @@ function ArchivedScreen({
   totalIncome,
   onBack,
   onRestore,
+  theme,
 }: {
   categories: Category[];
   totalIncome: number;
   onBack: () => void;
   onRestore: (id: string) => void;
+  theme: Theme;
 }) {
   const archived = categories.filter(c => c.isArchived);
   const bodyAnim = useEntranceAnim();
 
   return (
     <>
-      <BalanceHeader title="Archived Income Sources" totalIncome={totalIncome} onBack={onBack} />
+      <BalanceHeader title="Archived Income Sources" totalIncome={totalIncome} onBack={onBack} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
       <ScrollView
-        style={s.white}
+        style={[s.white, { backgroundColor: theme.cardBg }]}
         contentContainerStyle={s.whiteContent}
         showsVerticalScrollIndicator={false}
       >
@@ -896,7 +916,7 @@ function ArchivedScreen({
             <View style={[s.expIcon, { backgroundColor: '#9AA5B4' }]}>
               <Ionicons name={cat.icon} size={20} color="#fff" />
             </View>
-            <Text style={[s.expTitle, { flex: 1 }]}>{cat.label}</Text>
+            <Text style={[s.expTitle, { flex: 1, color: theme.textPrimary }]}>{cat.label}</Text>
             <TouchableOpacity style={s.restoreBtn} onPress={() => onRestore(cat.id)} activeOpacity={0.75}>
               <Text style={s.restoreTxt}>Restore</Text>
             </TouchableOpacity>
@@ -910,6 +930,7 @@ function ArchivedScreen({
 
 // ── ManageIncomeScreen (main export) ──────────────────────────────────────────
 export default function ManageIncomeScreen() {
+  const { theme } = useAppTheme();
   const [screen,     setScreen]     = useState<Screen>({ name: 'main' });
   const [categories, setCategories] = useState<Category[]>(SEED_CATEGORIES);
   const [income,     setIncome]     = useState<IncomeSource[]>(SEED_INCOME);
@@ -1057,6 +1078,7 @@ export default function ManageIncomeScreen() {
             onNew={() => setScreen({ name: 'categories', mode: 'new' })}
             onUpdate={() => setScreen({ name: 'categories', mode: 'update' })}
             onViewArchived={() => setScreen({ name: 'archived' })}
+            theme={theme}
           />
         );
 
@@ -1076,6 +1098,7 @@ export default function ManageIncomeScreen() {
               }
             }}
             onAddCategory={() => setShowNewCat(true)}
+            theme={theme}
           />
         );
 
@@ -1090,6 +1113,7 @@ export default function ManageIncomeScreen() {
             onBack={() => setScreen({ name: 'categories', mode: 'update' })}
             onAdd={() => setScreen({ name: 'add', prefillCategoryId: cat.id })}
             onEditIncome={id => setScreen({ name: 'edit', incomeId: id })}
+            theme={theme}
           />
         );
       }
@@ -1103,6 +1127,7 @@ export default function ManageIncomeScreen() {
             screenTitle="New Income Source"
             onBack={() => setScreen({ name: 'categories', mode: 'new' })}
             onSave={handleSave}
+            theme={theme}
           />
         );
 
@@ -1123,6 +1148,7 @@ export default function ManageIncomeScreen() {
             }}
             onSave={handleSave}
             onArchive={() => handleArchiveIncome(screen.incomeId)}
+            theme={theme}
           />
         );
       }
@@ -1134,22 +1160,24 @@ export default function ManageIncomeScreen() {
             totalIncome={totalIncome}
             onBack={() => setScreen({ name: 'main' })}
             onRestore={handleRestore}
+            theme={theme}
           />
         );
     }
   };
 
   return (
-    <SafeAreaView style={s.safeArea} edges={['top', 'left', 'right']}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[s.safeArea, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
+      <StatusBar style={theme.statusBar} />
       {renderScreen()}
 
-      <ConfirmModal state={confirm} onCancel={hideConfirm} />
+      <ConfirmModal state={confirm} onCancel={hideConfirm} theme={theme} />
 
       <NewCategoryModal
         visible={showNewCat}
         onClose={() => setShowNewCat(false)}
         onCreate={handleNewCategory}
+        theme={theme}
       />
 
       {toast !== '' && (
