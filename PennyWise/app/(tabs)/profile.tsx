@@ -1,5 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -14,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
+import { supabase } from '@/lib/supabase';
 
 type Screen = 'profile' | 'edit' | 'terms';
 type IoniconName = keyof typeof Ionicons.glyphMap;
@@ -107,8 +112,24 @@ function MenuItem({
 }
 
 // ── Profile main screen ─────────────────────────────────────────────────────────
-function ProfileView({ navigate }: { navigate: (s: Screen) => void }) {
+function ProfileView({
+  profile,
+  loading,
+  navigate,
+}: {
+  profile: ProfileData;
+  loading: boolean;
+  navigate: (s: Screen) => void;
+}) {
   const { theme } = useAppTheme();
+  const [logoutVisible, setLogoutVisible] = useState(false);
+  const [loggingOut, setLoggingOut]       = useState(false);
+
+  async function confirmLogout() {
+    setLoggingOut(true);
+    await supabase.auth.signOut();
+    // _layout.tsx SIGNED_OUT listener handles the redirect
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.headerBg }]}>
@@ -124,8 +145,18 @@ function ProfileView({ navigate }: { navigate: (s: Screen) => void }) {
 
       {/* Card */}
       <View style={[styles.card, { backgroundColor: theme.cardBg }]}>
-        <Text style={[styles.profileName, { color: theme.textPrimary }]}>John Smith</Text>
-        <Text style={[styles.profileId, { color: theme.textSecondary }]}>ID: 25030024</Text>
+        {loading ? (
+          <ActivityIndicator color="#3ECBA8" style={{ marginVertical: 12 }} />
+        ) : (
+          <>
+            <Text style={[styles.profileName, { color: theme.textPrimary }]}>
+              {profile.full_name || 'User'}
+            </Text>
+            <Text style={[styles.profileId, { color: theme.textSecondary }]}>
+              {profile.email}
+            </Text>
+          </>
+        )}
 
         <View style={styles.menuList}>
           <MenuItem
@@ -160,20 +191,92 @@ function ProfileView({ navigate }: { navigate: (s: Screen) => void }) {
             label="Logout"
             theme={theme}
             danger
+            onPress={() => setLogoutVisible(true)}
           />
         </View>
       </View>
+
+      {/* ── Logout confirmation modal ── */}
+      <Modal
+        visible={logoutVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLogoutVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => !loggingOut && setLogoutVisible(false)}>
+          <Pressable style={[styles.modalBox, { backgroundColor: theme.confirmBg }]} onPress={() => {}}>
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="log-out-outline" size={30} color="#E05555" />
+            </View>
+            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Log Out?</Text>
+            <Text style={[styles.modalMsg, { color: theme.textSecondary }]}>
+              Are you sure you want to log out of your account?
+            </Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtnNo, { backgroundColor: theme.surface }]}
+                onPress={() => setLogoutVisible(false)}
+                disabled={loggingOut}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.modalBtnNoText, { color: theme.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalBtnYes}
+                onPress={confirmLogout}
+                disabled={loggingOut}
+                activeOpacity={0.85}
+              >
+                {loggingOut
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={styles.modalBtnYesText}>Yes, Log Out</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 // ── Edit Profile screen ─────────────────────────────────────────────────────────
-function EditProfileView({ onBack }: { onBack: () => void }) {
+function EditProfileView({
+  profile,
+  onBack,
+  onSaved,
+}: {
+  profile: ProfileData;
+  onBack: () => void;
+  onSaved: (updated: ProfileData) => void;
+}) {
   const { theme, darkMode, toggleDark } = useAppTheme();
-  const [pushNotif, setPushNotif] = useState(true);
-  const [username, setUsername]   = useState('John Smith');
-  const [phone, setPhone]         = useState('+44 555 5555 55');
-  const [email, setEmail]         = useState('example@example.com');
+  const [pushNotif, setPushNotif]     = useState(true);
+  const [username, setUsername]       = useState(profile.full_name);
+  const [phone, setPhone]             = useState(profile.phone ?? '');
+  const [email, setEmail]             = useState(profile.email);
+  const [saving, setSaving]           = useState(false);
+  const [saveConfirm, setSaveConfirm] = useState(false);
+  const [savedToast, setSavedToast]   = useState(false);
+
+  async function handleSave() {
+    setSaveConfirm(false);
+    setSaving(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from('profiles')
+      .update({ full_name: username.trim(), phone: phone.trim(), email: email.trim() })
+      .eq('id', user?.id);
+
+    setSaving(false);
+
+    if (!error) {
+      onSaved({ full_name: username.trim(), phone: phone.trim(), email: email.trim() });
+      setSavedToast(true);
+      setTimeout(() => setSavedToast(false), 2800);
+    }
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.headerBg }]}>
@@ -190,8 +293,12 @@ function EditProfileView({ onBack }: { onBack: () => void }) {
 
         {/* Form card */}
         <View style={[styles.card, styles.formCard, { backgroundColor: theme.cardBg }]}>
-          <Text style={[styles.profileName, { color: theme.textPrimary }]}>John Smith</Text>
-          <Text style={[styles.profileId, { color: theme.textSecondary }]}>ID: 25030024</Text>
+          <Text style={[styles.profileName, { color: theme.textPrimary }]}>
+            {profile.full_name || 'User'}
+          </Text>
+          <Text style={[styles.profileId, { color: theme.textSecondary }]}>
+            {profile.email}
+          </Text>
 
           <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>Account Settings</Text>
 
@@ -255,11 +362,54 @@ function EditProfileView({ onBack }: { onBack: () => void }) {
             />
           </View>
 
-          <TouchableOpacity style={styles.saveBtn} activeOpacity={0.85}>
-            <Text style={styles.saveBtnText}>Save Changes</Text>
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+            activeOpacity={0.85}
+            disabled={saving}
+            onPress={() => setSaveConfirm(true)}
+          >
+            {saving
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.saveBtnText}>Save Changes</Text>
+            }
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* ── Save confirm modal ── */}
+      <Modal visible={saveConfirm} transparent animationType="fade" onRequestClose={() => setSaveConfirm(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setSaveConfirm(false)}>
+          <Pressable style={[styles.modalBox, { backgroundColor: theme.confirmBg }]} onPress={() => {}}>
+            <View style={[styles.modalIconWrap, { backgroundColor: 'rgba(62,203,168,0.12)' }]}>
+              <Ionicons name="save-outline" size={30} color="#3ECBA8" />
+            </View>
+            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Save Changes?</Text>
+            <Text style={[styles.modalMsg, { color: theme.textSecondary }]}>
+              Are you sure you want to save the changes to your profile?
+            </Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtnNo, { backgroundColor: theme.surface }]}
+                onPress={() => setSaveConfirm(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.modalBtnNoText, { color: theme.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalBtnYes} onPress={handleSave} activeOpacity={0.85}>
+                <Text style={styles.modalBtnYesText}>Yes, Save</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ── Success toast ── */}
+      {savedToast && (
+        <View style={styles.toast} pointerEvents="none">
+          <Ionicons name="checkmark-circle" size={18} color="#fff" />
+          <Text style={styles.toastText}>Profile updated successfully.</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -325,13 +475,45 @@ function TermsView({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ── Types ────────────────────────────────────────────────────────────────────────
+type ProfileData = {
+  full_name: string;
+  email: string;
+  phone: string;
+};
+
 // ── Root ────────────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
-  const [screen, setScreen] = useState<Screen>('profile');
+  const [screen, setScreen]   = useState<Screen>('profile');
+  const [profile, setProfile] = useState<ProfileData>({ full_name: '', email: '', phone: '' });
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
-  if (screen === 'edit')  return <EditProfileView onBack={() => setScreen('profile')} />;
+  useEffect(() => {
+    async function fetchProfile() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, email, phone')
+        .eq('id', user.id)
+        .single();
+      if (data) setProfile(data);
+      setLoadingProfile(false);
+    }
+    fetchProfile();
+  }, []);
+
+  if (screen === 'edit') {
+    return (
+      <EditProfileView
+        profile={profile}
+        onBack={() => setScreen('profile')}
+        onSaved={(updated) => setProfile(updated)}
+      />
+    );
+  }
   if (screen === 'terms') return <TermsView onBack={() => setScreen('profile')} />;
-  return <ProfileView navigate={setScreen} />;
+  return <ProfileView profile={profile} loading={loadingProfile} navigate={setScreen} />;
 }
 
 // ── Styles ──────────────────────────────────────────────────────────────────────
@@ -540,6 +722,96 @@ const styles = StyleSheet.create({
   checkLabel: {
     fontFamily: Font.bodyMedium,
     fontSize: 13,
+    flex: 1,
+  },
+
+  // ── Confirmation modal ────────────────────────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  modalBox: {
+    width: '100%',
+    borderRadius: 24,
+    padding: 28,
+    alignItems: 'center',
+  },
+  modalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(224,85,85,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontFamily: Font.headerBold,
+    fontSize: 18,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMsg: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 21,
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalBtnNo: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  modalBtnNoText: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 14,
+  },
+  modalBtnYes: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#E05555',
+    alignItems: 'center',
+  },
+  modalBtnYesText: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 14,
+    color: '#fff',
+  },
+
+  // ── Toast ────────────────────────────────────────────────────────────────────
+  toast: {
+    position: 'absolute',
+    bottom: 28,
+    left: 20,
+    right: 20,
+    backgroundColor: '#1E9C70',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  toastText: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 14,
+    color: '#fff',
     flex: 1,
   },
 });

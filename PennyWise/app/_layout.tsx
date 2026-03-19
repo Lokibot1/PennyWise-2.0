@@ -32,8 +32,6 @@ export default function RootLayout() {
     } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
         router.replace("/login-form");
-      } else if (event === "SIGNED_IN") {
-        router.replace("/(tabs)");
       }
     });
     return () => subscription.unsubscribe();
