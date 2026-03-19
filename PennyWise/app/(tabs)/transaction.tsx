@@ -18,6 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Font } from '@/constants/fonts';
+import { useAppTheme } from '@/contexts/AppTheme';
 import Animated, {
   useSharedValue,
   withSpring,
@@ -108,17 +109,19 @@ function FilterChip({
   label,
   active,
   onPress,
+  theme,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  theme: import('@/contexts/AppTheme').Theme;
 }) {
   const scale = useSharedValue(1);
   const anim  = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <Animated.View style={anim}>
       <TouchableOpacity
-        style={[styles.filterTab, active && styles.filterTabActive]}
+        style={[styles.filterTab, active && styles.filterTabActive, !active && { backgroundColor: theme.surface }]}
         onPress={() => {
           scale.value = withSequence(
             withSpring(0.88, { damping: 6,  stiffness: 600 }),
@@ -128,7 +131,7 @@ function FilterChip({
         }}
         activeOpacity={0.8}
       >
-        <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
+        <Text style={[styles.filterText, active && styles.filterTextActive, !active && { color: theme.textSecondary }]}>{label}</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -153,10 +156,12 @@ function TransactionItem({
   item,
   isLast,
   onPress,
+  theme,
 }: {
   item: Transaction;
   isLast: boolean;
   onPress: () => void;
+  theme: import('@/contexts/AppTheme').Theme;
 }) {
   const isExpense = item.value < 0;
   const scale     = useSharedValue(1);
@@ -164,7 +169,7 @@ function TransactionItem({
   return (
     <Animated.View style={scaleAnim}>
     <TouchableOpacity
-      style={[styles.txItem, !isLast && styles.txItemBorder]}
+      style={[styles.txItem, !isLast && styles.txItemBorder, !isLast && { borderBottomColor: theme.divider }]}
       onPress={onPress}
       onPressIn={() => { scale.value = withSpring(0.98, { damping: 15, stiffness: 300 }); }}
       onPressOut={() => { scale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
@@ -185,15 +190,15 @@ function TransactionItem({
         )}
       </View>
       <View style={styles.txInfo}>
-        <Text style={[styles.txTitle, item.archived && styles.txTitleMuted]}>{item.title}</Text>
-        <Text style={styles.txMeta}>
+        <Text style={[styles.txTitle, item.archived && styles.txTitleMuted, { color: theme.textPrimary }]}>{item.title}</Text>
+        <Text style={[styles.txMeta, { color: theme.textMuted }]}>
           {item.time} · {item.date}
           {item.recurring && item.frequency ? ` · ${item.frequency}` : ''}
         </Text>
       </View>
-      <Text style={styles.txCategory}>{item.category}</Text>
+      <Text style={[styles.txCategory, { color: theme.textMuted }]}>{item.category}</Text>
       <View style={styles.txAmtDivider} />
-      <Text style={[styles.txAmount, isExpense && styles.txAmountBlue]}>
+      <Text style={[styles.txAmount, isExpense && styles.txAmountBlue, !isExpense && { color: theme.textPrimary }]}>
         {fmt(item.value)}
       </Text>
     </TouchableOpacity>
@@ -203,6 +208,7 @@ function TransactionItem({
 
 // ── Screen ─────────────────────────────────────────────────────────────────────
 export default function TransactionScreen() {
+  const { theme } = useAppTheme();
   const [transactions, setTransactions] = useState<Transaction[]>(INITIAL);
   const [search, setSearch]             = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
@@ -429,16 +435,16 @@ export default function TransactionScreen() {
   }, [formType]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]}>
+      <StatusBar style={theme.statusBar} />
 
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
       {/* ── Green Header ──────────────────────────────────────────────────── */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.headerBg }]}>
         <View style={styles.headerSpacer} />
-        <Text style={styles.headerTitle}>Transactions</Text>
-        <TouchableOpacity style={styles.headerBtn} activeOpacity={0.8}>
-          <Ionicons name="notifications-outline" size={20} color="#1A1A1A" />
+        <Text style={[styles.headerTitle, { color: theme.iconBtnColor }]}>Transactions</Text>
+        <TouchableOpacity style={[styles.headerBtn, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
+          <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
         </TouchableOpacity>
       </View>
 
@@ -478,10 +484,10 @@ export default function TransactionScreen() {
 
       {/* ── Search Bar ────────────────────────────────────────────────────── */}
       <View style={styles.searchRow}>
-        <View style={styles.searchBox}>
+        <View style={[styles.searchBox, { backgroundColor: theme.iconBtnBg }]}>
           <Ionicons name="search-outline" size={18} color="#999" />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: theme.textPrimary }]}
             placeholder="Search transactions..."
             placeholderTextColor="#BBB"
             value={search}
@@ -497,7 +503,7 @@ export default function TransactionScreen() {
       </View>
 
       {/* ── White Card ────────────────────────────────────────────────────── */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: theme.cardBg }]}>
         <View style={styles.filterHeaderRow}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.filterRow}>
@@ -507,6 +513,7 @@ export default function TransactionScreen() {
                   label={f}
                   active={activeFilter === f}
                   onPress={() => setActiveFilter(f)}
+                  theme={theme}
                 />
               ))}
             </View>
@@ -527,7 +534,7 @@ export default function TransactionScreen() {
         {filtered.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="receipt-outline" size={40} color="#DDD" />
-            <Text style={styles.emptyText}>No transactions found</Text>
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>No transactions found</Text>
           </View>
         ) : (
           <FlatList
@@ -540,6 +547,7 @@ export default function TransactionScreen() {
                 item={item}
                 isLast={index === filtered.length - 1}
                 onPress={() => openDetail(item)}
+                theme={theme}
               />
             )}
           />
@@ -559,13 +567,13 @@ export default function TransactionScreen() {
           <Pressable style={{ flex: 1 }} onPress={cancelEdit} />
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <ScrollView
-              style={styles.modalSheet}
+              style={[styles.modalSheet, { backgroundColor: theme.modalBg }]}
               contentContainerStyle={styles.modalContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>
+            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>
               {editingId ? 'Edit Transaction' : 'New Transaction'}
             </Text>
 
@@ -602,7 +610,7 @@ export default function TransactionScreen() {
             {/* ── Step 2: Select Category (expense only) ───────────────── */}
             {formType === 'expense' && (
               <>
-                <Text style={styles.fieldLabel}>Category</Text>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Category</Text>
                 <View style={styles.categoryGrid}>
                   {CATEGORIES.map((cat) => {
                     const active = formCategory === cat.label;
@@ -625,18 +633,18 @@ export default function TransactionScreen() {
             )}
 
             {/* ── Step 3: Enter Details ────────────────────────────────── */}
-            <Text style={styles.fieldLabel}>Title</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Title</Text>
             <TextInput
-              style={styles.fieldInput}
+              style={[styles.fieldInput, { backgroundColor: theme.surface, borderColor: theme.inputBorder, color: theme.textPrimary }]}
               placeholder="e.g. Salary, Rent..."
               placeholderTextColor="#CCC"
               value={formTitle}
               onChangeText={setFormTitle}
             />
 
-            <Text style={styles.fieldLabel}>Description <Text style={styles.fieldLabelOptional}>(optional)</Text></Text>
+            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Description <Text style={styles.fieldLabelOptional}>(optional)</Text></Text>
             <TextInput
-              style={[styles.fieldInput, styles.fieldInputMulti]}
+              style={[styles.fieldInput, styles.fieldInputMulti, { backgroundColor: theme.surface, borderColor: theme.inputBorder, color: theme.textPrimary }]}
               placeholder="Add a note..."
               placeholderTextColor="#CCC"
               value={formDescription}
@@ -646,9 +654,9 @@ export default function TransactionScreen() {
               textAlignVertical="top"
             />
 
-            <Text style={styles.fieldLabel}>Amount (₱)</Text>
+            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Amount (₱)</Text>
             <TextInput
-              style={styles.fieldInput}
+              style={[styles.fieldInput, { backgroundColor: theme.surface, borderColor: theme.inputBorder, color: theme.textPrimary }]}
               placeholder="0.00"
               placeholderTextColor="#CCC"
               value={formAmount}
@@ -659,7 +667,7 @@ export default function TransactionScreen() {
             {/* ── Step 4: Recurring? ───────────────────────────────────── */}
             <View style={styles.recurringRow}>
               <View>
-                <Text style={styles.fieldLabel}>Recurring?</Text>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Recurring?</Text>
                 <Text style={styles.recurringSubtitle}>Repeat this transaction automatically</Text>
               </View>
               <TouchableOpacity
@@ -674,7 +682,7 @@ export default function TransactionScreen() {
             {/* ── Step 5: Set Frequency (only if recurring) ────────────── */}
             {formRecurring && (
               <View style={styles.freqSection}>
-                <Text style={styles.fieldLabel}>Frequency</Text>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Frequency</Text>
                 <View style={styles.freqRow}>
                   {FREQUENCIES.map((f) => (
                     <TouchableOpacity
@@ -695,7 +703,7 @@ export default function TransactionScreen() {
             {/* Icon picker (expense only) */}
             {formType === 'expense' && (
               <>
-                <Text style={styles.fieldLabel}>Icon</Text>
+                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Icon</Text>
                 <View style={styles.iconGrid}>
                   {ICON_OPTIONS.map((ico) => (
                     <TouchableOpacity
@@ -715,7 +723,7 @@ export default function TransactionScreen() {
             <View style={styles.modalActions}>
               {editingId && (
                 <TouchableOpacity
-                  style={styles.archiveBtn}
+                  style={[styles.archiveBtn, { borderColor: theme.divider }]}
                   onPress={handleArchiveFromForm}
                   activeOpacity={0.8}
                 >
@@ -724,13 +732,13 @@ export default function TransactionScreen() {
                     size={15}
                     color="#888"
                   />
-                  <Text style={styles.archiveBtnText}>
+                  <Text style={[styles.archiveBtnText, { color: theme.textSecondary }]}>
                     {editingTx?.archived ? 'Unarchive' : 'Archive'}
                   </Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity style={styles.cancelBtn} onPress={cancelEdit} activeOpacity={0.8}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+              <TouchableOpacity style={[styles.cancelBtn, { backgroundColor: theme.surface }]} onPress={cancelEdit} activeOpacity={0.8}>
+                <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={handleSavePress} activeOpacity={0.85}>
                 <Text style={styles.saveBtnText}>Save</Text>
@@ -749,12 +757,12 @@ export default function TransactionScreen() {
         onRequestClose={() => setConfirmVisible(false)}
       >
         <Pressable style={styles.confirmOverlay} onPress={() => setConfirmVisible(false)}>
-          <Pressable onPress={() => {}} style={styles.confirmBox}>
+          <Pressable onPress={() => {}} style={[styles.confirmBox, { backgroundColor: theme.confirmBg }]}>
             <View style={styles.confirmIconWrap}>
               <Ionicons name="save-outline" size={28} color="#3ECBA8" />
             </View>
-            <Text style={styles.confirmTitle}>Save Transaction?</Text>
-            <Text style={styles.confirmMsg}>
+            <Text style={[styles.confirmTitle, { color: theme.textPrimary }]}>Save Transaction?</Text>
+            <Text style={[styles.confirmMsg, { color: theme.textSecondary }]}>
               Are you sure you want to save this transaction? Your balance will be updated.
             </Text>
             <View style={styles.confirmActions}>
@@ -786,7 +794,7 @@ export default function TransactionScreen() {
       >
         <View style={styles.modalContainer}>
           <Pressable style={{ flex: 1 }} onPress={closeDetail} />
-          <View style={styles.detailSheet}>
+          <View style={[styles.detailSheet, { backgroundColor: theme.modalBg }]}>
             <View style={styles.modalHandle} />
 
             {/* Icon + title */}
@@ -803,7 +811,7 @@ export default function TransactionScreen() {
                   </View>
                 )}
               </View>
-              <Text style={styles.detailTitle}>{liveTx?.title}</Text>
+              <Text style={[styles.detailTitle, { color: theme.textPrimary }]}>{liveTx?.title}</Text>
               {liveTx?.archived && (
                 <View style={styles.archivedBadge}>
                   <Text style={styles.archivedBadgeText}>Archived</Text>
@@ -812,32 +820,32 @@ export default function TransactionScreen() {
             </View>
 
             {/* Amount */}
-            <Text style={[styles.detailAmount, (liveTx?.value ?? 0) < 0 && styles.txAmountBlue]}>
+            <Text style={[styles.detailAmount, (liveTx?.value ?? 0) < 0 && styles.txAmountBlue, (liveTx?.value ?? 0) >= 0 && { color: theme.textPrimary }]}>
               {liveTx ? fmt(liveTx.value) : ''}
             </Text>
 
             {/* Meta rows */}
-            <View style={styles.detailMeta}>
+            <View style={[styles.detailMeta, { backgroundColor: theme.surface }]}>
               <View style={styles.detailMetaRow}>
                 <Ionicons name="calendar-outline" size={14} color="#999" />
-                <Text style={styles.detailMetaText}>{liveTx?.date} · {liveTx?.time}</Text>
+                <Text style={[styles.detailMetaText, { color: theme.textSecondary }]}>{liveTx?.date} · {liveTx?.time}</Text>
               </View>
               {liveTx?.category ? (
                 <View style={styles.detailMetaRow}>
                   <Ionicons name="pricetag-outline" size={14} color="#999" />
-                  <Text style={styles.detailMetaText}>{liveTx.category}</Text>
+                  <Text style={[styles.detailMetaText, { color: theme.textSecondary }]}>{liveTx.category}</Text>
                 </View>
               ) : null}
               {liveTx?.recurring && liveTx.frequency ? (
                 <View style={styles.detailMetaRow}>
                   <Ionicons name="repeat" size={14} color="#999" />
-                  <Text style={styles.detailMetaText}>Recurring · {liveTx.frequency}</Text>
+                  <Text style={[styles.detailMetaText, { color: theme.textSecondary }]}>Recurring · {liveTx.frequency}</Text>
                 </View>
               ) : null}
               {liveTx?.description ? (
                 <View style={styles.detailMetaRow}>
                   <Ionicons name="document-text-outline" size={14} color="#999" />
-                  <Text style={styles.detailMetaText}>{liveTx.description}</Text>
+                  <Text style={[styles.detailMetaText, { color: theme.textSecondary }]}>{liveTx.description}</Text>
                 </View>
               ) : null}
             </View>
@@ -847,13 +855,13 @@ export default function TransactionScreen() {
               <Ionicons name="create-outline" size={18} color="#fff" />
               <Text style={styles.detailUpdateBtnText}>Update Transaction</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.detailArchiveBtn} onPress={handleArchivePress} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.detailArchiveBtn, { backgroundColor: theme.surface }]} onPress={handleArchivePress} activeOpacity={0.8}>
               <Ionicons
                 name={liveTx?.archived ? 'refresh-outline' : 'archive-outline'}
                 size={18}
                 color="#888"
               />
-              <Text style={styles.detailArchiveBtnText}>
+              <Text style={[styles.detailArchiveBtnText, { color: theme.textSecondary }]}>
                 {liveTx?.archived ? 'Unarchive Transaction' : 'Archive Transaction'}
               </Text>
             </TouchableOpacity>
@@ -869,12 +877,12 @@ export default function TransactionScreen() {
         onRequestClose={() => setRestorePromptVisible(false)}
       >
         <Pressable style={styles.confirmOverlay} onPress={() => setRestorePromptVisible(false)}>
-          <Pressable onPress={() => {}} style={styles.confirmBox}>
+          <Pressable onPress={() => {}} style={[styles.confirmBox, { backgroundColor: theme.confirmBg }]}>
             <View style={[styles.confirmIconWrap, { backgroundColor: 'rgba(62,203,168,0.12)' }]}>
               <Ionicons name="refresh-outline" size={28} color="#3ECBA8" />
             </View>
-            <Text style={styles.confirmTitle}>Restore this Transaction?</Text>
-            <Text style={styles.confirmMsg}>
+            <Text style={[styles.confirmTitle, { color: theme.textPrimary }]}>Restore this Transaction?</Text>
+            <Text style={[styles.confirmMsg, { color: theme.textSecondary }]}>
               {`Do you want to restore "${liveTx?.title}" back to your active transactions?`}
             </Text>
             <View style={styles.confirmActions}>
@@ -905,7 +913,7 @@ export default function TransactionScreen() {
         onRequestClose={() => setArchiveConfirmVisible(false)}
       >
         <Pressable style={styles.confirmOverlay} onPress={() => setArchiveConfirmVisible(false)}>
-          <Pressable onPress={() => {}} style={styles.confirmBox}>
+          <Pressable onPress={() => {}} style={[styles.confirmBox, { backgroundColor: theme.confirmBg }]}>
             <View style={[styles.confirmIconWrap, liveTx?.archived
               ? { backgroundColor: 'rgba(62,203,168,0.12)' }
               : { backgroundColor: 'rgba(255,140,0,0.1)' }
@@ -916,10 +924,10 @@ export default function TransactionScreen() {
                 color={liveTx?.archived ? '#3ECBA8' : '#FF8C00'}
               />
             </View>
-            <Text style={styles.confirmTitle}>
+            <Text style={[styles.confirmTitle, { color: theme.textPrimary }]}>
               {liveTx?.archived ? 'Restore Transaction?' : 'Archive Transaction?'}
             </Text>
-            <Text style={styles.confirmMsg}>
+            <Text style={[styles.confirmMsg, { color: theme.textSecondary }]}>
               {liveTx?.archived
                 ? 'Are you sure you want to restore this transaction? It will return to your active list.'
                 : 'Are you sure you want to archive this transaction?'}
