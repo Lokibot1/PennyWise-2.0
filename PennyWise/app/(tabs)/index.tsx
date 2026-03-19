@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,63 +7,80 @@ import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-na
 
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
+import { supabase } from '@/lib/supabase';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Period = 'Daily' | 'Weekly' | 'Monthly';
 
-type Transaction = {
+type TxRow = {
   id: string;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: string;
   title: string;
   time: string;
-  date: string;
+  date: string;   // ISO "YYYY-MM-DD"
   category: string;
-  amount: string;
-  isNegative: boolean;
+  value: number;  // positive = income, negative = expense
 };
 
-// ── Static Data ────────────────────────────────────────────────────────────────
-const TRANSACTIONS: Transaction[] = [
-  {
-    id: '1',
-    icon: 'cash-outline',
-    title: 'Salary',
-    time: '18:27',
-    date: 'April 30',
-    category: 'Monthly',
-    amount: '₱4,000.00',
-    isNegative: false,
-  },
-  {
-    id: '2',
-    icon: 'receipt-outline',
-    title: 'Groceries',
-    time: '17:00',
-    date: 'April 24',
-    category: 'Pantry',
-    amount: '-₱100.00',
-    isNegative: true,
-  },
-  {
-    id: '3',
-    icon: 'home-outline',
-    title: 'Rent',
-    time: '8:30',
-    date: 'April 15',
-    category: 'Rent',
-    amount: '-₱674.40',
-    isNegative: true,
-  },
-];
+type SavingsGoal = {
+  icon: string;
+  title: string;
+  target_amount: number;
+  current_amount: number;
+};
 
 const PERIODS: Period[] = ['Daily', 'Weekly', 'Monthly'];
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function formatCurrency(value: number): string {
+  const abs = Math.abs(value);
+  const str = abs.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (value < 0 ? '-' : '') + '₱' + str;
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
+function filterByPeriod(txs: TxRow[], period: Period): TxRow[] {
+  const now = new Date();
+  return txs.filter(tx => {
+    const d = new Date(tx.date);
+    if (period === 'Daily') return d.toDateString() === now.toDateString();
+    if (period === 'Weekly') {
+      const weekAgo = new Date(now);
+      weekAgo.setDate(now.getDate() - 7);
+      return d >= weekAgo && d <= now;
+    }
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+}
+
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good Morning';
+  if (h < 18) return 'Good Afternoon';
+  return 'Good Evening';
+}
 
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const { theme } = useAppTheme();
   const [activePeriod, setActivePeriod] = useState<Period>('Monthly');
 
-  // Sliding period indicator — same technique as the bottom tab bar
+  // Dashboard state
+  const [userName, setUserName]                   = useState('');
+  const [totalBalance, setTotalBalance]           = useState(0);
+  const [totalExpense, setTotalExpense]           = useState(0);
+  const [budgetLimit, setBudgetLimit]             = useState(20000);
+  const [savingsGoal, setSavingsGoal]             = useState<SavingsGoal | null>(null);
+  const [revenueLastWeek, setRevenueLastWeek]     = useState(0);
+  const [expenseLastWeek, setExpenseLastWeek]     = useState(0);
+  const [allTransactions, setAllTransactions]     = useState<TxRow[]>([]);
+  const [loading, setLoading]                     = useState(true);
+
+  // Sliding period indicator
   const [tabWidth, setTabWidth] = useState(0);
   const tabWidthRef = useRef(0);
   const indicatorX = useSharedValue(0);
@@ -73,10 +90,9 @@ export default function HomeScreen() {
   }));
 
   const handlePeriodLayout = (width: number) => {
-    const w = (width - 8) / PERIODS.length; // subtract container padding (4 each side)
+    const w = (width - 8) / PERIODS.length;
     tabWidthRef.current = w;
     setTabWidth(w);
-    // Set initial position without animation
     indicatorX.value = PERIODS.indexOf(activePeriod) * w;
   };
 
@@ -87,6 +103,95 @@ export default function HomeScreen() {
     });
     setActivePeriod(period);
   };
+
+  // ── Fetch data on auth ──────────────────────────────────────────────────────
+  // Use onAuthStateChange instead of getUser() to avoid the AsyncStorage
+  // race condition — getUser() can return null if called before the persisted
+  // session has finished loading. onAuthStateChange fires INITIAL_SESSION
+  // only after the session is fully restored.
+  useEffect(() => {
+    async function loadDashboard(userId: string) {
+      const now = new Date();
+      const weekAgo = new Date(now);
+      weekAgo.setDate(now.getDate() - 7);
+
+      const [profileRes, txRes, goalsRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('full_name, budget_limit')
+          .eq('id', userId)
+          .single(),
+        supabase
+          .from('transactions')
+          .select('id, icon, title, category, value, date, time')
+          .eq('user_id', userId)
+          .eq('is_archived', false)
+          .order('date', { ascending: false })
+          .order('time', { ascending: false }),
+        supabase
+          .from('savings_goals')
+          .select('icon, title, target_amount, current_amount')
+          .eq('user_id', userId)
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      if (profileRes.data) {
+        setUserName(profileRes.data.full_name || '');
+        setBudgetLimit(profileRes.data.budget_limit ?? 20000);
+      }
+
+      if (goalsRes.data) setSavingsGoal(goalsRes.data);
+
+      const txs: TxRow[] = (txRes.data ?? []).map(t => ({
+        id: t.id,
+        icon: t.icon || 'receipt-outline',
+        title: t.title,
+        time: t.time,
+        date: t.date,
+        category: t.category,
+        value: Number(t.value),
+      }));
+      setAllTransactions(txs);
+
+      let balance = 0, expense = 0, revWeek = 0, expWeek = 0;
+      for (const tx of txs) {
+        balance += tx.value;
+        if (tx.value < 0) expense += Math.abs(tx.value);
+        const d = new Date(tx.date);
+        if (d >= weekAgo && d <= now) {
+          if (tx.value > 0) revWeek += tx.value;
+          else expWeek += Math.abs(tx.value);
+        }
+      }
+      setTotalBalance(balance);
+      setTotalExpense(expense);
+      setRevenueLastWeek(revWeek);
+      setExpenseLastWeek(expWeek);
+      setLoading(false);
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        loadDashboard(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const displayedTransactions = useMemo(
+    () => filterByPeriod(allTransactions, activePeriod),
+    [allTransactions, activePeriod],
+  );
+
+  const budgetPercent = budgetLimit > 0 ? Math.min(100, (totalExpense / budgetLimit) * 100) : 0;
+  const budgetMsg =
+    budgetPercent <= 30 ? `${budgetPercent.toFixed(0)}% Of Your Expenses, Looks Good.`
+    : budgetPercent <= 70 ? `${budgetPercent.toFixed(0)}% Of Your Expenses, Be Careful.`
+    : `${budgetPercent.toFixed(0)}% Of Your Expenses, Over Budget!`;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]}>
@@ -102,83 +207,96 @@ export default function HomeScreen() {
           {/* Greeting */}
           <View style={styles.greetingRow}>
             <View>
-              <Text style={[styles.greetingTitle, { color: theme.iconBtnColor }]}>Hi, Welcome Back</Text>
-              <Text style={styles.greetingSubtitle}>Good Morning</Text>
+              <Text style={[styles.greetingTitle, { color: theme.iconBtnColor }]}>
+                {userName ? `Hi, ${userName}` : 'Hi, Welcome Back'}
+              </Text>
+              <Text style={styles.greetingSubtitle}>{getGreeting()}</Text>
             </View>
             <TouchableOpacity style={[styles.bellButton, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
               <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
             </TouchableOpacity>
           </View>
 
-          {/* Balance Card */}
-          <View style={styles.balanceCard}>
-            {/* Totals row */}
-            <View style={styles.balanceRow}>
-              <View style={styles.balanceItem}>
-                <View style={styles.labelRow}>
-                  <Ionicons name="wallet-outline" size={11} color="#666" />
-                  <Text style={styles.balanceLabel}> Total Balance</Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" size="large" style={{ marginVertical: 40 }} />
+          ) : (
+            <>
+              {/* Balance Card */}
+              <View style={styles.balanceCard}>
+                <View style={styles.balanceRow}>
+                  <View style={styles.balanceItem}>
+                    <View style={styles.labelRow}>
+                      <Ionicons name="wallet-outline" size={11} color="#666" />
+                      <Text style={styles.balanceLabel}> Total Balance</Text>
+                    </View>
+                    <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>
+                      {formatCurrency(totalBalance)}
+                    </Text>
+                  </View>
+                  <View style={styles.balanceDivider} />
+                  <View style={[styles.balanceItem, { alignItems: 'flex-end' }]}>
+                    <View style={styles.labelRow}>
+                      <Ionicons name="trending-down-outline" size={11} color="#666" />
+                      <Text style={styles.balanceLabel}> Total Expense</Text>
+                    </View>
+                    <Text style={[styles.balanceAmount, styles.expenseAmount]}>
+                      {formatCurrency(-totalExpense)}
+                    </Text>
+                  </View>
                 </View>
-                <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>₱7,783.00</Text>
-              </View>
-              <View style={styles.balanceDivider} />
-              <View style={[styles.balanceItem, { alignItems: 'flex-end' }]}>
-                <View style={styles.labelRow}>
-                  <Ionicons name="trending-down-outline" size={11} color="#666" />
-                  <Text style={styles.balanceLabel}> Total Expense</Text>
-                </View>
-                <Text style={[styles.balanceAmount, styles.expenseAmount]}>-₱1,187.40</Text>
-              </View>
-            </View>
 
-            {/* Progress */}
-            <View style={styles.progressSection}>
-              <View style={styles.progressLabelRow}>
-                <View style={styles.percentBadge}>
-                  <Text style={styles.percentText}>30%</Text>
-                </View>
-                <Text style={styles.budgetLimit}>₱20,000.00</Text>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: '30%' }]} />
-              </View>
-              <View style={styles.checkRow}>
-                <Ionicons name="checkbox-outline" size={14} color="#4A8A6A" />
-                <Text style={styles.checkText}> 30% Of Your Expenses, Looks Good.</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Savings Card */}
-          <View style={styles.savingsCard}>
-            {/* Left: ring chart */}
-            <View style={styles.savingsLeft}>
-              <View style={styles.donutRing}>
-                <Ionicons name="car-outline" size={26} color="#fff" />
-              </View>
-              <Text style={styles.savingsLabel}>Savings{'\n'}On Goals</Text>
-            </View>
-
-            <View style={styles.savingsDivider} />
-
-            {/* Right: stats */}
-            <View style={styles.savingsRight}>
-              <View style={styles.savingsStat}>
-                <Ionicons name="layers-outline" size={18} color="#fff" />
-                <View style={styles.savingsStatText}>
-                  <Text style={styles.savingsStatLabel}>Revenue Last Week</Text>
-                  <Text style={styles.savingsStatAmount}>₱4,000.00</Text>
+                {/* Progress */}
+                <View style={styles.progressSection}>
+                  <View style={styles.progressLabelRow}>
+                    <View style={styles.percentBadge}>
+                      <Text style={styles.percentText}>{budgetPercent.toFixed(0)}%</Text>
+                    </View>
+                    <Text style={styles.budgetLimit}>{formatCurrency(budgetLimit)}</Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${budgetPercent}%` as any }]} />
+                  </View>
+                  <View style={styles.checkRow}>
+                    <Ionicons name="checkbox-outline" size={14} color="#4A8A6A" />
+                    <Text style={styles.checkText}> {budgetMsg}</Text>
+                  </View>
                 </View>
               </View>
-              <View style={[styles.savingsStat, { marginTop: 14 }]}>
-                <Ionicons name="restaurant-outline" size={18} color="#fff" />
-                <View style={styles.savingsStatText}>
-                  <Text style={styles.savingsStatLabel}>Food Last Week</Text>
-                  <Text style={[styles.savingsStatAmount, styles.negativeText]}>-₱100.00</Text>
+
+              {/* Savings Card */}
+              <View style={styles.savingsCard}>
+                <View style={styles.savingsLeft}>
+                  <View style={styles.donutRing}>
+                    <Ionicons name={(savingsGoal?.icon ?? 'car-outline') as any} size={26} color="#fff" />
+                  </View>
+                  <Text style={styles.savingsLabel}>
+                    {savingsGoal?.title ?? 'Savings\nOn Goals'}
+                  </Text>
+                </View>
+
+                <View style={styles.savingsDivider} />
+
+                <View style={styles.savingsRight}>
+                  <View style={styles.savingsStat}>
+                    <Ionicons name="layers-outline" size={18} color="#fff" />
+                    <View style={styles.savingsStatText}>
+                      <Text style={styles.savingsStatLabel}>Revenue Last Week</Text>
+                      <Text style={styles.savingsStatAmount}>{formatCurrency(revenueLastWeek)}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.savingsStat, { marginTop: 14 }]}>
+                    <Ionicons name="trending-down-outline" size={18} color="#fff" />
+                    <View style={styles.savingsStatText}>
+                      <Text style={styles.savingsStatLabel}>Expenses Last Week</Text>
+                      <Text style={[styles.savingsStatAmount, styles.negativeText]}>
+                        {formatCurrency(-expenseLastWeek)}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </View>
-            </View>
-          </View>
+            </>
+          )}
         </View>
 
         {/* ── White Content Section ─────────────────────────────────────── */}
@@ -189,7 +307,6 @@ export default function HomeScreen() {
             style={styles.periodTabs}
             onLayout={(e) => handlePeriodLayout(e.nativeEvent.layout.width)}
           >
-            {/* Sliding teal pill — mirrors the bottom tab bar approach */}
             <Animated.View
               style={[styles.periodIndicator, { width: tabWidth }, indicatorStyle]}
             />
@@ -210,25 +327,39 @@ export default function HomeScreen() {
 
           {/* Transaction List */}
           <View>
-            {TRANSACTIONS.map((tx, index) => (
-              <View
-                key={tx.id}
-                style={[styles.txItem, index < TRANSACTIONS.length - 1 && styles.txItemBorder, index < TRANSACTIONS.length - 1 && { borderBottomColor: theme.divider }]}
-              >
-                <View style={styles.txIconCircle}>
-                  <Ionicons name={tx.icon} size={20} color="#fff" />
+            {displayedTransactions.length === 0 ? (
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                No transactions for this period.
+              </Text>
+            ) : (
+              displayedTransactions.map((tx, index) => (
+                <View
+                  key={tx.id}
+                  style={[
+                    styles.txItem,
+                    index < displayedTransactions.length - 1 && styles.txItemBorder,
+                    index < displayedTransactions.length - 1 && { borderBottomColor: theme.divider },
+                  ]}
+                >
+                  <View style={styles.txIconCircle}>
+                    <Ionicons name={tx.icon as any} size={20} color="#fff" />
+                  </View>
+                  <View style={styles.txInfo}>
+                    <Text style={[styles.txTitle, { color: theme.textPrimary }]}>{tx.title}</Text>
+                    <Text style={[styles.txMeta, { color: theme.textSecondary }]}>{tx.time} - {formatDate(tx.date)}</Text>
+                  </View>
+                  <Text style={[styles.txCategory, { color: theme.textSecondary }]}>{tx.category}</Text>
+                  <View style={styles.txAmtDivider} />
+                  <Text style={[
+                    styles.txAmount,
+                    tx.value < 0 && styles.txAmountBlue,
+                    tx.value >= 0 && { color: theme.textPrimary },
+                  ]}>
+                    {formatCurrency(tx.value)}
+                  </Text>
                 </View>
-                <View style={styles.txInfo}>
-                  <Text style={[styles.txTitle, { color: theme.textPrimary }]}>{tx.title}</Text>
-                  <Text style={[styles.txMeta, { color: theme.textSecondary }]}>{tx.time} - {tx.date}</Text>
-                </View>
-                <Text style={[styles.txCategory, { color: theme.textSecondary }]}>{tx.category}</Text>
-                <View style={styles.txAmtDivider} />
-                <Text style={[styles.txAmount, tx.isNegative && styles.txAmountBlue, !tx.isNegative && { color: theme.textPrimary }]}>
-                  {tx.amount}
-                </Text>
-              </View>
-            ))}
+              ))
+            )}
           </View>
         </View>
       </ScrollView>
@@ -533,5 +664,11 @@ const styles = StyleSheet.create({
   },
   txAmountBlue: {
     color: '#4895EF',
+  },
+  emptyText: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 32,
   },
 });

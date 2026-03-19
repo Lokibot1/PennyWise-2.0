@@ -489,18 +489,29 @@ export default function ProfileScreen() {
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   useEffect(() => {
-    async function fetchProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    // Use onAuthStateChange instead of getUser() to avoid the AsyncStorage
+    // race condition — getUser() can return null if called before the persisted
+    // session has finished loading. onAuthStateChange fires INITIAL_SESSION
+    // only after the session is fully restored.
+    async function loadProfile(userId: string) {
       const { data } = await supabase
         .from('profiles')
         .select('full_name, email, phone')
-        .eq('id', user.id)
+        .eq('id', userId)
         .single();
       if (data) setProfile(data);
       setLoadingProfile(false);
     }
-    fetchProfile();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        loadProfile(session.user.id);
+      } else {
+        setLoadingProfile(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   if (screen === 'edit') {
