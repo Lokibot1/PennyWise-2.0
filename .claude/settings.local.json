@@ -8,7 +8,8 @@
       "Bash(ls:*)",
       "Bash(grep -E \"\\\\.\\(tsx?|json\\)$\")",
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
-      "Bash(find '/c/Projects/3rd Year/PennyWise-2.0/PennyWise' -not -path */node_modules/* -type d)"
+      "Bash(find '/c/Projects/3rd Year/PennyWise-2.0/PennyWise' -not -path */node_modules/* -type d)",
+      "Bash(npx expo:*)"
     ]
   }
 }

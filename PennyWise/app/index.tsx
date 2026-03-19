@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
+import { supabase } from '@/lib/supabase';
 
 export default function SplashScreen() {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -24,8 +25,13 @@ export default function SplashScreen() {
       }),
     ]).start();
 
-    const timer = setTimeout(() => {
-      router.replace('/(tabs)/login');
+    const timer = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/login-form');
+      }
     }, 2500);
 
     return () => clearTimeout(timer);

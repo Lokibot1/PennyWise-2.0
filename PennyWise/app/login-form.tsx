@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -16,13 +17,35 @@ import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-na
 
 import { FormInput } from '@/components/form-input';
 import { Font } from '@/constants/fonts';
+import { supabase } from '@/lib/supabase';
 
 export default function LoginFormScreen() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
 
   const btnScale = useSharedValue(1);
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: btnScale.value }] }));
+
+  async function handleLogin() {
+    if (!email.trim() || !password) return;
+    setLoading(true);
+    setError('');
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email:    email.trim(),
+      password,
+    });
+
+    setLoading(false);
+
+    if (authError) {
+      setError(authError.message);
+    } else {
+      router.replace('/(tabs)');
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -51,7 +74,7 @@ export default function LoginFormScreen() {
               placeholder="example@example.com"
               iconName="mail-outline"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(v) => { setEmail(v); setError(''); }}
               keyboardType="email-address"
             />
             <FormInput
@@ -59,21 +82,33 @@ export default function LoginFormScreen() {
               placeholder="••••••••"
               iconName="lock-closed-outline"
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(v) => { setPassword(v); setError(''); }}
               isPassword
             />
           </View>
 
+          {/* Error message */}
+          {error !== '' && (
+            <View style={styles.errorBox}>
+              <Ionicons name="alert-circle-outline" size={16} color="#E05858" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
           {/* Log In */}
           <Animated.View style={btnStyle}>
             <TouchableOpacity
-              style={styles.primaryButton}
+              style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
               activeOpacity={1}
+              disabled={loading}
               onPressIn={() => { btnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
               onPressOut={() => { btnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
-              onPress={() => router.replace('/(tabs)')}
+              onPress={handleLogin}
             >
-              <Text style={styles.primaryButtonText}>Log In</Text>
+              {loading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.primaryButtonText}>Log In</Text>
+              }
             </TouchableOpacity>
           </Animated.View>
 
@@ -167,6 +202,23 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
+  // ── Error ───────────────────────────────────────────
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF0F0',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  errorText: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    color: '#E05858',
+    flex: 1,
+  },
+
   // ── Buttons ─────────────────────────────────────────
   primaryButton: {
     backgroundColor: '#3ECBA8',
@@ -179,6 +231,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.32,
     shadowRadius: 12,
     elevation: 5,
+  },
+  primaryButtonDisabled: {
+    opacity: 0.7,
   },
   primaryButtonText: {
     fontFamily: Font.bodySemiBold,

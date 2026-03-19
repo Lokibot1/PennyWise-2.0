@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -15,9 +16,31 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { FormInput } from '@/components/form-input';
 import { Font } from '@/constants/fonts';
+import { supabase } from '@/lib/supabase';
 
 export default function ForgotPasswordScreen() {
-  const [email, setEmail] = useState('');
+  const [email, setEmail]   = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError]   = useState('');
+  const [sent, setSent]     = useState(false);
+
+  async function handleReset() {
+    if (!email.trim()) return;
+    setLoading(true);
+    setError('');
+
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email.trim()
+    );
+
+    setLoading(false);
+
+    if (resetError) {
+      setError(resetError.message);
+    } else {
+      setSent(true);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -39,63 +62,100 @@ export default function ForgotPasswordScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Reset section */}
-          <View style={styles.resetSection}>
-            <Text style={styles.resetTitle}>Reset Password?</Text>
-            <Text style={styles.resetDescription}>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-              eiusmod tempor incididunt ut labore et dolore magna aliqua.
-            </Text>
-          </View>
+          {sent ? (
+            /* ── Success state ── */
+            <View style={styles.successBox}>
+              <Ionicons name="mail-outline" size={48} color="#3ECBA8" />
+              <Text style={styles.successTitle}>Check Your Email</Text>
+              <Text style={styles.successDesc}>
+                We sent a password reset link to{'\n'}
+                <Text style={styles.successEmail}>{email}</Text>
+              </Text>
+              <TouchableOpacity
+                style={styles.nextButton}
+                onPress={() => router.replace('/login-form')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.nextButtonText}>Back to Login</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {/* Reset section */}
+              <View style={styles.resetSection}>
+                <Text style={styles.resetTitle}>Reset Password?</Text>
+                <Text style={styles.resetDescription}>
+                  Enter the email address linked to your account and we'll send
+                  you a link to reset your password.
+                </Text>
+              </View>
 
-          {/* Email input */}
-          <FormInput
-            label="Enter Email Address"
-            placeholder="example@example.com"
-            iconName="mail-outline"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-          />
+              {/* Email input */}
+              <FormInput
+                label="Enter Email Address"
+                placeholder="example@example.com"
+                iconName="mail-outline"
+                value={email}
+                onChangeText={(v) => { setEmail(v); setError(''); }}
+                keyboardType="email-address"
+              />
 
-          {/* Next Step */}
-          <TouchableOpacity style={styles.nextButton} activeOpacity={0.85}>
-            <Text style={styles.nextButtonText}>Next Step</Text>
-          </TouchableOpacity>
+              {/* Error message */}
+              {error !== '' && (
+                <View style={styles.errorBox}>
+                  <Ionicons name="alert-circle-outline" size={16} color="#E05858" />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
 
-          {/* Sign Up */}
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => router.push('/create-account')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.secondaryButtonText}>Sign Up</Text>
-          </TouchableOpacity>
+              {/* Next Step */}
+              <TouchableOpacity
+                style={[styles.nextButton, loading && styles.nextButtonDisabled]}
+                activeOpacity={0.85}
+                disabled={loading}
+                onPress={handleReset}
+              >
+                {loading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.nextButtonText}>Next Step</Text>
+                }
+              </TouchableOpacity>
 
-          {/* Social divider */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or sign up with</Text>
-            <View style={styles.dividerLine} />
-          </View>
+              {/* Sign Up */}
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => router.push('/create-account')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.secondaryButtonText}>Sign Up</Text>
+              </TouchableOpacity>
 
-          {/* Social buttons */}
-          <View style={styles.socialRow}>
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
-              <Ionicons name="logo-facebook" size={22} color="#1877F2" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
-              <Ionicons name="logo-google" size={20} color="#EA4335" />
-            </TouchableOpacity>
-          </View>
+              {/* Social divider */}
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or sign up with</Text>
+                <View style={styles.dividerLine} />
+              </View>
 
-          {/* Footer */}
-          <View style={styles.footerRow}>
-            <Text style={styles.footerText}>Don't have an account? </Text>
-            <TouchableOpacity onPress={() => router.push('/create-account')} activeOpacity={0.7}>
-              <Text style={styles.footerLink}>Sign Up</Text>
-            </TouchableOpacity>
-          </View>
+              {/* Social buttons */}
+              <View style={styles.socialRow}>
+                <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
+                  <Ionicons name="logo-facebook" size={22} color="#1877F2" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
+                  <Ionicons name="logo-google" size={20} color="#EA4335" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Footer */}
+              <View style={styles.footerRow}>
+                <Text style={styles.footerText}>Don't have an account? </Text>
+                <TouchableOpacity onPress={() => router.push('/create-account')} activeOpacity={0.7}>
+                  <Text style={styles.footerLink}>Sign Up</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -156,6 +216,46 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
+  // ── Error ───────────────────────────────────────────
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFF0F0',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  errorText: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    color: '#E05858',
+    flex: 1,
+  },
+
+  // ── Success state ────────────────────────────────────
+  successBox: {
+    alignItems: 'center',
+    gap: 16,
+    paddingTop: 20,
+  },
+  successTitle: {
+    fontFamily: Font.headerBold,
+    fontSize: 24,
+    color: '#1E3A2E',
+  },
+  successDesc: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 14,
+    color: '#7A9A8A',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  successEmail: {
+    fontFamily: Font.bodySemiBold,
+    color: '#3ECBA8',
+  },
+
   // ── Buttons ─────────────────────────────────────────
   nextButton: {
     backgroundColor: '#3ECBA8',
@@ -169,6 +269,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.32,
     shadowRadius: 12,
     elevation: 5,
+  },
+  nextButtonDisabled: {
+    opacity: 0.7,
   },
   nextButtonText: {
     fontFamily: Font.bodySemiBold,

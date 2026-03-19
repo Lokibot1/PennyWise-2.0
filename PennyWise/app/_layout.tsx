@@ -1,5 +1,6 @@
+import 'react-native-url-polyfill/auto';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
@@ -7,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { supabase } from '@/lib/supabase';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -16,6 +18,19 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  // Listen for auth state changes at the app level.
+  // Handles sign-out and session expiry from anywhere in the app.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        router.replace('/login-form');
+      } else if (event === 'SIGNED_IN') {
+        router.replace('/(tabs)');
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const [fontsLoaded] = useFonts({
     KumbhSans_400Regular: require('@expo-google-fonts/kumbh-sans/400Regular/KumbhSans_400Regular.ttf'),
