@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import DatePickerModal from '@/components/DatePickerModal';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import type { Theme } from '@/contexts/AppTheme';
+import { supabase } from '@/lib/supabase';
 import Animated, {
   useSharedValue,
   withSpring,
@@ -36,7 +39,7 @@ type Category = {
   isArchived: boolean;
 };
 
-type IncomeSource = {
+type ExpenseEntry = {
   id: string;
   categoryId: string;
   title: string;
@@ -54,10 +57,10 @@ type Screen =
   | { name: 'categories'; mode: 'new' | 'update' }
   | { name: 'detail';   categoryId: string }
   | { name: 'add';      prefillCategoryId: string }
-  | { name: 'edit';     incomeId: string }
+  | { name: 'edit';     expenseId: string }
   | { name: 'archived' };
 
-type IncomeFormValues = {
+type ExpenseFormValues = {
   date: string;
   categoryId: string;
   amount: string;
@@ -73,25 +76,7 @@ type ConfirmState = {
   onYes: () => void;
 };
 
-// ── Seed Data ─────────────────────────────────────────────────────────────────
-const SEED_CATEGORIES: Category[] = [
-  { id: 'job',        label: 'Job',        icon: 'briefcase-outline',  isArchived: false },
-  { id: 'business',   label: 'Business',   icon: 'business-outline',   isArchived: false },
-  { id: 'sidehustle', label: 'Side Hustle', icon: 'flash-outline',     isArchived: false },
-  { id: 'allowance',  label: 'Allowance',  icon: 'cash-outline',       isArchived: false },
-];
-
-const SEED_INCOME: IncomeSource[] = [
-  { id: 'i1', categoryId: 'job',        title: 'Monthly Salary',    amount: 25000, date: '2024-04-30', time: '09:00', description: 'April salary', isRecurring: true,  frequency: 'Monthly', isArchived: false },
-  { id: 'i2', categoryId: 'job',        title: 'Overtime Pay',      amount: 3500,  date: '2024-04-28', time: '18:00', description: '',             isRecurring: false, frequency: null,      isArchived: false },
-  { id: 'i3', categoryId: 'business',   title: 'Freelance Project', amount: 8000,  date: '2024-04-20', time: '14:30', description: 'Logo design',  isRecurring: false, frequency: null,      isArchived: false },
-  { id: 'i4', categoryId: 'sidehustle', title: 'Online Selling',    amount: 1200,  date: '2024-04-15', time: '11:00', description: '',             isRecurring: false, frequency: null,      isArchived: false },
-  { id: 'i5', categoryId: 'allowance',  title: 'Weekly Allowance',  amount: 500,   date: '2024-04-08', time: '08:00', description: '',             isRecurring: true,  frequency: 'Weekly',  isArchived: false },
-];
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const genId = () => Math.random().toString(36).slice(2, 9);
-
 const fmtAmt = (n: number) =>
   `₱${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 
@@ -102,15 +87,15 @@ const MONTHS = [
 
 const fmtDateShort = (iso: string) => { const [,m,d] = iso.split('-').map(Number); return `${MONTHS[m-1]} ${d}`; };
 const monthLabel   = (iso: string) => MONTHS[+iso.split('-')[1] - 1];
-const monthYearKey   = (iso: string) => iso.slice(0, 7);
+const monthYearKey = (iso: string) => iso.slice(0, 7);
 
-function groupByMonth(items: IncomeSource[]) {
-  const map = new Map<string, { label: string; items: IncomeSource[] }>();
+function groupByMonth(items: ExpenseEntry[]) {
+  const map = new Map<string, { key: string; label: string; items: ExpenseEntry[] }>();
   const sorted = [...items].sort((a, b) => b.date.localeCompare(a.date));
-  for (const inc of sorted) {
-    const key = monthYearKey(inc.date);
-    if (!map.has(key)) map.set(key, { label: monthLabel(inc.date), items: [] });
-    map.get(key)!.items.push(inc);
+  for (const exp of sorted) {
+    const key = monthYearKey(exp.date);
+    if (!map.has(key)) map.set(key, { key, label: monthLabel(exp.date), items: [] });
+    map.get(key)!.items.push(exp);
   }
   return Array.from(map.values());
 }
@@ -118,7 +103,6 @@ function groupByMonth(items: IncomeSource[]) {
 const FREQUENCIES: Frequency[] = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
 
 // ── Animation Helpers ─────────────────────────────────────────────────────────
-// Fade-in + slide-up for screen body content on mount
 function useEntranceAnim() {
   const opacity = useSharedValue(0);
   const ty      = useSharedValue(20);
@@ -132,7 +116,6 @@ function useEntranceAnim() {
   }));
 }
 
-// Staggered entrance + press-spring for main option cards
 function AnimCard({
   delay = 0,
   style,
@@ -205,15 +188,25 @@ const ms = StyleSheet.create({
 // ── BalanceHeader ─────────────────────────────────────────────────────────────
 function BalanceHeader({
   title,
-  totalIncome,
+  totalExpenses,
+  budgetLimit,
   onBack,
   theme,
 }: {
   title: string;
-  totalIncome: number;
+  totalExpenses: number;
+  budgetLimit: number;
   onBack?: () => void;
   theme: Theme;
 }) {
+  const remaining = budgetLimit - totalExpenses;
+  const pct       = budgetLimit > 0 ? Math.min(100, (totalExpenses / budgetLimit) * 100) : 0;
+  const pctStr    = pct.toFixed(0);
+  const pctMsg    =
+    pct <= 30 ? `${pctStr}% Of Income Spent, Looks Good.`
+    : pct <= 70 ? `${pctStr}% Of Income Spent, Be Careful.`
+    : `${pctStr}% Of Income Spent, Over Budget!`;
+
   return (
     <View style={[bh.wrap, { backgroundColor: theme.headerBg }]}>
       <View style={bh.nav}>
@@ -235,27 +228,29 @@ function BalanceHeader({
               <Ionicons name="trending-up-outline" size={11} color="#666" />
               <Text style={bh.lbl}> Total Income</Text>
             </View>
-            <Text style={[bh.amt, { color: '#1E9C70' }]}>{fmtAmt(totalIncome)}</Text>
+            <Text style={[bh.amt, { color: '#1E9C70' }]}>{fmtAmt(budgetLimit)}</Text>
           </View>
           <View style={bh.divider} />
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <View style={bh.lblRow}>
               <Ionicons name="wallet-outline" size={11} color="#666" />
-              <Text style={bh.lbl}> Net Balance</Text>
+              <Text style={bh.lbl}> Remaining</Text>
             </View>
-            <Text style={bh.amt}>₱7,783.00</Text>
+            <Text style={[bh.amt, { color: remaining >= 0 ? '#1A1A1A' : '#E05858' }]}>
+              {fmtAmt(remaining)}
+            </Text>
           </View>
         </View>
 
         <View style={{ paddingTop: 12 }}>
           <View style={bh.progRow}>
-            <View style={bh.pctBadge}><Text style={bh.pctTxt}>85%</Text></View>
-            <Text style={bh.budgetLbl}>Monthly Goal: ₱30,000.00</Text>
+            <View style={bh.pctBadge}><Text style={bh.pctTxt}>{pctStr}%</Text></View>
+            <Text style={bh.budgetLbl}>Spent of {fmtAmt(budgetLimit)}</Text>
           </View>
-          <View style={bh.track}><View style={[bh.fill, { width: '85%' }]} /></View>
+          <View style={bh.track}><View style={[bh.fill, { width: `${pct}%` as any }]} /></View>
           <View style={bh.lblRow}>
             <Ionicons name="checkbox-outline" size={14} color="#4A8A6A" />
-            <Text style={bh.checkTxt}> 85% Of Your Income Goal, Great Progress!</Text>
+            <Text style={bh.checkTxt}> {pctMsg}</Text>
           </View>
         </View>
       </View>
@@ -275,11 +270,11 @@ const bh = StyleSheet.create({
   amt:       { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A', letterSpacing: -0.3 },
   divider:   { width: 1, height: 40, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 12 },
   progRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  pctBadge:  { backgroundColor: '#1E9C70', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  pctBadge:  { backgroundColor: '#E05858', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   pctTxt:    { fontFamily: Font.bodySemiBold, fontSize: 11, color: '#fff' },
   budgetLbl: { fontFamily: Font.bodyRegular, fontSize: 12, color: '#666' },
   track:     { height: 10, backgroundColor: '#E0E0E0', borderRadius: 5, overflow: 'hidden', marginBottom: 8 },
-  fill:      { height: 10, backgroundColor: '#1E9C70', borderRadius: 5 },
+  fill:      { height: 10, backgroundColor: '#E05858', borderRadius: 5 },
   checkTxt:  { fontFamily: Font.bodyRegular, fontSize: 12, color: '#4A7A5A' },
 });
 
@@ -400,10 +395,10 @@ function NewCategoryModal({
       >
         <Pressable style={ncm.overlay} onPress={onClose}>
           <Pressable style={[ncm.card, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
-            <Text style={[pk.heading, { color: theme.textPrimary }]}>New Income Category</Text>
+            <Text style={[pk.heading, { color: theme.textPrimary }]}>New Expense Category</Text>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={s.label}>Category Name</Text>
-              <Text style={s.hint}>e.g. Remittance, Gift, 13th Month Pay, Prize…</Text>
+              <Text style={s.hint}>e.g. Rent, Groceries, Transport, Utilities…</Text>
               <View style={[s.fieldRow, { marginBottom: 4 }]}>
                 <TextInput
                   style={[s.fieldTxt, { flex: 1 }]}
@@ -423,7 +418,7 @@ function NewCategoryModal({
                     onPress={() => setIcon(ic)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name={ic} size={22} color={icon === ic ? '#fff' : '#1E9C70'} />
+                    <Ionicons name={ic} size={22} color={icon === ic ? '#fff' : '#E05858'} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -443,15 +438,17 @@ function NewCategoryModal({
   );
 }
 
-// ── MainScreen (G) ────────────────────────────────────────────────────────────
+// ── MainScreen ────────────────────────────────────────────────────────────────
 function MainScreen({
-  totalIncome,
+  totalExpenses,
+  budgetLimit,
   onNew,
   onUpdate,
   onViewArchived,
   theme,
 }: {
-  totalIncome: number;
+  totalExpenses: number;
+  budgetLimit: number;
   onNew: () => void;
   onUpdate: () => void;
   onViewArchived: () => void;
@@ -460,7 +457,7 @@ function MainScreen({
   const bodyAnim = useEntranceAnim();
   return (
     <>
-      <BalanceHeader title="Income Sources" totalIncome={totalIncome} theme={theme} />
+      <BalanceHeader title="Expenses" totalExpenses={totalExpenses} budgetLimit={budgetLimit} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
         <ScrollView
           style={[s.white, { backgroundColor: theme.cardBg }]}
@@ -469,37 +466,34 @@ function MainScreen({
         >
           <Text style={[s.sectionTitle, { color: theme.textPrimary }]}>What would you like to do?</Text>
 
-          {/* New Income Source */}
           <AnimCard delay={0} style={main.optionCard} onPress={onNew}>
-            <View style={[main.optionIcon, { backgroundColor: '#1E9C70' }]}>
+            <View style={[main.optionIcon, { backgroundColor: '#E05858' }]}>
               <Ionicons name="add-circle-outline" size={30} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>New Income Source</Text>
-              <Text style={[main.optionDesc, { color: theme.textSecondary }]}>Add a new income entry to a category</Text>
+              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>New Expense</Text>
+              <Text style={[main.optionDesc, { color: theme.textSecondary }]}>Add a new expense entry to a category</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#aaa" />
           </AnimCard>
 
-          {/* Update Income Source */}
           <AnimCard delay={80} style={main.optionCard} onPress={onUpdate}>
             <View style={[main.optionIcon, { backgroundColor: '#4B78E0' }]}>
               <Ionicons name="pencil-outline" size={28} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>Update Income Source</Text>
-              <Text style={[main.optionDesc, { color: theme.textSecondary }]}>Edit or archive an existing income entry</Text>
+              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>Update Expense</Text>
+              <Text style={[main.optionDesc, { color: theme.textSecondary }]}>Edit or archive an existing expense entry</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#aaa" />
           </AnimCard>
 
-          {/* View Archived */}
           <AnimCard delay={160} style={main.optionCard} onPress={onViewArchived}>
             <View style={[main.optionIcon, { backgroundColor: '#9AA5B4' }]}>
               <Ionicons name="archive-outline" size={28} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>Archived Income Sources</Text>
+              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>Archived Expenses</Text>
               <Text style={[main.optionDesc, { color: theme.textSecondary }]}>View and restore archived categories</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#aaa" />
@@ -511,7 +505,7 @@ function MainScreen({
 }
 
 const main = StyleSheet.create({
-  optionCard:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, gap: 14, borderWidth: 1, borderColor: '#EEF7F3', elevation: 1, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  optionCard:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, gap: 14, borderWidth: 1, borderColor: '#F5EAEA', elevation: 1, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
   optionIcon:  { width: 58, height: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   optionTitle: { fontFamily: Font.bodySemiBold, fontSize: 15, color: '#1A1A1A', marginBottom: 4 },
   optionDesc:  { fontFamily: Font.bodyRegular, fontSize: 12, color: '#888' },
@@ -520,70 +514,71 @@ const main = StyleSheet.create({
 // ── CategoriesScreen ──────────────────────────────────────────────────────────
 function CategoriesScreen({
   categories,
-  income,
+  expenses,
   mode,
-  totalIncome,
+  totalExpenses,
+  budgetLimit,
   onBack,
   onSelectCategory,
   onAddCategory,
   theme,
 }: {
   categories: Category[];
-  income: IncomeSource[];
+  expenses: ExpenseEntry[];
   mode: 'new' | 'update';
-  totalIncome: number;
+  totalExpenses: number;
+  budgetLimit: number;
   onBack: () => void;
   onSelectCategory: (id: string) => void;
   onAddCategory: () => void;
   theme: Theme;
 }) {
   const active = categories.filter(c => !c.isArchived);
-  const headerTitle = mode === 'new' ? 'Select Category' : 'Update Income Source';
+  const headerTitle = mode === 'new' ? 'Select Category' : 'Update Expense';
   const bodyAnim = useEntranceAnim();
 
   return (
     <>
-      <BalanceHeader title={headerTitle} totalIncome={totalIncome} onBack={onBack} theme={theme} />
+      <BalanceHeader title={headerTitle} totalExpenses={totalExpenses} budgetLimit={budgetLimit} onBack={onBack} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
-      <ScrollView
-        style={[s.white, { backgroundColor: theme.cardBg }]}
-        contentContainerStyle={s.whiteContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {mode === 'new' && (
-          <Text style={s.hint}>
-            Select an existing category or tap <Text style={{ color: '#1E9C70', fontFamily: Font.bodySemiBold }}>More</Text> to create a new one.
-          </Text>
-        )}
+        <ScrollView
+          style={[s.white, { backgroundColor: theme.cardBg }]}
+          contentContainerStyle={s.whiteContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {mode === 'new' && (
+            <Text style={s.hint}>
+              Select an existing category or tap <Text style={{ color: '#E05858', fontFamily: Font.bodySemiBold }}>More</Text> to create a new one.
+            </Text>
+          )}
 
-        <View style={s.grid}>
-          {active.map(cat => {
-            const count = income.filter(i => i.categoryId === cat.id && !i.isArchived).length;
-            return (
-              <TouchableOpacity
-                key={cat.id}
-                style={s.catCard}
-                onPress={() => onSelectCategory(cat.id)}
-                activeOpacity={0.85}
-              >
-                <View style={s.catIcon}>
-                  <Ionicons name={cat.icon} size={28} color="#fff" />
-                </View>
-                <Text style={[s.catLabel, { color: theme.textPrimary }]}>{cat.label}</Text>
-                {count > 0 && <Text style={[s.catCount, { color: theme.textMuted }]}>{count} item{count !== 1 ? 's' : ''}</Text>}
-              </TouchableOpacity>
-            );
-          })}
+          <View style={s.grid}>
+            {active.map(cat => {
+              const count = expenses.filter(e => e.categoryId === cat.id && !e.isArchived).length;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  style={s.catCard}
+                  onPress={() => onSelectCategory(cat.id)}
+                  activeOpacity={0.85}
+                >
+                  <View style={s.catIcon}>
+                    <Ionicons name={cat.icon} size={28} color="#fff" />
+                  </View>
+                  <Text style={[s.catLabel, { color: theme.textPrimary }]}>{cat.label}</Text>
+                  {count > 0 && <Text style={[s.catCount, { color: theme.textMuted }]}>{count} item{count !== 1 ? 's' : ''}</Text>}
+                </TouchableOpacity>
+              );
+            })}
 
-          {/* Add new category tile */}
-          <TouchableOpacity style={s.catCard} onPress={onAddCategory} activeOpacity={0.85}>
-            <View style={[s.catIcon, s.catIconMore]}>
-              <Ionicons name="add" size={32} color="#1E9C70" />
-            </View>
-            <Text style={[s.catLabel, { color: theme.textPrimary }]}>More</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+            <TouchableOpacity style={s.catCard} onPress={onAddCategory} activeOpacity={0.85}>
+              <View style={[s.catIcon, s.catIconMore]}>
+                <Ionicons name="add" size={32} color="#E05858" />
+              </View>
+              <Text style={[s.catLabel, { color: theme.textPrimary }]}>More</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </Animated.View>
     </>
   );
@@ -592,22 +587,24 @@ function CategoriesScreen({
 // ── CategoryDetailScreen ──────────────────────────────────────────────────────
 function CategoryDetailScreen({
   category,
-  income,
-  totalIncome,
+  expenses,
+  totalExpenses,
+  budgetLimit,
   onBack,
   onAdd,
-  onEditIncome,
+  onEditExpense,
   theme,
 }: {
   category: Category;
-  income: IncomeSource[];
-  totalIncome: number;
+  expenses: ExpenseEntry[];
+  totalExpenses: number;
+  budgetLimit: number;
   onBack: () => void;
   onAdd: () => void;
-  onEditIncome: (id: string) => void;
+  onEditExpense: (id: string) => void;
   theme: Theme;
 }) {
-  const active  = income.filter(i => i.categoryId === category.id && !i.isArchived);
+  const active  = expenses.filter(e => e.categoryId === category.id && !e.isArchived);
   const grouped = groupByMonth(active);
   const bodyAnim    = useEntranceAnim();
   const addBtnScale = useSharedValue(1);
@@ -615,7 +612,7 @@ function CategoryDetailScreen({
 
   return (
     <>
-      <BalanceHeader title={category.label} totalIncome={totalIncome} onBack={onBack} theme={theme} />
+      <BalanceHeader title={category.label} totalExpenses={totalExpenses} budgetLimit={budgetLimit} onBack={onBack} theme={theme} />
       <Animated.View style={[s.white, { flex: 1, backgroundColor: theme.cardBg }, bodyAnim]}>
         <ScrollView
           contentContainerStyle={[s.whiteContent, { paddingBottom: 100 }]}
@@ -623,36 +620,36 @@ function CategoryDetailScreen({
         >
           {grouped.length === 0 && (
             <View style={s.empty}>
-              <Ionicons name="cash-outline" size={48} color="#D0D0D0" />
-              <Text style={s.emptyTxt}>No income entries yet</Text>
+              <Ionicons name="receipt-outline" size={48} color="#D0D0D0" />
+              <Text style={s.emptyTxt}>No expense entries yet</Text>
             </View>
           )}
 
           {grouped.map(group => (
-            <View key={group.label} style={{ marginBottom: 8 }}>
+            <View key={group.key} style={{ marginBottom: 8 }}>
               <View style={s.monthHeader}>
                 <Text style={s.monthLabel}>{group.label}</Text>
                 <Ionicons name="calendar-outline" size={20} color="#3ECBA8" />
               </View>
 
-              {group.items.map((inc, idx) => (
+              {group.items.map((exp, idx) => (
                 <TouchableOpacity
-                  key={inc.id}
+                  key={exp.id}
                   style={[s.expRow, idx < group.items.length - 1 && s.expRowBorder]}
-                  onPress={() => onEditIncome(inc.id)}
+                  onPress={() => onEditExpense(exp.id)}
                   activeOpacity={0.85}
                 >
-                  <View style={[s.expIcon, { backgroundColor: '#1E9C70' }]}>
+                  <View style={[s.expIcon, { backgroundColor: '#E05858' }]}>
                     <Ionicons name={category.icon} size={20} color="#fff" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.expTitle, { color: theme.textPrimary }]}>{inc.title}</Text>
+                    <Text style={[s.expTitle, { color: theme.textPrimary }]}>{exp.title}</Text>
                     <Text style={[s.expMeta, { color: theme.textMuted }]}>
-                      {inc.time} · {fmtDateShort(inc.date)}
-                      {inc.isRecurring ? ` · ${inc.frequency}` : ''}
+                      {exp.time} · {fmtDateShort(exp.date)}
+                      {exp.isRecurring ? ` · ${exp.frequency}` : ''}
                     </Text>
                   </View>
-                  <Text style={s.incAmt}>+{fmtAmt(inc.amount)}</Text>
+                  <Text style={s.expAmt}>-{fmtAmt(exp.amount)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -668,7 +665,7 @@ function CategoryDetailScreen({
               onPress={onAdd}
               activeOpacity={1}
             >
-              <Text style={s.addBtnTxt}>Add Income</Text>
+              <Text style={s.addBtnTxt}>Add Expense</Text>
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -677,34 +674,37 @@ function CategoryDetailScreen({
   );
 }
 
-// ── IncomeFormScreen ──────────────────────────────────────────────────────────
-function IncomeFormScreen({
+// ── ExpenseFormScreen ─────────────────────────────────────────────────────────
+function ExpenseFormScreen({
   initial,
   categories,
   screenTitle,
   isEdit,
+  saving,
   onBack,
   onSave,
   onArchive,
   theme,
 }: {
-  initial: IncomeFormValues;
+  initial: ExpenseFormValues;
   categories: Category[];
   screenTitle: string;
   isEdit?: boolean;
+  saving?: boolean;
   onBack: () => void;
-  onSave: (vals: IncomeFormValues) => void;
+  onSave: (vals: ExpenseFormValues) => void;
   onArchive?: () => void;
   theme: Theme;
 }) {
-  const [vals, setVals]           = useState<IncomeFormValues>(initial);
+  const [vals, setVals]           = useState<ExpenseFormValues>(initial);
   const [showCatPicker, setCat]   = useState(false);
   const [showFreqPicker, setFreq] = useState(false);
+  const [showDatePicker, setDatePicker] = useState(false);
   const bodyAnim   = useEntranceAnim();
   const btnScale   = useSharedValue(1);
   const btnStyle   = useAnimatedStyle(() => ({ transform: [{ scale: btnScale.value }] }));
 
-  const set = <K extends keyof IncomeFormValues>(key: K, value: IncomeFormValues[K]) =>
+  const set = <K extends keyof ExpenseFormValues>(key: K, value: ExpenseFormValues[K]) =>
     setVals(prev => ({ ...prev, [key]: value }));
 
   const activeCategories = categories.filter(c => !c.isArchived);
@@ -714,132 +714,141 @@ function IncomeFormScreen({
     <>
       <FormHeader title={screenTitle} onBack={onBack} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView
-          style={[s.formScroll, { backgroundColor: theme.cardBg }]}
-          contentContainerStyle={s.formContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          {/* Date */}
-          <Text style={[s.label, { color: theme.textPrimary }]}>Date</Text>
-          <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
-            <TextInput
-              style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
-              value={vals.date}
-              onChangeText={v => set('date', v)}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#aaa"
-            />
-            <Ionicons name="calendar-outline" size={20} color="#3ECBA8" />
-          </View>
-
-          {/* Category */}
-          <Text style={[s.label, { color: theme.textPrimary }]}>Category</Text>
-          <TouchableOpacity
-            style={[s.fieldRow, s.selectRow, { backgroundColor: theme.inputBg }]}
-            onPress={() => setCat(true)}
-            activeOpacity={0.8}
+          <ScrollView
+            style={[s.formScroll, { backgroundColor: theme.cardBg }]}
+            contentContainerStyle={s.formContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={[s.fieldTxt, { flex: 1, color: selectedCat ? theme.textPrimary : '#aaa' }]}>
-              {selectedCat ? selectedCat.label : 'Select the category'}
-            </Text>
-            <Ionicons name="chevron-down" size={18} color="#aaa" />
-          </TouchableOpacity>
-
-          {/* Amount */}
-          <Text style={[s.label, { color: theme.textPrimary }]}>Amount</Text>
-          <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
-            <TextInput
-              style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
-              value={vals.amount}
-              onChangeText={v => set('amount', v)}
-              keyboardType="decimal-pad"
-              placeholder="₱0.00"
-              placeholderTextColor="#aaa"
-            />
-          </View>
-
-          {/* Title */}
-          <Text style={[s.label, { color: theme.textPrimary }]}>Income Title</Text>
-          <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
-            <TextInput
-              style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
-              value={vals.title}
-              onChangeText={v => set('title', v)}
-              placeholder="e.g. Monthly Salary"
-              placeholderTextColor="#aaa"
-            />
-          </View>
-
-          {/* Description */}
-          <Text style={[s.label, { color: theme.textPrimary }]}>Description</Text>
-          <View style={[s.fieldRow, { alignItems: 'flex-start', minHeight: 100, backgroundColor: theme.inputBg }]}>
-            <TextInput
-              style={[s.fieldTxt, { flex: 1, textAlignVertical: 'top', paddingTop: 2, minHeight: 80, color: theme.textPrimary }]}
-              value={vals.description}
-              onChangeText={v => set('description', v)}
-              placeholder="Enter description"
-              placeholderTextColor="#aaa"
-              multiline
-            />
-          </View>
-
-          {/* Recurring toggle */}
-          <TouchableOpacity
-            style={s.recurRow}
-            onPress={() => set('isRecurring', !vals.isRecurring)}
-            activeOpacity={0.8}
-          >
-            <View style={[s.checkbox, vals.isRecurring && s.checkboxOn]}>
-              {vals.isRecurring && <Ionicons name="checkmark" size={14} color="#fff" />}
-            </View>
-            <Text style={[s.recurTxt, { color: theme.textPrimary }]}>Recurring Income</Text>
-          </TouchableOpacity>
-
-          {/* Frequency (only when recurring) */}
-          {vals.isRecurring && (
-            <>
-              <Text style={[s.label, { color: theme.textPrimary }]}>Frequency</Text>
-              <TouchableOpacity
-                style={[s.fieldRow, s.selectRow, { backgroundColor: theme.inputBg }]}
-                onPress={() => setFreq(true)}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}>{vals.frequency}</Text>
-                <Ionicons name="chevron-down" size={18} color="#aaa" />
-              </TouchableOpacity>
-            </>
-          )}
-
-          {/* Archive button (edit only) */}
-          {isEdit && onArchive && (
-            <TouchableOpacity style={s.archiveBtn} onPress={onArchive} activeOpacity={0.8}>
-              <Ionicons name="archive-outline" size={16} color="#E05858" />
-              <Text style={s.archiveBtnTxt}> Archive This Income Source</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Save */}
-          <Animated.View style={btnStyle}>
+            {/* Date */}
+            <Text style={[s.label, { color: theme.textPrimary }]}>Date</Text>
             <TouchableOpacity
-              style={s.saveBtn}
-              onPressIn={() => { btnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
-              onPressOut={() => { btnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
-              onPress={() => onSave(vals)}
-              activeOpacity={1}
+              style={[s.fieldRow, { backgroundColor: theme.inputBg }]}
+              onPress={() => setDatePicker(true)}
+              activeOpacity={0.8}
             >
-              <Text style={s.saveBtnTxt}>Save</Text>
+              <Text style={[s.fieldTxt, { flex: 1, color: vals.date ? theme.textPrimary : '#aaa' }]}>
+                {vals.date || 'Select a date'}
+              </Text>
+              <Ionicons name="calendar-outline" size={20} color="#3ECBA8" />
             </TouchableOpacity>
-          </Animated.View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+
+            {/* Category */}
+            <Text style={[s.label, { color: theme.textPrimary }]}>Category</Text>
+            <TouchableOpacity
+              style={[s.fieldRow, s.selectRow, { backgroundColor: theme.inputBg }]}
+              onPress={() => setCat(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={[s.fieldTxt, { flex: 1, color: selectedCat ? theme.textPrimary : '#aaa' }]}>
+                {selectedCat ? selectedCat.label : 'Select the category'}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color="#aaa" />
+            </TouchableOpacity>
+
+            {/* Amount */}
+            <Text style={[s.label, { color: theme.textPrimary }]}>Amount</Text>
+            <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
+              <TextInput
+                style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
+                value={vals.amount}
+                onChangeText={v => set('amount', v)}
+                keyboardType="decimal-pad"
+                placeholder="₱0.00"
+                placeholderTextColor="#aaa"
+              />
+            </View>
+
+            {/* Title */}
+            <Text style={[s.label, { color: theme.textPrimary }]}>Expense Title</Text>
+            <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
+              <TextInput
+                style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
+                value={vals.title}
+                onChangeText={v => set('title', v)}
+                placeholder="e.g. Monthly Rent"
+                placeholderTextColor="#aaa"
+              />
+            </View>
+
+            {/* Description */}
+            <Text style={[s.label, { color: theme.textPrimary }]}>Description</Text>
+            <View style={[s.fieldRow, { alignItems: 'flex-start', minHeight: 100, backgroundColor: theme.inputBg }]}>
+              <TextInput
+                style={[s.fieldTxt, { flex: 1, textAlignVertical: 'top', paddingTop: 2, minHeight: 80, color: theme.textPrimary }]}
+                value={vals.description}
+                onChangeText={v => set('description', v)}
+                placeholder="Enter description"
+                placeholderTextColor="#aaa"
+                multiline
+              />
+            </View>
+
+            {/* Recurring toggle */}
+            <TouchableOpacity
+              style={s.recurRow}
+              onPress={() => set('isRecurring', !vals.isRecurring)}
+              activeOpacity={0.8}
+            >
+              <View style={[s.checkbox, vals.isRecurring && s.checkboxOn]}>
+                {vals.isRecurring && <Ionicons name="checkmark" size={14} color="#fff" />}
+              </View>
+              <Text style={[s.recurTxt, { color: theme.textPrimary }]}>Recurring Expense</Text>
+            </TouchableOpacity>
+
+            {/* Frequency (only when recurring) */}
+            {vals.isRecurring && (
+              <>
+                <Text style={[s.label, { color: theme.textPrimary }]}>Frequency</Text>
+                <TouchableOpacity
+                  style={[s.fieldRow, s.selectRow, { backgroundColor: theme.inputBg }]}
+                  onPress={() => setFreq(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}>{vals.frequency}</Text>
+                  <Ionicons name="chevron-down" size={18} color="#aaa" />
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* Archive button (edit only) */}
+            {isEdit && onArchive && (
+              <TouchableOpacity style={s.archiveBtn} onPress={onArchive} activeOpacity={0.8} disabled={saving}>
+                <Ionicons name="archive-outline" size={16} color="#E05858" />
+                <Text style={s.archiveBtnTxt}> Archive This Expense Category</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Save */}
+            <Animated.View style={btnStyle}>
+              <TouchableOpacity
+                style={[s.saveBtn, saving && { opacity: 0.7 }]}
+                onPressIn={() => { btnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
+                onPressOut={() => { btnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+                onPress={() => onSave(vals)}
+                activeOpacity={1}
+                disabled={saving}
+              >
+                {saving
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={s.saveBtnTxt}>Save</Text>
+                }
+              </TouchableOpacity>
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </Animated.View>
 
-      {/* Category picker */}
+      <DatePickerModal
+        visible={showDatePicker}
+        value={vals.date ? new Date(vals.date) : new Date()}
+        onConfirm={date => set('date', date.toISOString().slice(0, 10))}
+        onClose={() => setDatePicker(false)}
+      />
       <PickerSheet
         visible={showCatPicker}
         title="Select Category"
@@ -861,7 +870,6 @@ function IncomeFormScreen({
         theme={theme}
       />
 
-      {/* Frequency picker */}
       <PickerSheet
         visible={showFreqPicker}
         title="Set Frequency"
@@ -878,13 +886,15 @@ function IncomeFormScreen({
 // ── ArchivedScreen ────────────────────────────────────────────────────────────
 function ArchivedScreen({
   categories,
-  totalIncome,
+  totalExpenses,
+  budgetLimit,
   onBack,
   onRestore,
   theme,
 }: {
   categories: Category[];
-  totalIncome: number;
+  totalExpenses: number;
+  budgetLimit: number;
   onBack: () => void;
   onRestore: (id: string) => void;
   theme: Theme;
@@ -894,54 +904,114 @@ function ArchivedScreen({
 
   return (
     <>
-      <BalanceHeader title="Archived Income Sources" totalIncome={totalIncome} onBack={onBack} theme={theme} />
+      <BalanceHeader title="Archived Expenses" totalExpenses={totalExpenses} budgetLimit={budgetLimit} onBack={onBack} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
-      <ScrollView
-        style={[s.white, { backgroundColor: theme.cardBg }]}
-        contentContainerStyle={s.whiteContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {archived.length === 0 && (
-          <View style={s.empty}>
-            <Ionicons name="archive-outline" size={48} color="#D0D0D0" />
-            <Text style={s.emptyTxt}>No archived categories</Text>
-          </View>
-        )}
-
-        {archived.map((cat, idx) => (
-          <View
-            key={cat.id}
-            style={[s.archiveRow, idx < archived.length - 1 && s.archiveRowBorder]}
-          >
-            <View style={[s.expIcon, { backgroundColor: '#9AA5B4' }]}>
-              <Ionicons name={cat.icon} size={20} color="#fff" />
+        <ScrollView
+          style={[s.white, { backgroundColor: theme.cardBg }]}
+          contentContainerStyle={s.whiteContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {archived.length === 0 && (
+            <View style={s.empty}>
+              <Ionicons name="archive-outline" size={48} color="#D0D0D0" />
+              <Text style={s.emptyTxt}>No archived categories</Text>
             </View>
-            <Text style={[s.expTitle, { flex: 1, color: theme.textPrimary }]}>{cat.label}</Text>
-            <TouchableOpacity style={s.restoreBtn} onPress={() => onRestore(cat.id)} activeOpacity={0.75}>
-              <Text style={s.restoreTxt}>Restore</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </ScrollView>
+          )}
+
+          {archived.map((cat, idx) => (
+            <View
+              key={cat.id}
+              style={[s.archiveRow, idx < archived.length - 1 && s.archiveRowBorder]}
+            >
+              <View style={[s.expIcon, { backgroundColor: '#9AA5B4' }]}>
+                <Ionicons name={cat.icon} size={20} color="#fff" />
+              </View>
+              <Text style={[s.expTitle, { flex: 1, color: theme.textPrimary }]}>{cat.label}</Text>
+              <TouchableOpacity style={s.restoreBtn} onPress={() => onRestore(cat.id)} activeOpacity={0.75}>
+                <Text style={s.restoreTxt}>Restore</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
       </Animated.View>
     </>
   );
 }
 
-// ── ManageIncomeScreen (main export) ──────────────────────────────────────────
-export default function ManageIncomeScreen() {
+// ── Root Screen ───────────────────────────────────────────────────────────────
+export default function ManageExpenseScreen() {
   const { theme } = useAppTheme();
-  const [screen,     setScreen]     = useState<Screen>({ name: 'main' });
-  const [categories, setCategories] = useState<Category[]>(SEED_CATEGORIES);
-  const [income,     setIncome]     = useState<IncomeSource[]>(SEED_INCOME);
-  const [confirm,    setConfirm]    = useState<ConfirmState>({ visible: false, message: '', onYes: () => {} });
-  const [showNewCat, setShowNewCat] = useState(false);
-  const [toast,      setToast]      = useState('');
+  const userIdRef = useRef('');
+
+  const [screen,      setScreen]      = useState<Screen>({ name: 'main' });
+  const [categories,  setCategories]  = useState<Category[]>([]);
+  const [expenses,    setExpenses]    = useState<ExpenseEntry[]>([]);
+  const [budgetLimit, setBudgetLimit] = useState(20000);
+  const [loading,     setLoading]     = useState(true);
+  const [saving,      setSaving]      = useState(false);
+  const [confirm,     setConfirm]     = useState<ConfirmState>({ visible: false, message: '', onYes: () => {} });
+  const [showNewCat,  setShowNewCat]  = useState(false);
+  const [toast,       setToast]       = useState('');
+
+  // ── Load from Supabase ──────────────────────────────────────────────────────
+  useEffect(() => {
+    async function loadData(userId: string) {
+      const [incomeRes, catRes, expRes] = await Promise.all([
+        // Budget limit = total of all active income sources
+        supabase.from('income_sources').select('amount').eq('user_id', userId).eq('is_archived', false),
+        supabase.from('expense_categories').select('id, label, icon, is_archived').eq('user_id', userId),
+        supabase.from('expenses').select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived').eq('user_id', userId),
+      ]);
+
+      if (incomeRes.data) {
+        const totalIncome = incomeRes.data.reduce((sum, r) => sum + Number(r.amount), 0);
+        setBudgetLimit(totalIncome);
+      }
+
+      if (catRes.data) {
+        setCategories(catRes.data.map(c => ({
+          id:         c.id,
+          label:      c.label,
+          icon:       c.icon as IoniconName,
+          isArchived: c.is_archived,
+        })));
+      }
+
+      if (expRes.data) {
+        setExpenses(expRes.data.map(e => ({
+          id:          e.id,
+          categoryId:  e.category_id,
+          title:       e.title,
+          amount:      Number(e.amount),
+          date:        e.date,
+          time:        e.time,
+          description: e.description,
+          isRecurring: e.is_recurring,
+          frequency:   e.frequency as Frequency | null,
+          isArchived:  e.is_archived,
+        })));
+      }
+
+      setLoading(false);
+    }
+
+    // Use onAuthStateChange to avoid the AsyncStorage race condition.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        userIdRef.current = session.user.id;
+        loadData(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // ── Computed ─────────────────────────────────────────────────────────────────
-  const totalIncome = income
-    .filter(i => !i.isArchived)
-    .reduce((sum, i) => sum + i.amount, 0);
+  const totalExpenses = expenses
+    .filter(e => !e.isArchived)
+    .reduce((sum, e) => sum + e.amount, 0);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const showToast = (msg: string) => {
@@ -955,94 +1025,140 @@ export default function ManageIncomeScreen() {
   const hideConfirm = () => setConfirm(prev => ({ ...prev, visible: false }));
 
   // ── Action Handlers ───────────────────────────────────────────────────────────
-  const handleSave = (vals: IncomeFormValues) => {
+  const handleSave = (vals: ExpenseFormValues) => {
     const msg =
       screen.name === 'add'
-        ? 'Are you sure you want to save this new Income Source?'
-        : 'Are you sure you want to save this updated Income Source?';
+        ? 'Are you sure you want to save this new Expense?'
+        : 'Are you sure you want to save the updated Expense?';
 
-    showConfirm(msg, () => {
+    showConfirm(msg, async () => {
       hideConfirm();
+      setSaving(true);
 
       if (screen.name === 'add') {
-        const newInc: IncomeSource = {
-          id:          genId(),
-          categoryId:  vals.categoryId,
-          title:       vals.title,
-          amount:      parseFloat(vals.amount) || 0,
-          date:        vals.date,
-          time:        new Date().toTimeString().slice(0, 5),
-          description: vals.description,
-          isRecurring: vals.isRecurring,
-          frequency:   vals.isRecurring ? vals.frequency : null,
-          isArchived:  false,
-        };
-        setIncome(prev => [...prev, newInc]);
-        showToast('Income Source added successfully.');
-        setScreen({ name: 'main' });
+        const { data, error } = await supabase
+          .from('expenses')
+          .insert({
+            user_id:     userIdRef.current,
+            category_id: vals.categoryId,
+            title:       vals.title.trim(),
+            amount:      parseFloat(vals.amount) || 0,
+            date:        vals.date,
+            time:        new Date().toTimeString().slice(0, 5),
+            description: vals.description.trim(),
+            is_recurring: vals.isRecurring,
+            frequency:   vals.isRecurring ? vals.frequency : null,
+          })
+          .select()
+          .single();
+
+        if (!error && data) {
+          setExpenses(prev => [...prev, {
+            id:          data.id,
+            categoryId:  data.category_id,
+            title:       data.title,
+            amount:      Number(data.amount),
+            date:        data.date,
+            time:        data.time,
+            description: data.description,
+            isRecurring: data.is_recurring,
+            frequency:   data.frequency as Frequency | null,
+            isArchived:  data.is_archived,
+          }]);
+          showToast('Expense added successfully.');
+          setScreen({ name: 'main' });
+        }
 
       } else if (screen.name === 'edit') {
-        setIncome(prev =>
-          prev.map(i =>
-            i.id === screen.incomeId
+        const { error } = await supabase
+          .from('expenses')
+          .update({
+            category_id:  vals.categoryId,
+            title:        vals.title.trim(),
+            amount:       parseFloat(vals.amount) || 0,
+            date:         vals.date,
+            description:  vals.description.trim(),
+            is_recurring: vals.isRecurring,
+            frequency:    vals.isRecurring ? vals.frequency : null,
+          })
+          .eq('id', screen.expenseId);
+
+        if (!error) {
+          setExpenses(prev => prev.map(e =>
+            e.id === screen.expenseId
               ? {
-                  ...i,
+                  ...e,
                   categoryId:  vals.categoryId,
-                  title:       vals.title,
+                  title:       vals.title.trim(),
                   amount:      parseFloat(vals.amount) || 0,
                   date:        vals.date,
-                  description: vals.description,
+                  description: vals.description.trim(),
                   isRecurring: vals.isRecurring,
                   frequency:   vals.isRecurring ? vals.frequency : null,
                 }
-              : i,
-          ),
-        );
-        showToast('Income Sources category updated successfully.');
-        setScreen({ name: 'main' });
+              : e,
+          ));
+          showToast('Expense updated successfully.');
+          setScreen({ name: 'main' });
+        }
       }
+
+      setSaving(false);
     });
   };
 
-  const handleArchiveIncome = (incomeId: string) => {
-    const inc = income.find(i => i.id === incomeId);
-    const cat = inc ? categories.find(c => c.id === inc.categoryId) : null;
-    showConfirm('Are you sure you want to archive this Income Sources category?', () => {
+  const handleArchiveCategory = (categoryId: string) => {
+    showConfirm('Are you sure you want to archive this Expense Category?', async () => {
       hideConfirm();
-      if (cat) {
-        setCategories(prev =>
-          prev.map(c => (c.id === cat.id ? { ...c, isArchived: true } : c)),
-        );
-        showToast('Income Sources category archived successfully.');
+      const { error } = await supabase
+        .from('expense_categories')
+        .update({ is_archived: true })
+        .eq('id', categoryId);
+
+      if (!error) {
+        setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
+        showToast('Expense category archived successfully.');
+        setScreen({ name: 'main' });
       }
-      setScreen({ name: 'main' });
     });
   };
 
   const handleRestore = (categoryId: string) => {
-    showConfirm('Are you sure you want to restore this Income Sources category?', () => {
+    showConfirm('Are you sure you want to restore this Expense Category?', async () => {
       hideConfirm();
-      setCategories(prev =>
-        prev.map(c => (c.id === categoryId ? { ...c, isArchived: false } : c)),
-      );
-      showToast('Income Sources category restored successfully.');
+      const { error } = await supabase
+        .from('expense_categories')
+        .update({ is_archived: false })
+        .eq('id', categoryId);
+
+      if (!error) {
+        setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
+        showToast('Expense category restored successfully.');
+      }
     });
   };
 
-  const handleNewCategory = (label: string, icon: IoniconName) => {
-    const newCat: Category = { id: genId(), label, icon, isArchived: false };
-    setCategories(prev => [...prev, newCat]);
-    showToast(`Category "${label}" created.`);
-    // After creating new category, go straight to add form with it prefilled
-    if (screen.name === 'categories') {
-      setScreen({ name: 'add', prefillCategoryId: newCat.id });
+  const handleNewCategory = async (label: string, icon: IoniconName) => {
+    const { data, error } = await supabase
+      .from('expense_categories')
+      .insert({ user_id: userIdRef.current, label, icon })
+      .select()
+      .single();
+
+    if (!error && data) {
+      const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
+      setCategories(prev => [...prev, newCat]);
+      showToast(`Category "${label}" created.`);
+      if (screen.name === 'categories') {
+        setScreen({ name: 'add', prefillCategoryId: newCat.id });
+      }
     }
   };
 
-  // ── Form Initial Values ────────────────────────────────────────────────────
+  // ── Form Initial Values ───────────────────────────────────────────────────
   const today = new Date().toISOString().slice(0, 10);
 
-  const addInitial = (): IncomeFormValues => ({
+  const addInitial = (): ExpenseFormValues => ({
     date:        today,
     categoryId:  screen.name === 'add' ? screen.prefillCategoryId : '',
     amount:      '',
@@ -1052,20 +1168,29 @@ export default function ManageIncomeScreen() {
     frequency:   'Monthly',
   });
 
-  const editInitial = (): IncomeFormValues => {
+  const editInitial = (): ExpenseFormValues => {
     if (screen.name !== 'edit') return addInitial();
-    const inc = income.find(i => i.id === screen.incomeId);
-    if (!inc) return addInitial();
+    const exp = expenses.find(e => e.id === screen.expenseId);
+    if (!exp) return addInitial();
     return {
-      date:        inc.date,
-      categoryId:  inc.categoryId,
-      amount:      inc.amount.toString(),
-      title:       inc.title,
-      description: inc.description,
-      isRecurring: inc.isRecurring,
-      frequency:   inc.frequency ?? 'Monthly',
+      date:        exp.date,
+      categoryId:  exp.categoryId,
+      amount:      exp.amount.toString(),
+      title:       exp.title,
+      description: exp.description,
+      isRecurring: exp.isRecurring,
+      frequency:   exp.frequency ?? 'Monthly',
     };
   };
+
+  // ── Loading State ─────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <SafeAreaView style={[s.safeArea, { backgroundColor: theme.headerBg, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator color="#fff" size="large" />
+      </SafeAreaView>
+    );
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   const renderScreen = () => {
@@ -1074,7 +1199,8 @@ export default function ManageIncomeScreen() {
       case 'main':
         return (
           <MainScreen
-            totalIncome={totalIncome}
+            totalExpenses={totalExpenses}
+            budgetLimit={budgetLimit}
             onNew={() => setScreen({ name: 'categories', mode: 'new' })}
             onUpdate={() => setScreen({ name: 'categories', mode: 'update' })}
             onViewArchived={() => setScreen({ name: 'archived' })}
@@ -1086,9 +1212,10 @@ export default function ManageIncomeScreen() {
         return (
           <CategoriesScreen
             categories={categories}
-            income={income}
+            expenses={expenses}
             mode={screen.mode}
-            totalIncome={totalIncome}
+            totalExpenses={totalExpenses}
+            budgetLimit={budgetLimit}
             onBack={() => setScreen({ name: 'main' })}
             onSelectCategory={id => {
               if (screen.mode === 'new') {
@@ -1108,11 +1235,12 @@ export default function ManageIncomeScreen() {
         return (
           <CategoryDetailScreen
             category={cat}
-            income={income}
-            totalIncome={totalIncome}
+            expenses={expenses}
+            totalExpenses={totalExpenses}
+            budgetLimit={budgetLimit}
             onBack={() => setScreen({ name: 'categories', mode: 'update' })}
             onAdd={() => setScreen({ name: 'add', prefillCategoryId: cat.id })}
-            onEditIncome={id => setScreen({ name: 'edit', incomeId: id })}
+            onEditExpense={id => setScreen({ name: 'edit', expenseId: id })}
             theme={theme}
           />
         );
@@ -1120,11 +1248,12 @@ export default function ManageIncomeScreen() {
 
       case 'add':
         return (
-          <IncomeFormScreen
+          <ExpenseFormScreen
             key={`add-${screen.prefillCategoryId}`}
             initial={addInitial()}
             categories={categories}
-            screenTitle="New Income Source"
+            screenTitle="New Expense"
+            saving={saving}
             onBack={() => setScreen({ name: 'categories', mode: 'new' })}
             onSave={handleSave}
             theme={theme}
@@ -1132,22 +1261,26 @@ export default function ManageIncomeScreen() {
         );
 
       case 'edit': {
-        const inc = income.find(i => i.id === screen.incomeId);
+        const exp = expenses.find(e => e.id === screen.expenseId);
         return (
-          <IncomeFormScreen
-            key={`edit-${screen.incomeId}`}
+          <ExpenseFormScreen
+            key={`edit-${screen.expenseId}`}
             initial={editInitial()}
             categories={categories}
-            screenTitle="Update Income Source"
+            screenTitle="Update Expense"
             isEdit
+            saving={saving}
             onBack={() => {
-              const catId = inc?.categoryId;
+              const catId = exp?.categoryId;
               catId
                 ? setScreen({ name: 'detail', categoryId: catId })
                 : setScreen({ name: 'categories', mode: 'update' });
             }}
             onSave={handleSave}
-            onArchive={() => handleArchiveIncome(screen.incomeId)}
+            onArchive={() => {
+              const catId = exp?.categoryId;
+              if (catId) handleArchiveCategory(catId);
+            }}
             theme={theme}
           />
         );
@@ -1157,7 +1290,8 @@ export default function ManageIncomeScreen() {
         return (
           <ArchivedScreen
             categories={categories}
-            totalIncome={totalIncome}
+            totalExpenses={totalExpenses}
+            budgetLimit={budgetLimit}
             onBack={() => setScreen({ name: 'main' })}
             onRestore={handleRestore}
             theme={theme}
@@ -1194,82 +1328,66 @@ export default function ManageIncomeScreen() {
 const s = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#7CB898' },
 
-  // White section
   white:        { flex: 1, backgroundColor: '#fff' },
   whiteContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
 
-  // Section title
   sectionTitle: { fontFamily: Font.headerBold, fontSize: 18, color: '#1A1A1A', marginBottom: 20 },
 
-  // Hint text
   hint: { fontFamily: Font.bodyRegular, fontSize: 13, color: '#888', marginBottom: 16 },
 
-  // Category grid
   grid:        { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 14, marginBottom: 24 },
   catCard:     { width: '30%', alignItems: 'center', marginBottom: 4 },
-  catIcon:     { width: 76, height: 76, borderRadius: 20, backgroundColor: '#1E9C70', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  catIconMore: { backgroundColor: 'rgba(30,156,112,0.12)' },
+  catIcon:     { width: 76, height: 76, borderRadius: 20, backgroundColor: '#E05858', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  catIconMore: { backgroundColor: 'rgba(224,88,88,0.12)' },
   catLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, color: '#1A1A1A', textAlign: 'center' },
   catCount:    { fontFamily: Font.bodyRegular, fontSize: 11, color: '#888', marginTop: 2 },
 
-  // Month group
   monthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   monthLabel:  { fontFamily: Font.headerBold, fontSize: 16, color: '#1A1A1A' },
 
-  // Income row
   expRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   expRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F2' },
-  expIcon:      { width: 46, height: 46, borderRadius: 23, backgroundColor: '#1E9C70', alignItems: 'center', justifyContent: 'center' },
+  expIcon:      { width: 46, height: 46, borderRadius: 23, backgroundColor: '#E05858', alignItems: 'center', justifyContent: 'center' },
   expTitle:     { fontFamily: Font.bodySemiBold, fontSize: 15, color: '#1A1A1A', marginBottom: 3 },
   expMeta:      { fontFamily: Font.bodyRegular, fontSize: 11, color: '#999' },
-  incAmt:       { fontFamily: Font.bodySemiBold, fontSize: 13, color: '#1E9C70' },
+  expAmt:       { fontFamily: Font.bodySemiBold, fontSize: 13, color: '#E05858' },
 
-  // Add Income button
   addBtnWrapper: { position: 'absolute', bottom: 20, left: 20, right: 20 },
   addBtn:        { backgroundColor: '#3ECBA8', borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
   addBtnTxt:     { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
 
-  // Empty state
   empty:    { alignItems: 'center', paddingTop: 60, paddingBottom: 40 },
   emptyTxt: { fontFamily: Font.bodyRegular, fontSize: 14, color: '#aaa', marginTop: 12 },
 
-  // Form
   formScroll:  { flex: 1, backgroundColor: '#F0FAF6' },
   formContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 48 },
   label:       { fontFamily: Font.bodyMedium, fontSize: 14, color: '#1A1A1A', marginBottom: 8, marginTop: 16 },
-  fieldRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F7EF', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  fieldRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5EAEA', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14 },
   fieldTxt:    { fontFamily: Font.bodyRegular, fontSize: 14, color: '#1A1A1A' },
   selectRow:   { justifyContent: 'space-between' },
 
-  // Recurring
   recurRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 20 },
   checkbox:   { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#3ECBA8', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   checkboxOn: { backgroundColor: '#3ECBA8' },
   recurTxt:   { fontFamily: Font.bodyMedium, fontSize: 14, color: '#1A1A1A' },
 
-  // Archive
   archiveBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 24, paddingVertical: 12 },
   archiveBtnTxt: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#E05858' },
 
-  // Save button
   saveBtn:    { backgroundColor: '#3ECBA8', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 28 },
   saveBtnTxt: { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
 
-  // Picker icon
-  pickerIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#1E9C70', alignItems: 'center', justifyContent: 'center' },
+  pickerIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#E05858', alignItems: 'center', justifyContent: 'center' },
 
-  // Archived list
   archiveRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   archiveRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F2' },
   restoreBtn:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#3ECBA8' },
   restoreTxt:       { fontFamily: Font.bodyMedium, fontSize: 13, color: '#3ECBA8' },
 
-  // New category icon grid
   iconGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
-  iconOpt:       { width: 50, height: 50, borderRadius: 14, borderWidth: 2, borderColor: '#1E9C70', alignItems: 'center', justifyContent: 'center' },
-  iconOptActive: { backgroundColor: '#1E9C70', borderColor: '#1E9C70' },
+  iconOpt:       { width: 50, height: 50, borderRadius: 14, borderWidth: 2, borderColor: '#E05858', alignItems: 'center', justifyContent: 'center' },
+  iconOptActive: { backgroundColor: '#E05858', borderColor: '#E05858' },
 
-  // Toast
   toast:    { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#1E9C70', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', elevation: 8 },
   toastTxt: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#fff' },
 });
