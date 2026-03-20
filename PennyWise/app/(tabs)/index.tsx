@@ -194,7 +194,7 @@ export default function HomeScreen() {
     : `${budgetPercent.toFixed(0)}% Of Your Expenses, Over Budget!`;
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
       <StatusBar style={theme.statusBar} />
       <ScrollView
         style={styles.scroll}
@@ -371,7 +371,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#7CB898',
+    backgroundColor: '#1B3D2B',
   },
   scroll: {
     flex: 1,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
 
   // ── Green Section ────────────────────────────────────────────────────────────
   greenSection: {
-    backgroundColor: '#7CB898',
+    backgroundColor: '#1B3D2B',
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 28,
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
 
   // ── Savings Card ─────────────────────────────────────────────────────────────
   savingsCard: {
-    backgroundColor: '#1E9C70',
+    backgroundColor: '#115533',
     borderRadius: 20,
     padding: 18,
     flexDirection: 'row',
@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
     top: 4,
     bottom: 4,
     borderRadius: 50,
-    backgroundColor: '#3ECBA8',
+    backgroundColor: '#1B7A4A',
   },
   periodTab: {
     flex: 1,

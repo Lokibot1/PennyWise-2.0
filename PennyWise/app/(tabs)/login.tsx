@@ -51,7 +51,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0FAF6',
+    backgroundColor: '#EDF7F1',
   },
   content: {
     flex: 1,
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   tagline: {
     fontFamily: Font.bodyRegular,
     fontSize: 14,
-    color: '#5A7A6A',
+    color: '#4A6355',
     letterSpacing: 0.3,
     textAlign: 'center',
   },
@@ -81,12 +81,12 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   loginButton: {
-    backgroundColor: '#3ECBA8',
+    backgroundColor: '#1B7A4A',
     borderRadius: 50,
     paddingVertical: 16,
     width: '100%',
     alignItems: 'center',
-    shadowColor: '#3ECBA8',
+    shadowColor: '#1B7A4A',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     borderRadius: 50,
     borderWidth: 1.5,
-    borderColor: '#3ECBA8',
+    borderColor: '#1B7A4A',
     paddingVertical: 15,
     width: '100%',
     alignItems: 'center',
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   signupButtonText: {
     fontFamily: Font.bodySemiBold,
     fontSize: 16,
-    color: '#2AAD8E',
+    color: '#1B7A4A',
     letterSpacing: 0.5,
   },
   forgotButton: {
@@ -120,8 +120,8 @@ const styles = StyleSheet.create({
   forgotButtonText: {
     fontFamily: Font.bodyRegular,
     fontSize: 13,
-    color: '#7A9A8A',
+    color: '#7A7A7A',
     textDecorationLine: 'underline',
-    textDecorationColor: '#B0CCBF',
+    textDecorationColor: '#9ABAA6',
   },
 });

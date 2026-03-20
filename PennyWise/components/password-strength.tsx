@@ -10,7 +10,7 @@ const RULES = [
   { label: 'Contains a number (0–9)', test: (p: string) => /[0-9]/.test(p) },
 ];
 
-const STRENGTH_COLORS = ['#FF5C5C', '#FF9A3C', '#F5C518', '#3ECBA8'];
+const STRENGTH_COLORS = ['#FF5C5C', '#FF9A3C', '#F5C518', '#1B7A4A'];
 const STRENGTH_LABELS = ['Weak', 'Fair', 'Good', 'Strong'];
 
 interface PasswordStrengthProps {
@@ -50,7 +50,7 @@ export function PasswordStrength({ password }: PasswordStrengthProps) {
             <Ionicons
               name={rule.met ? 'checkmark-circle' : 'ellipse-outline'}
               size={14}
-              color={rule.met ? '#3ECBA8' : '#B8D4C6'}
+              color={rule.met ? '#1B7A4A' : '#B8D4C6'}
             />
             <Text style={[styles.ruleText, rule.met && styles.ruleTextMet]}>
               {rule.label}
@@ -101,6 +101,6 @@ const styles = StyleSheet.create({
     color: '#9ABCAC',
   },
   ruleTextMet: {
-    color: '#3A5A4A',
+    color: '#1B3D2B',
   },
 });

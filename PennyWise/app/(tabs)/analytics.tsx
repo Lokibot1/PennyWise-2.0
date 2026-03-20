@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { router } from 'expo-router';
 import DatePickerModal from '@/components/DatePickerModal';
+import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -180,7 +182,7 @@ const ms = StyleSheet.create({
   row:        { flexDirection: 'row', gap: 10 },
   cancel:     { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: '#F0F0F0', alignItems: 'center' },
   cancelTxt:  { fontFamily: Font.bodyMedium, fontSize: 14, color: '#666' },
-  confirm:    { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: '#3ECBA8', alignItems: 'center' },
+  confirm:    { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: '#1B7A4A', alignItems: 'center' },
   confirmTxt: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff' },
 });
 
@@ -199,10 +201,14 @@ function BalanceHeader({
   return (
     <View style={[bh.wrap, { backgroundColor: theme.headerBg }]}>
       <View style={bh.nav}>
-        <TouchableOpacity style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} onPress={onBack} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]}
+          onPress={onBack ?? (() => router.replace('/(tabs)'))}
+          activeOpacity={0.8}
+        >
           {onBack
             ? <Ionicons name="chevron-back" size={22} color={theme.iconBtnColor} />
-            : <View style={{ width: 22 }} />}
+            : <PennyWiseLogo size="xs" />}
         </TouchableOpacity>
         <Text style={[bh.title, { color: theme.iconBtnColor }]}>{title}</Text>
         <TouchableOpacity style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
@@ -217,7 +223,7 @@ function BalanceHeader({
               <Ionicons name="trending-up-outline" size={11} color="#666" />
               <Text style={bh.lbl}> Total Income</Text>
             </View>
-            <Text style={[bh.amt, { color: '#1E9C70' }]}>{fmtAmt(totalIncome)}</Text>
+            <Text style={[bh.amt, { color: '#115533' }]}>{fmtAmt(totalIncome)}</Text>
           </View>
           <View style={bh.divider} />
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
@@ -234,7 +240,7 @@ function BalanceHeader({
 }
 
 const bh = StyleSheet.create({
-  wrap:    { backgroundColor: '#7CB898', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
+  wrap:    { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
   nav:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
   title:   { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A' },
@@ -264,7 +270,7 @@ function FormHeader({ title, onBack, theme }: { title: string; onBack: () => voi
 }
 
 const fh = StyleSheet.create({
-  wrap:    { backgroundColor: '#7CB898', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
+  wrap:    { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
   nav:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
   title:   { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A' },
@@ -287,7 +293,7 @@ function PickerSheet<T extends string>({
             {options.map(opt => (
               <TouchableOpacity key={opt} style={pk.item} onPress={() => { onSelect(opt); onClose(); }} activeOpacity={0.8}>
                 {renderItem ? renderItem(opt) : <Text style={pk.itemTxt}>{opt}</Text>}
-                {selected === opt && <Ionicons name="checkmark" size={18} color="#3ECBA8" />}
+                {selected === opt && <Ionicons name="checkmark" size={18} color="#1B7A4A" />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -354,7 +360,7 @@ function NewCategoryModal({
               <View style={s.iconGrid}>
                 {NEW_CAT_ICONS.map(ic => (
                   <TouchableOpacity key={ic} style={[s.iconOpt, icon === ic && s.iconOptActive]} onPress={() => setIcon(ic)} activeOpacity={0.8}>
-                    <Ionicons name={ic} size={22} color={icon === ic ? '#fff' : '#1E9C70'} />
+                    <Ionicons name={ic} size={22} color={icon === ic ? '#fff' : '#115533'} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -400,7 +406,7 @@ function CategoriesScreen({
             })}
             <TouchableOpacity style={s.catCard} onPress={onAddCategory} activeOpacity={0.85}>
               <View style={[s.catIcon, s.catIconMore]}>
-                <Ionicons name="add" size={32} color="#1E9C70" />
+                <Ionicons name="add" size={32} color="#115533" />
               </View>
               <Text style={[s.catLabel, { color: theme.textPrimary }]}>More</Text>
             </TouchableOpacity>
@@ -443,7 +449,7 @@ function CategoryDetailScreen({
             <View key={group.key} style={{ marginBottom: 8 }}>
               <View style={s.monthHeader}>
                 <Text style={s.monthLabel}>{group.label}</Text>
-                <Ionicons name="calendar-outline" size={20} color="#3ECBA8" />
+                <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
               </View>
               {group.items.map((inc, idx) => (
                 <TouchableOpacity
@@ -524,7 +530,7 @@ function IncomeFormScreen({
               <Text style={[s.fieldTxt, { flex: 1, color: vals.date ? theme.textPrimary : '#aaa' }]}>
                 {vals.date || 'Select a date'}
               </Text>
-              <Ionicons name="calendar-outline" size={20} color="#3ECBA8" />
+              <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
             </TouchableOpacity>
 
             <Text style={[s.label, { color: theme.textPrimary }]}>Category</Text>
@@ -929,7 +935,7 @@ export default function IncomeSourcesScreen() {
 
 // ── Shared Styles ─────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#7CB898' },
+  safeArea: { flex: 1, backgroundColor: '#1B3D2B' },
 
   white:        { flex: 1, backgroundColor: '#fff' },
   whiteContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
@@ -938,8 +944,8 @@ const s = StyleSheet.create({
 
   grid:        { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 14, marginBottom: 24 },
   catCard:     { width: '30%', alignItems: 'center', marginBottom: 4 },
-  catIcon:     { width: 76, height: 76, borderRadius: 20, backgroundColor: '#1E9C70', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  catIconMore: { backgroundColor: 'rgba(30,156,112,0.12)' },
+  catIcon:     { width: 76, height: 76, borderRadius: 20, backgroundColor: '#115533', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  catIconMore: { backgroundColor: 'rgba(17,85,51,0.12)' },
   catLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, color: '#1A1A1A', textAlign: 'center' },
   catCount:    { fontFamily: Font.bodyRegular, fontSize: 11, color: '#888', marginTop: 2 },
 
@@ -951,19 +957,19 @@ const s = StyleSheet.create({
 
   incRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   incRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F2' },
-  incIcon:      { width: 46, height: 46, borderRadius: 23, backgroundColor: '#1E9C70', alignItems: 'center', justifyContent: 'center' },
+  incIcon:      { width: 46, height: 46, borderRadius: 23, backgroundColor: '#115533', alignItems: 'center', justifyContent: 'center' },
   incTitle:     { fontFamily: Font.bodySemiBold, fontSize: 15, color: '#1A1A1A', marginBottom: 3 },
   incMeta:      { fontFamily: Font.bodyRegular, fontSize: 11, color: '#999' },
-  incAmt:       { fontFamily: Font.bodySemiBold, fontSize: 13, color: '#1E9C70' },
+  incAmt:       { fontFamily: Font.bodySemiBold, fontSize: 13, color: '#115533' },
 
   addBtnWrapper: { position: 'absolute', bottom: 20, left: 20, right: 20 },
-  addBtn:        { backgroundColor: '#3ECBA8', borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
+  addBtn:        { backgroundColor: '#1B7A4A', borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
   addBtnTxt:     { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
 
   empty:    { alignItems: 'center', paddingTop: 60, paddingBottom: 40 },
   emptyTxt: { fontFamily: Font.bodyRegular, fontSize: 14, color: '#aaa', marginTop: 12 },
 
-  formScroll:  { flex: 1, backgroundColor: '#F0FAF6' },
+  formScroll:  { flex: 1, backgroundColor: '#EDF7F1' },
   formContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 48 },
   label:       { fontFamily: Font.bodyMedium, fontSize: 14, color: '#1A1A1A', marginBottom: 8, marginTop: 16 },
   fieldRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F7EF', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14 },
@@ -971,27 +977,27 @@ const s = StyleSheet.create({
   selectRow:   { justifyContent: 'space-between' },
 
   recurRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 20 },
-  checkbox:   { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#3ECBA8', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  checkboxOn: { backgroundColor: '#3ECBA8' },
+  checkbox:   { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#1B7A4A', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  checkboxOn: { backgroundColor: '#1B7A4A' },
   recurTxt:   { fontFamily: Font.bodyMedium, fontSize: 14, color: '#1A1A1A' },
 
   archiveBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 24, paddingVertical: 12 },
   archiveBtnTxt: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#E05858' },
 
-  saveBtn:    { backgroundColor: '#3ECBA8', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 28 },
+  saveBtn:    { backgroundColor: '#1B7A4A', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 28 },
   saveBtnTxt: { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
 
-  pickerIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#1E9C70', alignItems: 'center', justifyContent: 'center' },
+  pickerIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#115533', alignItems: 'center', justifyContent: 'center' },
 
   archiveRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   archiveRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F2' },
-  restoreBtn:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#3ECBA8' },
-  restoreTxt:       { fontFamily: Font.bodyMedium, fontSize: 13, color: '#3ECBA8' },
+  restoreBtn:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#1B7A4A' },
+  restoreTxt:       { fontFamily: Font.bodyMedium, fontSize: 13, color: '#1B7A4A' },
 
   iconGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
-  iconOpt:       { width: 50, height: 50, borderRadius: 14, borderWidth: 2, borderColor: '#1E9C70', alignItems: 'center', justifyContent: 'center' },
-  iconOptActive: { backgroundColor: '#1E9C70', borderColor: '#1E9C70' },
+  iconOpt:       { width: 50, height: 50, borderRadius: 14, borderWidth: 2, borderColor: '#115533', alignItems: 'center', justifyContent: 'center' },
+  iconOptActive: { backgroundColor: '#115533', borderColor: '#115533' },
 
-  toast:    { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#1E9C70', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', elevation: 8 },
+  toast:    { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#115533', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', elevation: 8 },
   toastTxt: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#fff' },
 });

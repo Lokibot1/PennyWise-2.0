@@ -74,7 +74,7 @@ function TabItem({
 }
 
 // Screens inside (tabs) that must NOT show the nav bar
-const AUTH_SCREENS = new Set(['login', 'register']);
+const AUTH_SCREENS = new Set(['login']);
 
 // ── CustomTabBar ───────────────────────────────────────────────────────────────
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
@@ -156,7 +156,6 @@ export default function TabLayout() {
       <Tabs.Screen name="profile" />
       <Tabs.Screen name="explore"  options={{ href: null }} />
       <Tabs.Screen name="login"    options={{ href: null }} />
-      <Tabs.Screen name="register" options={{ href: null }} />
       <Tabs.Screen name="transfer" options={{ href: null }} />
     </Tabs>
   );
@@ -183,7 +182,7 @@ const styles = StyleSheet.create({
     width: INDICATOR_SIZE,
     height: INDICATOR_SIZE,
     borderRadius: INDICATOR_SIZE / 2,
-    backgroundColor: '#3ECBA8',
+    backgroundColor: '#1B7A4A',
   },
   tabItem: {
     flex: 1,

@@ -18,6 +18,8 @@ type Props = {
   value: Date;
   onConfirm: (date: Date) => void;
   onClose: () => void;
+  maximumDate?: Date;
+  minimumDate?: Date;
 };
 
 const MONTHS = [
@@ -30,7 +32,7 @@ function fmt(d: Date) {
 }
 
 // ── Android: native dialog fires immediately, no modal wrapper needed ─────────
-function AndroidPicker({ visible, value, onConfirm, onClose }: Props) {
+function AndroidPicker({ visible, value, onConfirm, onClose, maximumDate, minimumDate }: Props) {
   if (!visible) return null;
 
   const handleChange = (_: DateTimePickerEvent, selected?: Date) => {
@@ -44,14 +46,14 @@ function AndroidPicker({ visible, value, onConfirm, onClose }: Props) {
       mode="date"
       display="calendar"
       onChange={handleChange}
-      maximumDate={new Date(2100, 11, 31)}
-      minimumDate={new Date(2000, 0, 1)}
+      maximumDate={maximumDate ?? new Date(2100, 11, 31)}
+      minimumDate={minimumDate ?? new Date(2000, 0, 1)}
     />
   );
 }
 
 // ── iOS: inline calendar inside a bottom-sheet modal ─────────────────────────
-function IOSPicker({ visible, value, onConfirm, onClose }: Props) {
+function IOSPicker({ visible, value, onConfirm, onClose, maximumDate, minimumDate }: Props) {
   const { theme } = useAppTheme();
   const [draft, setDraft] = useState(value);
 
@@ -75,17 +77,17 @@ function IOSPicker({ visible, value, onConfirm, onClose }: Props) {
               <Text style={[st.headerBtnTxt, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
             <View style={st.headerCenter}>
-              <Ionicons name="calendar-outline" size={18} color="#3ECBA8" />
+              <Ionicons name="calendar-outline" size={18} color="#1B7A4A" />
               <Text style={[st.headerTitle, { color: theme.textPrimary }]}>  Select Date</Text>
             </View>
             <TouchableOpacity onPress={handleConfirm} activeOpacity={0.7} style={st.headerBtn}>
-              <Text style={[st.headerBtnTxt, { color: '#3ECBA8', fontFamily: Font.bodySemiBold }]}>Done</Text>
+              <Text style={[st.headerBtnTxt, { color: '#1B7A4A', fontFamily: Font.bodySemiBold }]}>Done</Text>
             </TouchableOpacity>
           </View>
 
           {/* Selected date badge */}
           <View style={st.badge}>
-            <Text style={st.badgeTxt}>{fmt(draft)}</Text>
+            <Text style={[st.badgeTxt, { color: theme.textSecondary }]}>{fmt(draft)}</Text>
           </View>
 
           {/* Inline calendar */}
@@ -94,9 +96,9 @@ function IOSPicker({ visible, value, onConfirm, onClose }: Props) {
             mode="date"
             display="inline"
             onChange={handleChange}
-            maximumDate={new Date(2100, 11, 31)}
-            minimumDate={new Date(2000, 0, 1)}
-            accentColor="#3ECBA8"
+            maximumDate={maximumDate ?? new Date(2100, 11, 31)}
+            minimumDate={minimumDate ?? new Date(2000, 0, 1)}
+            accentColor="#1B7A4A"
             themeVariant={theme.statusBar === 'dark' ? 'light' : 'dark'}
             style={st.picker}
           />
@@ -162,7 +164,7 @@ const st = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 14,
     marginBottom: 4,
-    backgroundColor: 'rgba(62,203,168,0.12)',
+    backgroundColor: 'rgba(27,122,74,0.12)',
     borderRadius: 20,
     paddingHorizontal: 18,
     paddingVertical: 7,
@@ -170,7 +172,6 @@ const st = StyleSheet.create({
   badgeTxt: {
     fontFamily: Font.bodySemiBold,
     fontSize: 14,
-    color: '#1E9C70',
   },
 
   // DateTimePicker itself
@@ -183,7 +184,7 @@ const st = StyleSheet.create({
   confirmBtn: {
     marginHorizontal: 20,
     marginTop: 8,
-    backgroundColor: '#3ECBA8',
+    backgroundColor: '#1B7A4A',
     borderRadius: 50,
     paddingVertical: 15,
     alignItems: 'center',

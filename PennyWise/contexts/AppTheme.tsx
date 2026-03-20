@@ -23,41 +23,41 @@ export type Theme = {
 };
 
 export const LIGHT: Theme = {
-  headerBg: '#7CB898',
+  headerBg: '#1B3D2B',        // deep forest green — logo background
   cardBg: '#FFFFFF',
-  surface: '#F8FBF9',
-  textPrimary: '#1A1A1A',
-  textSecondary: '#666666',
-  textMuted: '#999999',
-  iconBtnBg: 'rgba(255,255,255,0.5)',
-  iconBtnColor: '#1A1A1A',
+  surface: '#F2F8F4',         // soft green-tinted off-white
+  textPrimary: '#0F1F17',     // near-black with a green tint
+  textSecondary: '#4A6355',   // muted forest green
+  textMuted: '#8FAF9A',       // subtle green-grey
+  iconBtnBg: 'rgba(255,255,255,0.18)',
+  iconBtnColor: '#FFFFFF',    // white icons on dark green header
   tabBarBg: '#FFFFFF',
-  tabBarInactive: '#9AA5B4',
-  inputBg: '#EEF7F3',
-  inputBorder: '#D5EDE4',
-  divider: '#F2F2F2',
+  tabBarInactive: '#8FAF9A',
+  inputBg: '#F2F8F4',         // light green-tinted input background
+  inputBorder: '#C8DDD2',     // soft green border
+  divider: '#E0EDE6',         // very light green divider
   modalBg: '#FFFFFF',
   confirmBg: '#FFFFFF',
-  statusBar: 'dark',
+  statusBar: 'light',         // white status bar icons on dark green header
   isDark: false,
 };
 
 export const DARK: Theme = {
-  headerBg: '#1B3028',
-  cardBg: '#141414',
-  surface: '#1E1E1E',
-  textPrimary: '#FFFFFF',
-  textSecondary: '#AAAAAA',
-  textMuted: '#666666',
+  headerBg: '#0C1F14',        // darkest forest — logo coin shadow
+  cardBg: '#121C16',
+  surface: '#1A2820',
+  textPrimary: '#E8F5EE',     // soft white with green tint
+  textSecondary: '#7AAF90',   // muted emerald
+  textMuted: '#4A6A55',
   iconBtnBg: 'rgba(255,255,255,0.12)',
   iconBtnColor: '#FFFFFF',
-  tabBarBg: '#141414',
-  tabBarInactive: '#4A4A4A',
-  inputBg: '#252525',
-  inputBorder: '#333333',
-  divider: '#252525',
-  modalBg: '#1E1E1E',
-  confirmBg: '#242424',
+  tabBarBg: '#121C16',
+  tabBarInactive: '#4A6A55',
+  inputBg: '#1A2820',
+  inputBorder: '#2A4035',
+  divider: '#1E3028',
+  modalBg: '#1A2820',
+  confirmBg: '#1E3028',
   statusBar: 'light',
   isDark: true,
 };

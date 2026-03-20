@@ -163,7 +163,7 @@ export default function LoginFormScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#7CB898',
+    backgroundColor: '#1B3D2B',
   },
 
   // ── Header ──────────────────────────────────────────
@@ -221,12 +221,12 @@ const styles = StyleSheet.create({
 
   // ── Buttons ─────────────────────────────────────────
   primaryButton: {
-    backgroundColor: '#3ECBA8',
+    backgroundColor: '#1B7A4A',
     borderRadius: 50,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 6,
-    shadowColor: '#3ECBA8',
+    shadowColor: '#1B7A4A',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.32,
     shadowRadius: 12,
@@ -248,10 +248,10 @@ const styles = StyleSheet.create({
   forgotText: {
     fontFamily: Font.bodyRegular,
     fontSize: 13,
-    color: '#6A8A7A',
+    color: '#8A8A8A',
   },
   secondaryButton: {
-    backgroundColor: '#E6F4ED',
+    backgroundColor: '#EDF7F1',
     borderRadius: 50,
     paddingVertical: 16,
     alignItems: 'center',
@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontFamily: Font.headerBold,
     fontSize: 18,
-    color: '#2D4A3E',
+    color: '#122A1E',
     letterSpacing: -0.2,
   },
 
@@ -273,12 +273,12 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#D6EDE4',
+    backgroundColor: '#C8DDD2',
   },
   dividerText: {
     fontFamily: Font.bodyRegular,
     fontSize: 12,
-    color: '#96BAA8',
+    color: '#9E9E9E',
   },
   socialRow: {
     flexDirection: 'row',
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     borderWidth: 1.5,
-    borderColor: '#C6E4D6',
+    borderColor: '#C8DDD2',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
@@ -306,11 +306,11 @@ const styles = StyleSheet.create({
   footerText: {
     fontFamily: Font.bodyRegular,
     fontSize: 13,
-    color: '#7A9A8A',
+    color: '#7A7A7A',
   },
   footerLink: {
     fontFamily: Font.bodySemiBold,
     fontSize: 13,
-    color: '#3ECBA8',
+    color: '#1B7A4A',
   },
 });

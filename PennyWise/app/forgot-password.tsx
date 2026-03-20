@@ -65,7 +65,7 @@ export default function ForgotPasswordScreen() {
           {sent ? (
             /* ── Success state ── */
             <View style={styles.successBox}>
-              <Ionicons name="mail-outline" size={48} color="#3ECBA8" />
+              <Ionicons name="mail-outline" size={48} color="#1B7A4A" />
               <Text style={styles.successTitle}>Check Your Email</Text>
               <Text style={styles.successDesc}>
                 We sent a password reset link to{'\n'}
@@ -165,7 +165,7 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#7CB898',
+    backgroundColor: '#1B3D2B',
   },
 
   // ── Header ──────────────────────────────────────────
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   resetDescription: {
     fontFamily: Font.bodyRegular,
     fontSize: 13,
-    color: '#7A9A8A',
+    color: '#7A7A7A',
     lineHeight: 20,
   },
 
@@ -247,24 +247,24 @@ const styles = StyleSheet.create({
   successDesc: {
     fontFamily: Font.bodyRegular,
     fontSize: 14,
-    color: '#7A9A8A',
+    color: '#7A7A7A',
     textAlign: 'center',
     lineHeight: 22,
   },
   successEmail: {
     fontFamily: Font.bodySemiBold,
-    color: '#3ECBA8',
+    color: '#1B7A4A',
   },
 
   // ── Buttons ─────────────────────────────────────────
   nextButton: {
-    backgroundColor: '#3ECBA8',
+    backgroundColor: '#1B7A4A',
     borderRadius: 50,
     paddingVertical: 16,
     alignItems: 'center',
     alignSelf: 'center',
     paddingHorizontal: 52,
-    shadowColor: '#3ECBA8',
+    shadowColor: '#1B7A4A',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.32,
     shadowRadius: 12,
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   secondaryButton: {
-    backgroundColor: '#E6F4ED',
+    backgroundColor: '#EDF7F1',
     borderRadius: 50,
     paddingVertical: 16,
     alignItems: 'center',
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontFamily: Font.headerBold,
     fontSize: 18,
-    color: '#2D4A3E',
+    color: '#122A1E',
     letterSpacing: -0.2,
   },
 
@@ -301,12 +301,12 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#D6EDE4',
+    backgroundColor: '#E0D8C8',
   },
   dividerText: {
     fontFamily: Font.bodyRegular,
     fontSize: 12,
-    color: '#96BAA8',
+    color: '#9E9E9E',
   },
   socialRow: {
     flexDirection: 'row',
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     borderWidth: 1.5,
-    borderColor: '#C6E4D6',
+    borderColor: '#E0D8C8',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
@@ -334,11 +334,11 @@ const styles = StyleSheet.create({
   footerText: {
     fontFamily: Font.bodyRegular,
     fontSize: 13,
-    color: '#7A9A8A',
+    color: '#7A7A7A',
   },
   footerLink: {
     fontFamily: Font.bodySemiBold,
     fontSize: 13,
-    color: '#3ECBA8',
+    color: '#1B7A4A',
   },
 });

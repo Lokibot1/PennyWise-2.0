@@ -2,9 +2,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Modal,
   Platform,
-  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -12,13 +10,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 import { FormInput } from '@/components/form-input';
 import { PasswordStrength } from '@/components/password-strength';
+import DatePickerModal from '@/components/DatePickerModal';
 import { Font } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
 
@@ -45,36 +43,15 @@ export default function CreateAccountScreen() {
   const [email, setEmail]                     = useState('');
   const [phone, setPhone]                     = useState('');
   const [dob, setDob]                         = useState<Date | null>(null);
-  const [tempDob, setTempDob]                 = useState<Date>(MAX_DOB);
   const [showPicker, setShowPicker]           = useState(false);
   const [password, setPassword]               = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading]                 = useState(false);
   const [error, setError]                     = useState('');
 
-  // ── Android: direct picker change ─────────────────────────────────────────
-  function onAndroidChange(event: DateTimePickerEvent, selected?: Date) {
-    setShowPicker(false);
-    if (event.type === 'set' && selected) {
-      setDob(selected);
-      setError('');
-    }
-  }
-
-  // ── iOS: picker scrolls, we confirm on "Done" ─────────────────────────────
-  function onIosChange(_event: DateTimePickerEvent, selected?: Date) {
-    if (selected) setTempDob(selected);
-  }
-
-  function confirmIosDob() {
-    setDob(tempDob);
-    setShowPicker(false);
+  function onDobConfirm(date: Date) {
+    setDob(date);
     setError('');
-  }
-
-  function openPicker() {
-    setTempDob(dob ?? MAX_DOB);
-    setShowPicker(true);
   }
 
   // ── Sign-up logic ─────────────────────────────────────────────────────────
@@ -167,14 +144,14 @@ export default function CreateAccountScreen() {
               <Text style={styles.fieldLabel}>Date of Birth</Text>
               <TouchableOpacity
                 style={[styles.dobRow, !dob && styles.dobRowEmpty]}
-                onPress={openPicker}
+                onPress={() => setShowPicker(true)}
                 activeOpacity={0.75}
               >
-                <Ionicons name="calendar-outline" size={17} color="#96BAA8" style={styles.dobIcon} />
+                <Ionicons name="calendar-outline" size={17} color="#9E9E9E" style={styles.dobIcon} />
                 <Text style={[styles.dobText, !dob && styles.dobPlaceholder]}>
                   {dob ? formatDob(dob) : 'Select your date of birth'}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#96BAA8" />
+                <Ionicons name="chevron-down" size={16} color="#9E9E9E" />
               </TouchableOpacity>
               <Text style={styles.dobHint}>You must be at least 13 years old.</Text>
             </View>
@@ -241,62 +218,14 @@ export default function CreateAccountScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* ════════════════════════════════════════════════
-          DATE PICKER
-          Android → native dialog (no extra UI needed)
-          iOS     → bottom-sheet modal
-      ════════════════════════════════════════════════ */}
-
-      {showPicker && Platform.OS === 'android' && (
-        <DateTimePicker
-          value={tempDob}
-          mode="date"
-          display="calendar"
-          maximumDate={MAX_DOB}
-          minimumDate={MIN_DOB}
-          onChange={onAndroidChange}
-        />
-      )}
-
-      {Platform.OS === 'ios' && (
-        <Modal
-          visible={showPicker}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowPicker(false)}
-        >
-          <Pressable style={styles.modalOverlay} onPress={() => setShowPicker(false)}>
-            <Pressable style={styles.modalSheet} onPress={() => {}}>
-
-              {/* Handle bar */}
-              <View style={styles.sheetHandle} />
-
-              {/* Header row */}
-              <View style={styles.sheetHeader}>
-                <TouchableOpacity onPress={() => setShowPicker(false)} activeOpacity={0.7}>
-                  <Text style={styles.sheetCancel}>Cancel</Text>
-                </TouchableOpacity>
-                <Text style={styles.sheetTitle}>Date of Birth</Text>
-                <TouchableOpacity onPress={confirmIosDob} activeOpacity={0.7}>
-                  <Text style={styles.sheetDone}>Done</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Picker wheel */}
-              <DateTimePicker
-                value={tempDob}
-                mode="date"
-                display="spinner"
-                maximumDate={MAX_DOB}
-                minimumDate={MIN_DOB}
-                onChange={onIosChange}
-                style={styles.iosPicker}
-              />
-
-            </Pressable>
-          </Pressable>
-        </Modal>
-      )}
+      <DatePickerModal
+        visible={showPicker}
+        value={dob ?? MAX_DOB}
+        onConfirm={onDobConfirm}
+        onClose={() => setShowPicker(false)}
+        maximumDate={MAX_DOB}
+        minimumDate={MIN_DOB}
+      />
 
     </SafeAreaView>
   );
@@ -306,7 +235,7 @@ export default function CreateAccountScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#7CB898',
+    backgroundColor: '#1B3D2B',
   },
 
   // ── Header ──────────────────────────────────────────
@@ -343,13 +272,13 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontFamily: Font.bodySemiBold,
     fontSize: 13,
-    color: '#3A5A4A',
+    color: '#1B3D2B',
     marginLeft: 2,
   },
   dobRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E6F4ED',
+    backgroundColor: '#EDF7F1',
     borderRadius: 12,
     paddingHorizontal: 14,
     height: 50,
@@ -363,15 +292,15 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: Font.bodyRegular,
     fontSize: 14,
-    color: '#2D4A3E',
+    color: '#122A1E',
   },
   dobPlaceholder: {
-    color: '#AABDB5',
+    color: '#BDBDBD',
   },
   dobHint: {
     fontFamily: Font.bodyRegular,
     fontSize: 11,
-    color: '#96BAA8',
+    color: '#9E9E9E',
     marginLeft: 2,
   },
 
@@ -396,22 +325,22 @@ const styles = StyleSheet.create({
   termsText: {
     fontFamily: Font.bodyRegular,
     fontSize: 12,
-    color: '#7A9A8A',
+    color: '#7A7A7A',
     textAlign: 'center',
     lineHeight: 18,
   },
   termsLink: {
     fontFamily: Font.bodySemiBold,
-    color: '#3ECBA8',
+    color: '#1B7A4A',
   },
 
   // ── Button ──────────────────────────────────────────
   primaryButton: {
-    backgroundColor: '#3ECBA8',
+    backgroundColor: '#1B7A4A',
     borderRadius: 50,
     paddingVertical: 16,
     alignItems: 'center',
-    shadowColor: '#3ECBA8',
+    shadowColor: '#1B7A4A',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.32,
     shadowRadius: 12,
@@ -434,60 +363,12 @@ const styles = StyleSheet.create({
   footerText: {
     fontFamily: Font.bodyRegular,
     fontSize: 13,
-    color: '#7A9A8A',
+    color: '#7A7A7A',
   },
   footerLink: {
     fontFamily: Font.bodySemiBold,
     fontSize: 13,
-    color: '#3ECBA8',
+    color: '#1B7A4A',
   },
 
-  // ── iOS bottom-sheet modal ───────────────────────────
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingBottom: 32,
-  },
-  sheetHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  sheetTitle: {
-    fontFamily: Font.headerBold,
-    fontSize: 16,
-    color: '#1A1A1A',
-  },
-  sheetCancel: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 15,
-    color: '#888',
-  },
-  sheetDone: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 15,
-    color: '#3ECBA8',
-  },
-  iosPicker: {
-    height: 200,
-  },
 });

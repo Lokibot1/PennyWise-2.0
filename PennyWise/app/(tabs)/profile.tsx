@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -15,39 +14,39 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
+import { PennyWiseLogo } from '@/components/penny-wise-logo';
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = 'profile' | 'edit' | 'terms';
 type IoniconName = keyof typeof Ionicons.glyphMap;
+type ProfileData = { full_name: string; email: string; phone: string };
 
-// ── Shared nav header (matches every other page exactly) ────────────────────────
-function NavHeader({
-  title,
-  onBack,
-  theme,
-}: {
-  title: string;
-  onBack?: () => void;
-  theme: ReturnType<typeof useAppTheme>['theme'];
-}) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  return parts.map(w => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+}
+
+// ── Nav header ────────────────────────────────────────────────────────────────
+function NavHeader({ title, onBack }: { title: string; onBack?: () => void }) {
+  const { theme } = useAppTheme();
   return (
     <View style={styles.nav}>
       <TouchableOpacity
         style={[styles.iconBtn, { backgroundColor: theme.iconBtnBg }]}
-        onPress={onBack}
+        onPress={onBack ?? (() => router.replace('/(tabs)'))}
         activeOpacity={0.8}
-        disabled={!onBack}
       >
         {onBack
           ? <Ionicons name="chevron-back" size={22} color={theme.iconBtnColor} />
-          : <View style={{ width: 22 }} />}
+          : <PennyWiseLogo size="xs" />}
       </TouchableOpacity>
-
       <Text style={[styles.navTitle, { color: theme.iconBtnColor }]}>{title}</Text>
-
       <TouchableOpacity
         style={[styles.iconBtn, { backgroundColor: theme.iconBtnBg }]}
         activeOpacity={0.8}
@@ -58,15 +57,21 @@ function NavHeader({
   );
 }
 
-// ── Avatar ──────────────────────────────────────────────────────────────────────
-function Avatar({ showEdit }: { showEdit?: boolean }) {
+// ── Avatar ────────────────────────────────────────────────────────────────────
+function Avatar({ name, size = 96, showEdit }: { name: string; size?: number; showEdit?: boolean }) {
+  const initials = name ? getInitials(name) : '';
+  const fontSize = Math.round(size * 0.35);
   return (
-    <View style={styles.avatarWrap}>
-      <View style={styles.avatarCircle}>
-        <Ionicons name="person" size={52} color="#fff" />
+    <View style={{ position: 'relative' }}>
+      <View style={[styles.avatarRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2 }]}>
+        <View style={[styles.avatarCircle, { width: size, height: size, borderRadius: size / 2 }]}>
+          {initials
+            ? <Text style={[styles.avatarInitials, { fontSize }]}>{initials}</Text>
+            : <Ionicons name="person" size={size * 0.46} color="#fff" />}
+        </View>
       </View>
       {showEdit && (
-        <View style={styles.cameraBadge}>
+        <View style={[styles.cameraBadge, { bottom: 2, right: 2 }]}>
           <Ionicons name="camera" size={13} color="#fff" />
         </View>
       )}
@@ -74,52 +79,51 @@ function Avatar({ showEdit }: { showEdit?: boolean }) {
   );
 }
 
-// ── Profile menu item ────────────────────────────────────────────────────────────
+// ── Menu group ────────────────────────────────────────────────────────────────
+function MenuGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  const { theme } = useAppTheme();
+  return (
+    <View style={styles.menuGroup}>
+      <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>{label}</Text>
+      <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+// ── Menu item ─────────────────────────────────────────────────────────────────
 function MenuItem({
-  icon,
-  iconColor,
-  label,
-  theme,
-  danger,
-  onPress,
+  icon, iconBg, label, value, danger, last, onPress,
 }: {
-  icon: IoniconName;
-  iconColor: string;
-  label: string;
-  theme: ReturnType<typeof useAppTheme>['theme'];
-  danger?: boolean;
-  onPress?: () => void;
+  icon: IoniconName; iconBg: string; label: string;
+  value?: string; danger?: boolean; last?: boolean; onPress?: () => void;
 }) {
+  const { theme } = useAppTheme();
   return (
     <TouchableOpacity
-      style={[styles.menuRow, { borderBottomColor: theme.divider }]}
+      style={[styles.menuRow, !last && { borderBottomWidth: 1, borderBottomColor: theme.divider }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={[styles.menuIconCircle, { backgroundColor: iconColor }]}>
-        <Ionicons name={icon} size={20} color="#fff" />
+      <View style={[styles.menuIconCircle, { backgroundColor: iconBg }]}>
+        <Ionicons name={icon} size={18} color="#fff" />
       </View>
       <Text style={[styles.menuLabel, { color: danger ? '#E05555' : theme.textPrimary }]}>
         {label}
       </Text>
-      <Ionicons
-        name="chevron-forward"
-        size={18}
-        color={danger ? '#E05555' : theme.textMuted}
-      />
+      {value
+        ? <Text style={[styles.menuValue, { color: theme.textMuted }]}>{value}</Text>
+        : <Ionicons name="chevron-forward" size={16} color={danger ? '#E05555' : theme.textMuted} />}
     </TouchableOpacity>
   );
 }
 
-// ── Profile main screen ─────────────────────────────────────────────────────────
+// ── Profile view ──────────────────────────────────────────────────────────────
 function ProfileView({
-  profile,
-  loading,
-  navigate,
+  profile, loading, navigate,
 }: {
-  profile: ProfileData;
-  loading: boolean;
-  navigate: (s: Screen) => void;
+  profile: ProfileData; loading: boolean; navigate: (s: Screen) => void;
 }) {
   const { theme } = useAppTheme();
   const [logoutVisible, setLogoutVisible] = useState(false);
@@ -128,81 +132,67 @@ function ProfileView({
   async function confirmLogout() {
     setLoggingOut(true);
     await supabase.auth.signOut();
-    // _layout.tsx SIGNED_OUT listener handles the redirect
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.headerBg }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
       <StatusBar style={theme.statusBar} />
 
-      {/* Green header */}
+      {/* ── Header ── */}
       <View style={[styles.greenSection, { backgroundColor: theme.headerBg }]}>
-        <NavHeader title="Profile" theme={theme} />
-        <View style={styles.avatarCenter}>
-          <Avatar />
+        <NavHeader title="Profile" />
+        <View style={styles.avatarBlock}>
+          <Avatar name={profile.full_name} size={100} />
+          {loading ? (
+            <ActivityIndicator color="#9ABAA6" style={{ marginTop: 14 }} />
+          ) : (
+            <>
+              <Text style={styles.headerName}>{profile.full_name || 'Your Name'}</Text>
+              {!!profile.email && (
+                <Text style={styles.headerEmail}>{profile.email}</Text>
+              )}
+            </>
+          )}
         </View>
       </View>
 
-      {/* Card */}
-      <View style={[styles.card, { backgroundColor: theme.cardBg }]}>
-        {loading ? (
-          <ActivityIndicator color="#3ECBA8" style={{ marginVertical: 12 }} />
-        ) : (
-          <>
-            <Text style={[styles.profileName, { color: theme.textPrimary }]}>
-              {profile.full_name || 'User'}
-            </Text>
-            <Text style={[styles.profileId, { color: theme.textSecondary }]}>
-              {profile.email}
-            </Text>
-          </>
+      {/* ── Card ── */}
+      <ScrollView
+        style={[styles.card, { backgroundColor: theme.cardBg }]}
+        contentContainerStyle={styles.cardContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* Info pills */}
+        {!!profile.phone && (
+          <View style={[styles.infoPill, { backgroundColor: theme.surface }]}>
+            <Ionicons name="call-outline" size={14} color="#1B7A4A" />
+            <Text style={[styles.infoPillText, { color: theme.textSecondary }]}>{profile.phone}</Text>
+          </View>
         )}
 
-        <View style={styles.menuList}>
-          <MenuItem
-            icon="person-outline"
-            iconColor="#3ECBA8"
-            label="Edit Profile"
-            theme={theme}
-            onPress={() => navigate('edit')}
-          />
-          <MenuItem
-            icon="document-text-outline"
-            iconColor="#4B78E0"
-            label="Terms And Condition"
-            theme={theme}
-            onPress={() => navigate('terms')}
-          />
-          <MenuItem
-            icon="settings-outline"
-            iconColor="#F4A84E"
-            label="Setting"
-            theme={theme}
-          />
-          <MenuItem
-            icon="headset-outline"
-            iconColor="#7B68EE"
-            label="Help"
-            theme={theme}
-          />
-          <MenuItem
-            icon="log-out-outline"
-            iconColor="#E05555"
-            label="Logout"
-            theme={theme}
-            danger
-            onPress={() => setLogoutVisible(true)}
-          />
-        </View>
-      </View>
+        {/* Account section */}
+        <MenuGroup label="ACCOUNT">
+          <MenuItem icon="person-outline"        iconBg="#1B7A4A" label="Edit Profile"        onPress={() => navigate('edit')} />
+          <MenuItem icon="document-text-outline" iconBg="#2D7A5A" label="Terms & Conditions"  onPress={() => navigate('terms')} last />
+        </MenuGroup>
 
-      {/* ── Logout confirmation modal ── */}
-      <Modal
-        visible={logoutVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setLogoutVisible(false)}
-      >
+        {/* General section */}
+        <MenuGroup label="GENERAL">
+          <MenuItem icon="settings-outline" iconBg="#115533" label="Settings" />
+          <MenuItem icon="headset-outline"  iconBg="#43A872" label="Help & Support" last />
+        </MenuGroup>
+
+        {/* Danger zone */}
+        <View style={[styles.dangerCard, { backgroundColor: 'rgba(224,85,85,0.08)' }]}>
+          <MenuItem icon="log-out-outline" iconBg="#E05555" label="Log Out" danger last onPress={() => setLogoutVisible(true)} />
+        </View>
+
+        <View style={{ height: 32 }} />
+      </ScrollView>
+
+      {/* Logout modal */}
+      <Modal visible={logoutVisible} transparent animationType="fade" onRequestClose={() => setLogoutVisible(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => !loggingOut && setLogoutVisible(false)}>
           <Pressable style={[styles.modalBox, { backgroundColor: theme.confirmBg }]} onPress={() => {}}>
             <View style={styles.modalIconWrap}>
@@ -213,24 +203,13 @@ function ProfileView({
               Are you sure you want to log out of your account?
             </Text>
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalBtnNo, { backgroundColor: theme.surface }]}
-                onPress={() => setLogoutVisible(false)}
-                disabled={loggingOut}
-                activeOpacity={0.8}
-              >
+              <TouchableOpacity style={[styles.modalBtnNo, { backgroundColor: theme.surface }]} onPress={() => setLogoutVisible(false)} disabled={loggingOut} activeOpacity={0.8}>
                 <Text style={[styles.modalBtnNoText, { color: theme.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalBtnYes}
-                onPress={confirmLogout}
-                disabled={loggingOut}
-                activeOpacity={0.85}
-              >
+              <TouchableOpacity style={styles.modalBtnYes} onPress={confirmLogout} disabled={loggingOut} activeOpacity={0.85}>
                 {loggingOut
                   ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.modalBtnYesText}>Yes, Log Out</Text>
-                }
+                  : <Text style={styles.modalBtnYesText}>Yes, Log Out</Text>}
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -240,162 +219,166 @@ function ProfileView({
   );
 }
 
-// ── Edit Profile screen ─────────────────────────────────────────────────────────
+// ── Edit profile view ─────────────────────────────────────────────────────────
 function EditProfileView({
-  profile,
-  onBack,
-  onSaved,
+  profile, onBack, onSaved,
 }: {
-  profile: ProfileData;
-  onBack: () => void;
-  onSaved: (updated: ProfileData) => void;
+  profile: ProfileData; onBack: () => void; onSaved: (u: ProfileData) => void;
 }) {
   const { theme, darkMode, toggleDark } = useAppTheme();
-  const [pushNotif, setPushNotif]     = useState(true);
-  const [username, setUsername]       = useState(profile.full_name);
-  const [phone, setPhone]             = useState(profile.phone ?? '');
-  const [email, setEmail]             = useState(profile.email);
-  const [saving, setSaving]           = useState(false);
-  const [saveConfirm, setSaveConfirm] = useState(false);
-  const [savedToast, setSavedToast]   = useState(false);
+  const [username, setUsername] = useState(profile.full_name);
+  const [phone, setPhone]       = useState(profile.phone ?? '');
+  const [email, setEmail]       = useState(profile.email);
+  const [saving, setSaving]     = useState(false);
+  const [confirm, setConfirm]   = useState(false);
+  const [toast, setToast]       = useState(false);
 
   async function handleSave() {
-    setSaveConfirm(false);
+    setConfirm(false);
     setSaving(true);
-
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase
       .from('profiles')
       .update({ full_name: username.trim(), phone: phone.trim(), email: email.trim() })
       .eq('id', user?.id);
-
     setSaving(false);
-
     if (!error) {
       onSaved({ full_name: username.trim(), phone: phone.trim(), email: email.trim() });
-      setSavedToast(true);
-      setTimeout(() => setSavedToast(false), 2800);
+      setToast(true);
+      setTimeout(() => setToast(false), 2800);
     }
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.headerBg }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
       <StatusBar style={theme.statusBar} />
-      <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
 
-        {/* Green header */}
-        <View style={[styles.greenSection, { backgroundColor: theme.headerBg }]}>
-          <NavHeader title="Edit Profile" onBack={onBack} theme={theme} />
-          <View style={styles.avatarCenter}>
-            <Avatar showEdit />
+      {/* Sticky header — always visible */}
+      <View style={[styles.greenSection, { backgroundColor: theme.headerBg, paddingBottom: 24 }]}>
+        <NavHeader title="Edit Profile" onBack={onBack} />
+        <View style={styles.avatarBlock}>
+          <Avatar name={profile.full_name} size={88} showEdit />
+          <Text style={styles.headerName}>{profile.full_name || 'Your Name'}</Text>
+        </View>
+      </View>
+
+      {/* Scrollable form */}
+      <ScrollView
+        style={[styles.card, { backgroundColor: theme.cardBg }]}
+        contentContainerStyle={[styles.cardContent, { paddingTop: 28 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Personal info section */}
+        <Text style={[styles.formSectionTitle, { color: theme.textMuted }]}>PERSONAL INFO</Text>
+        <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+          <View style={[styles.formField, { borderBottomWidth: 1, borderBottomColor: theme.divider }]}>
+            <View style={styles.formFieldIcon}>
+              <Ionicons name="person-outline" size={16} color="#1B7A4A" />
+            </View>
+            <View style={styles.formFieldBody}>
+              <Text style={[styles.formFieldLabel, { color: theme.textMuted }]}>Username</Text>
+              <TextInput
+                style={[styles.formFieldInput, { color: theme.textPrimary }]}
+                value={username}
+                onChangeText={setUsername}
+                placeholderTextColor={theme.textMuted}
+                placeholder="Enter your name"
+              />
+            </View>
+          </View>
+
+          <View style={[styles.formField, { borderBottomWidth: 1, borderBottomColor: theme.divider }]}>
+            <View style={styles.formFieldIcon}>
+              <Ionicons name="call-outline" size={16} color="#1B7A4A" />
+            </View>
+            <View style={styles.formFieldBody}>
+              <Text style={[styles.formFieldLabel, { color: theme.textMuted }]}>Phone</Text>
+              <TextInput
+                style={[styles.formFieldInput, { color: theme.textPrimary }]}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                placeholderTextColor={theme.textMuted}
+                placeholder="Enter your phone"
+              />
+            </View>
+          </View>
+
+          <View style={styles.formField}>
+            <View style={styles.formFieldIcon}>
+              <Ionicons name="mail-outline" size={16} color="#1B7A4A" />
+            </View>
+            <View style={styles.formFieldBody}>
+              <Text style={[styles.formFieldLabel, { color: theme.textMuted }]}>Email</Text>
+              <TextInput
+                style={[styles.formFieldInput, { color: theme.textPrimary }]}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor={theme.textMuted}
+                placeholder="Enter your email"
+              />
+            </View>
           </View>
         </View>
 
-        {/* Form card */}
-        <View style={[styles.card, styles.formCard, { backgroundColor: theme.cardBg }]}>
-          <Text style={[styles.profileName, { color: theme.textPrimary }]}>
-            {profile.full_name || 'User'}
-          </Text>
-          <Text style={[styles.profileId, { color: theme.textSecondary }]}>
-            {profile.email}
-          </Text>
-
-          <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>Account Settings</Text>
-
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Username</Text>
-          <TextInput
-            style={[styles.input, {
-              backgroundColor: theme.inputBg,
-              borderColor: theme.inputBorder,
-              color: theme.textPrimary,
-            }]}
-            value={username}
-            onChangeText={setUsername}
-            placeholderTextColor={theme.textMuted}
-          />
-
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone</Text>
-          <TextInput
-            style={[styles.input, {
-              backgroundColor: theme.inputBg,
-              borderColor: theme.inputBorder,
-              color: theme.textPrimary,
-            }]}
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            placeholderTextColor={theme.textMuted}
-          />
-
-          <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email Address</Text>
-          <TextInput
-            style={[styles.input, {
-              backgroundColor: theme.inputBg,
-              borderColor: theme.inputBorder,
-              color: theme.textPrimary,
-            }]}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholderTextColor={theme.textMuted}
-          />
-
-          {/* Toggles */}
-          <View style={[styles.toggleRow, { borderBottomColor: theme.divider }]}>
-            <Text style={[styles.toggleLabel, { color: theme.textPrimary }]}>Push Notifications</Text>
-            <Switch
-              value={pushNotif}
-              onValueChange={setPushNotif}
-              trackColor={{ false: theme.inputBorder, true: '#3ECBA8' }}
-              thumbColor="#fff"
-            />
+        {/* Preferences section */}
+        <Text style={[styles.formSectionTitle, { color: theme.textMuted, marginTop: 24 }]}>PREFERENCES</Text>
+        <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+          <View style={styles.formField}>
+            <View style={styles.formFieldIcon}>
+              <Ionicons name="moon-outline" size={16} color="#1B7A4A" />
+            </View>
+            <View style={[styles.formFieldBody, { flexDirection: 'row', alignItems: 'center' }]}>
+              <Text style={[styles.formToggleLabel, { color: theme.textPrimary, flex: 1 }]}>Dark Theme</Text>
+              <Switch
+                value={darkMode}
+                onValueChange={toggleDark}
+                trackColor={{ false: theme.inputBorder, true: '#1B7A4A' }}
+                thumbColor="#fff"
+              />
+            </View>
           </View>
-
-          <View style={[styles.toggleRow, { borderBottomColor: theme.divider }]}>
-            <Text style={[styles.toggleLabel, { color: theme.textPrimary }]}>Dark Theme</Text>
-            <Switch
-              value={darkMode}
-              onValueChange={toggleDark}
-              trackColor={{ false: theme.inputBorder, true: '#3ECBA8' }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.saveBtn, saving && { opacity: 0.7 }]}
-            activeOpacity={0.85}
-            disabled={saving}
-            onPress={() => setSaveConfirm(true)}
-          >
-            {saving
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.saveBtnText}>Save Changes</Text>
-            }
-          </TouchableOpacity>
         </View>
+
+        {/* Actions */}
+        <TouchableOpacity
+          style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+          activeOpacity={0.85}
+          disabled={saving}
+          onPress={() => setConfirm(true)}
+        >
+          {saving
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.saveBtnText}>Save Changes</Text>}
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.cancelBtn} activeOpacity={0.7} onPress={onBack} disabled={saving}>
+          <Ionicons name="chevron-back" size={16} color={theme.textSecondary} />
+          <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Back to Profile</Text>
+        </TouchableOpacity>
+
+        <View style={{ height: 32 }} />
       </ScrollView>
 
-      {/* ── Save confirm modal ── */}
-      <Modal visible={saveConfirm} transparent animationType="fade" onRequestClose={() => setSaveConfirm(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setSaveConfirm(false)}>
+      {/* Save confirm modal */}
+      <Modal visible={confirm} transparent animationType="fade" onRequestClose={() => setConfirm(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setConfirm(false)}>
           <Pressable style={[styles.modalBox, { backgroundColor: theme.confirmBg }]} onPress={() => {}}>
-            <View style={[styles.modalIconWrap, { backgroundColor: 'rgba(62,203,168,0.12)' }]}>
-              <Ionicons name="save-outline" size={30} color="#3ECBA8" />
+            <View style={[styles.modalIconWrap, { backgroundColor: 'rgba(27,122,74,0.12)' }]}>
+              <Ionicons name="save-outline" size={30} color="#1B7A4A" />
             </View>
             <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Save Changes?</Text>
             <Text style={[styles.modalMsg, { color: theme.textSecondary }]}>
               Are you sure you want to save the changes to your profile?
             </Text>
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalBtnNo, { backgroundColor: theme.surface }]}
-                onPress={() => setSaveConfirm(false)}
-                activeOpacity={0.8}
-              >
+              <TouchableOpacity style={[styles.modalBtnNo, { backgroundColor: theme.surface }]} onPress={() => setConfirm(false)} activeOpacity={0.8}>
                 <Text style={[styles.modalBtnNoText, { color: theme.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalBtnYes} onPress={handleSave} activeOpacity={0.85}>
+              <TouchableOpacity style={[styles.modalBtnYes, { backgroundColor: '#1B7A4A' }]} onPress={handleSave} activeOpacity={0.85}>
                 <Text style={styles.modalBtnYesText}>Yes, Save</Text>
               </TouchableOpacity>
             </View>
@@ -403,8 +386,7 @@ function EditProfileView({
         </Pressable>
       </Modal>
 
-      {/* ── Success toast ── */}
-      {savedToast && (
+      {toast && (
         <View style={styles.toast} pointerEvents="none">
           <Ionicons name="checkmark-circle" size={18} color="#fff" />
           <Text style={styles.toastText}>Profile updated successfully.</Text>
@@ -414,60 +396,42 @@ function EditProfileView({
   );
 }
 
-// ── Terms & Conditions screen ───────────────────────────────────────────────────
+// ── Terms view ────────────────────────────────────────────────────────────────
 const TERMS_TEXT = `These terms and conditions outline the rules and regulations for the use of PennyWise.
 
-1. By accessing this app we assume you accept these terms and conditions. Do not continue to use PennyWise if you do not agree to take all of the terms and conditions stated on this page.
+1. By accessing this app we assume you accept these terms and conditions.
 
-2. The following terminology applies to these Terms and Conditions, Privacy Statement and Disclaimer Notice and all Agreements: "Client", "You" and "Your" refers to you, the person using this application. "The Company", "Ourselves", "We", "Our" and "Us" refers to PennyWise.
+2. All personal financial data you enter is stored securely. We do not sell your data to third parties.
 
-3. All personal financial data you enter in this app is stored locally on your device. We do not collect, transmit, or sell your financial data to any third parties.
+3. You are responsible for maintaining the security of your device and account.
 
-4. You are responsible for maintaining the security of your device and ensuring that no unauthorized person has access to your financial information stored in PennyWise.
+4. We reserve the right to modify these terms at any time.
 
-5. We reserve the right to modify these terms at any time. Continued use of the app after any such changes shall constitute your consent to such changes.
-
-6. This app is provided "as is" without any warranties. We do not warrant that the app will be uninterrupted, error-free, or free of viruses.
-
-Read the full terms at www.pennywise.app/terms`;
+5. This app is provided "as is" without any warranties.`;
 
 function TermsView({ onBack }: { onBack: () => void }) {
   const { theme } = useAppTheme();
   const [accepted, setAccepted] = useState(false);
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.headerBg }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
       <StatusBar style={theme.statusBar} />
-
       <View style={[styles.greenSection, styles.termsHeader, { backgroundColor: theme.headerBg }]}>
-        <NavHeader title="Terms & Condition" onBack={onBack} theme={theme} />
+        <NavHeader title="Terms & Conditions" onBack={onBack} />
       </View>
-
       <ScrollView
         style={[styles.termsScroll, { backgroundColor: theme.cardBg }]}
         contentContainerStyle={styles.termsContent}
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.termsText, { color: theme.textSecondary }]}>{TERMS_TEXT}</Text>
-
-        <TouchableOpacity
-          style={styles.checkRow}
-          onPress={() => setAccepted(v => !v)}
-          activeOpacity={0.8}
-        >
-          <View style={[styles.checkbox, accepted && styles.checkboxOn]}>
+        <TouchableOpacity style={styles.checkRow} onPress={() => setAccepted(v => !v)} activeOpacity={0.8}>
+          <View style={[styles.checkbox, { borderColor: '#1B7A4A' }, accepted && styles.checkboxOn]}>
             {accepted && <Ionicons name="checkmark" size={13} color="#fff" />}
           </View>
-          <Text style={[styles.checkLabel, { color: theme.textPrimary }]}>
-            I accept all the terms and conditions
-          </Text>
+          <Text style={[styles.checkLabel, { color: theme.textPrimary }]}>I accept all the terms and conditions</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.saveBtn, !accepted && styles.saveBtnOff]}
-          activeOpacity={accepted ? 0.85 : 1}
-          disabled={!accepted}
-        >
+        <TouchableOpacity style={[styles.saveBtn, !accepted && styles.saveBtnOff]} activeOpacity={accepted ? 0.85 : 1} disabled={!accepted}>
           <Text style={styles.saveBtnText}>Accept</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -475,354 +439,115 @@ function TermsView({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ── Types ────────────────────────────────────────────────────────────────────────
-type ProfileData = {
-  full_name: string;
-  email: string;
-  phone: string;
-};
-
-// ── Root ────────────────────────────────────────────────────────────────────────
+// ── Root ──────────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const [screen, setScreen]   = useState<Screen>('profile');
   const [profile, setProfile] = useState<ProfileData>({ full_name: '', email: '', phone: '' });
-  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Use onAuthStateChange instead of getUser() to avoid the AsyncStorage
-    // race condition — getUser() can return null if called before the persisted
-    // session has finished loading. onAuthStateChange fires INITIAL_SESSION
-    // only after the session is fully restored.
-    async function loadProfile(userId: string) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('full_name, email, phone')
-        .eq('id', userId)
-        .single();
-      if (data) setProfile(data);
-      setLoadingProfile(false);
-    }
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
-        setLoadingProfile(false);
-      }
+    let cancelled = false;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (cancelled || !user) { if (!cancelled) setLoading(false); return; }
+      const meta = (user.user_metadata ?? {}) as Record<string, string>;
+      supabase.from('profiles').select('full_name, email, phone').eq('id', user.id).single()
+        .then(({ data }) => {
+          if (cancelled) return;
+          setProfile({
+            full_name: data?.full_name || meta.full_name || '',
+            email:     data?.email     || meta.email     || '',
+            phone:     data?.phone     || meta.phone     || '',
+          });
+          setLoading(false);
+        });
     });
-
-    return () => subscription.unsubscribe();
+    return () => { cancelled = true; };
   }, []);
 
-  if (screen === 'edit') {
-    return (
-      <EditProfileView
-        profile={profile}
-        onBack={() => setScreen('profile')}
-        onSaved={(updated) => setProfile(updated)}
-      />
-    );
-  }
+  if (screen === 'edit')  return <EditProfileView profile={profile} onBack={() => setScreen('profile')} onSaved={u => setProfile(u)} />;
   if (screen === 'terms') return <TermsView onBack={() => setScreen('profile')} />;
-  return <ProfileView profile={profile} loading={loadingProfile} navigate={setScreen} />;
+  return <ProfileView profile={profile} loading={loading} navigate={setScreen} />;
 }
 
-// ── Styles ──────────────────────────────────────────────────────────────────────
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  safe:         { flex: 1 },
+  nav:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  iconBtn:      { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  navTitle:     { fontFamily: Font.headerBold, fontSize: 20 },
 
-  // ── Nav header (matches BalanceHeader/FormHeader on other pages) ──────────────
-  nav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  iconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  navTitle: {
-    fontFamily: Font.headerBold,
-    fontSize: 20,
-  },
+  greenSection: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 },
+  termsHeader:  { paddingBottom: 12 },
 
-  // ── Green top section ─────────────────────────────────────────────────────────
-  greenSection: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
-  },
-  termsHeader: {
-    paddingBottom: 12,
-  },
-  avatarCenter: {
-    alignItems: 'center',
-  },
+  // Avatar
+  avatarBlock:    { alignItems: 'center', marginTop: 4 },
+  avatarRing:     { backgroundColor: 'rgba(154,186,166,0.35)', alignItems: 'center', justifyContent: 'center' },
+  avatarCircle:   { backgroundColor: '#1B7A4A', alignItems: 'center', justifyContent: 'center' },
+  avatarInitials: { fontFamily: Font.headerBold, color: '#fff', letterSpacing: 1 },
+  cameraBadge:    { position: 'absolute', width: 28, height: 28, borderRadius: 14, backgroundColor: '#115533', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
 
-  // ── Avatar ────────────────────────────────────────────────────────────────────
-  avatarWrap: {
-    position: 'relative',
-  },
-  avatarCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#3ECBA8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.6)',
-  },
-  cameraBadge: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#3ECBA8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
+  // Header name / email
+  headerName:  { fontFamily: Font.headerBold, fontSize: 20, color: '#fff', marginTop: 12, letterSpacing: 0.3 },
+  headerEmail: { fontFamily: Font.bodyRegular, fontSize: 13, color: 'rgba(255,255,255,0.65)', marginTop: 3 },
 
-  // ── White card ────────────────────────────────────────────────────────────────
-  card: {
-    flex: 1,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -18,
-    paddingTop: 22,
-    paddingHorizontal: 20,
-    paddingBottom: 28,
-    alignItems: 'center',
-  },
-  formCard: {
-    alignItems: 'stretch',
-    flex: undefined,
-    paddingBottom: 44,
-  },
-  profileName: {
-    fontFamily: Font.headerBold,
-    fontSize: 22,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  profileId: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 13,
-    marginTop: 4,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
+  // Card (scrollable)
+  card:        { flex: 1, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -18 },
+  cardContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 12 },
 
-  // ── Menu list ─────────────────────────────────────────────────────────────────
-  menuList: {
-    width: '100%',
-    marginTop: 14,
-  },
-  menuRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
-  menuIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  menuLabel: {
-    flex: 1,
-    fontFamily: Font.bodySemiBold,
-    fontSize: 15,
-  },
+  // Info pill (phone)
+  infoPill:     { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 20 },
+  infoPillText: { fontFamily: Font.bodyMedium, fontSize: 13 },
 
-  // ── Edit form ─────────────────────────────────────────────────────────────────
-  sectionHeading: {
-    fontFamily: Font.headerBold,
-    fontSize: 18,
-    marginTop: 18,
-    marginBottom: 18,
-  },
-  fieldLabel: {
-    fontFamily: Font.bodyMedium,
-    fontSize: 13,
-    marginBottom: 6,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontFamily: Font.bodyRegular,
-    fontSize: 14,
-    marginBottom: 16,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-  },
-  toggleLabel: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 15,
-  },
-  saveBtn: {
-    backgroundColor: '#3ECBA8',
-    borderRadius: 50,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 28,
-  },
-  saveBtnOff: {
-    backgroundColor: '#A8DDD0',
-  },
-  saveBtnText: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 16,
-    color: '#fff',
-  },
+  // Menu group
+  menuGroup:  { marginBottom: 16 },
+  sectionLabel: { fontFamily: Font.bodySemiBold, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 },
+  menuCard:   { borderRadius: 16, overflow: 'hidden' },
+  dangerCard: { borderRadius: 16, overflow: 'hidden', marginBottom: 8 },
 
-  // ── Terms ─────────────────────────────────────────────────────────────────────
-  termsScroll: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -10,
-  },
-  termsContent: {
-    paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 44,
-  },
-  termsText: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 13,
-    lineHeight: 22,
-  },
-  checkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 24,
-    marginBottom: 4,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
-    borderWidth: 1.5,
-    borderColor: '#3ECBA8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 10,
-  },
-  checkboxOn: {
-    backgroundColor: '#3ECBA8',
-    borderColor: '#3ECBA8',
-  },
-  checkLabel: {
-    fontFamily: Font.bodyMedium,
-    fontSize: 13,
-    flex: 1,
-  },
+  // Menu row
+  menuRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 },
+  menuIconCircle: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  menuLabel:     { flex: 1, fontFamily: Font.bodySemiBold, fontSize: 15 },
+  menuValue:     { fontFamily: Font.bodyRegular, fontSize: 13 },
 
-  // ── Confirmation modal ────────────────────────────────────────────────────────
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  modalBox: {
-    width: '100%',
-    borderRadius: 24,
-    padding: 28,
-    alignItems: 'center',
-  },
-  modalIconWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(224,85,85,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontFamily: Font.headerBold,
-    fontSize: 18,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  modalMsg: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 21,
-    marginBottom: 24,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  modalBtnNo: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  modalBtnNoText: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 14,
-  },
-  modalBtnYes: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: '#E05555',
-    alignItems: 'center',
-  },
-  modalBtnYesText: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 14,
-    color: '#fff',
-  },
+  // Edit form
+  formSectionTitle: { fontFamily: Font.bodySemiBold, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, marginLeft: 4 },
+  formSection:      { borderRadius: 16, overflow: 'hidden' },
+  formField:        { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, minHeight: 64 },
+  formFieldIcon:    { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(27,122,74,0.12)', alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  formFieldBody:    { flex: 1 },
+  formFieldLabel:   { fontFamily: Font.bodyMedium, fontSize: 11, letterSpacing: 0.3, marginBottom: 3 },
+  formFieldInput:   { fontFamily: Font.bodyRegular, fontSize: 15, paddingVertical: 0 },
+  formToggleLabel:  { fontFamily: Font.bodySemiBold, fontSize: 15 },
 
-  // ── Toast ────────────────────────────────────────────────────────────────────
-  toast: {
-    position: 'absolute',
-    bottom: 28,
-    left: 20,
-    right: 20,
-    backgroundColor: '#1E9C70',
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-  },
-  toastText: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 14,
-    color: '#fff',
-    flex: 1,
-  },
+  // Buttons
+  saveBtn:     { backgroundColor: '#1B7A4A', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 28 },
+  saveBtnOff:  { backgroundColor: '#43A872' },
+  saveBtnText: { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
+  cancelBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 14, marginTop: 4 },
+  cancelBtnText: { fontFamily: Font.bodySemiBold, fontSize: 15 },
+
+  // Terms
+  termsScroll:   { borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -10 },
+  termsContent:  { paddingHorizontal: 22, paddingTop: 24, paddingBottom: 44 },
+  termsText:     { fontFamily: Font.bodyRegular, fontSize: 13, lineHeight: 22 },
+  checkRow:      { flexDirection: 'row', alignItems: 'center', marginTop: 24, marginBottom: 4 },
+  checkbox:      { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  checkboxOn:    { backgroundColor: '#1B7A4A', borderColor: '#1B7A4A' },
+  checkLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, flex: 1 },
+
+  // Modals
+  modalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  modalBox:        { width: '100%', borderRadius: 24, padding: 28, alignItems: 'center' },
+  modalIconWrap:   { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(224,85,85,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  modalTitle:      { fontFamily: Font.headerBold, fontSize: 18, marginBottom: 8, textAlign: 'center' },
+  modalMsg:        { fontFamily: Font.bodyRegular, fontSize: 14, textAlign: 'center', lineHeight: 21, marginBottom: 24 },
+  modalActions:    { flexDirection: 'row', gap: 12, width: '100%' },
+  modalBtnNo:      { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  modalBtnNoText:  { fontFamily: Font.bodySemiBold, fontSize: 14 },
+  modalBtnYes:     { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#E05555', alignItems: 'center' },
+  modalBtnYesText: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff' },
+
+  toast:     { position: 'absolute', bottom: 28, left: 20, right: 20, backgroundColor: '#115533', borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingVertical: 14, elevation: 10 },
+  toastText: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff', flex: 1 },
 });

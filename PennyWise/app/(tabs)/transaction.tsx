@@ -1,4 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { router } from 'expo-router';
+import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import {
   FlatList,
   Keyboard,
@@ -425,7 +427,7 @@ export default function TransactionScreen() {
   const typeProgress     = useSharedValue(0); // 0 = income, 1 = expense
   const typeIndicatorStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: typeIndicatorX.value }],
-    backgroundColor: interpolateColor(typeProgress.value, [0, 1], ['#3ECBA8', '#4B78E0']),
+    backgroundColor: interpolateColor(typeProgress.value, [0, 1], ['#1B7A4A', '#4B78E0']),
   }));
   useEffect(() => {
     if (typeTabWidthRef.current === 0) return;
@@ -435,13 +437,19 @@ export default function TransactionScreen() {
   }, [formType]);
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
       <StatusBar style={theme.statusBar} />
 
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
       {/* ── Green Header ──────────────────────────────────────────────────── */}
       <View style={[styles.header, { backgroundColor: theme.headerBg }]}>
-        <View style={styles.headerSpacer} />
+        <TouchableOpacity
+          style={[styles.headerBtn, { backgroundColor: theme.iconBtnBg }]}
+          onPress={() => router.replace('/(tabs)')}
+          activeOpacity={0.8}
+        >
+          <PennyWiseLogo size="xs" />
+        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.iconBtnColor }]}>Transactions</Text>
         <TouchableOpacity style={[styles.headerBtn, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
           <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
@@ -759,7 +767,7 @@ export default function TransactionScreen() {
         <Pressable style={styles.confirmOverlay} onPress={() => setConfirmVisible(false)}>
           <Pressable onPress={() => {}} style={[styles.confirmBox, { backgroundColor: theme.confirmBg }]}>
             <View style={styles.confirmIconWrap}>
-              <Ionicons name="save-outline" size={28} color="#3ECBA8" />
+              <Ionicons name="save-outline" size={28} color="#1B7A4A" />
             </View>
             <Text style={[styles.confirmTitle, { color: theme.textPrimary }]}>Save Transaction?</Text>
             <Text style={[styles.confirmMsg, { color: theme.textSecondary }]}>
@@ -878,8 +886,8 @@ export default function TransactionScreen() {
       >
         <Pressable style={styles.confirmOverlay} onPress={() => setRestorePromptVisible(false)}>
           <Pressable onPress={() => {}} style={[styles.confirmBox, { backgroundColor: theme.confirmBg }]}>
-            <View style={[styles.confirmIconWrap, { backgroundColor: 'rgba(62,203,168,0.12)' }]}>
-              <Ionicons name="refresh-outline" size={28} color="#3ECBA8" />
+            <View style={[styles.confirmIconWrap, { backgroundColor: 'rgba(27,122,74,0.12)' }]}>
+              <Ionicons name="refresh-outline" size={28} color="#1B7A4A" />
             </View>
             <Text style={[styles.confirmTitle, { color: theme.textPrimary }]}>Restore this Transaction?</Text>
             <Text style={[styles.confirmMsg, { color: theme.textSecondary }]}>
@@ -915,13 +923,13 @@ export default function TransactionScreen() {
         <Pressable style={styles.confirmOverlay} onPress={() => setArchiveConfirmVisible(false)}>
           <Pressable onPress={() => {}} style={[styles.confirmBox, { backgroundColor: theme.confirmBg }]}>
             <View style={[styles.confirmIconWrap, liveTx?.archived
-              ? { backgroundColor: 'rgba(62,203,168,0.12)' }
+              ? { backgroundColor: 'rgba(27,122,74,0.12)' }
               : { backgroundColor: 'rgba(255,140,0,0.1)' }
             ]}>
               <Ionicons
                 name={liveTx?.archived ? 'refresh-circle-outline' : 'archive-outline'}
                 size={28}
-                color={liveTx?.archived ? '#3ECBA8' : '#FF8C00'}
+                color={liveTx?.archived ? '#1B7A4A' : '#FF8C00'}
               />
             </View>
             <Text style={[styles.confirmTitle, { color: theme.textPrimary }]}>
@@ -941,7 +949,7 @@ export default function TransactionScreen() {
                 <Text style={styles.confirmNoText}>No, go back</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.confirmYes, { backgroundColor: liveTx?.archived ? '#3ECBA8' : '#FF8C00' }]}
+                style={[styles.confirmYes, { backgroundColor: liveTx?.archived ? '#1B7A4A' : '#FF8C00' }]}
                 onPress={confirmArchive}
                 activeOpacity={0.85}
               >
@@ -967,7 +975,7 @@ export default function TransactionScreen() {
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#7CB898' },
+  safeArea: { flex: 1, backgroundColor: '#1B3D2B' },
 
   // ── Header ───────────────────────────────────────────────────────────────────
   header: {
@@ -1028,12 +1036,12 @@ const styles = StyleSheet.create({
   filterHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
   filterRow: { flexDirection: 'row', gap: 8 },
   filterTab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 50, backgroundColor: '#F2F2F2' },
-  filterTabActive: { backgroundColor: '#3ECBA8' },
+  filterTabActive: { backgroundColor: '#1B7A4A' },
   filterText: { fontFamily: Font.bodyMedium, fontSize: 13, color: '#888' },
   filterTextActive: { fontFamily: Font.bodySemiBold, color: '#fff' },
   addBtn: {
     width: 38, height: 38, borderRadius: 19,
-    backgroundColor: '#3ECBA8', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#1B7A4A', alignItems: 'center', justifyContent: 'center',
   },
 
   // ── List ─────────────────────────────────────────────────────────────────────
@@ -1043,7 +1051,7 @@ const styles = StyleSheet.create({
   txItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 10 },
   txItemBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F2' },
   txIconCircle: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
-  txIconIncome: { backgroundColor: '#3ECBA8' },
+  txIconIncome: { backgroundColor: '#1B7A4A' },
   txIconExpense: { backgroundColor: '#4B78E0' },
   txIconArchived: { backgroundColor: '#C0C0C0' },
   recurringBadge: {
@@ -1089,7 +1097,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   typeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 10 },
-  typeBtnIncome: { backgroundColor: '#3ECBA8' },
+  typeBtnIncome: { backgroundColor: '#1B7A4A' },
   typeBtnExpense: { backgroundColor: '#4B78E0' },
   typeBtnText: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#888' },
   typeBtnTextActive: { fontFamily: Font.bodySemiBold, color: '#fff' },
@@ -1102,7 +1110,7 @@ const styles = StyleSheet.create({
     borderRadius: 50, backgroundColor: '#F2F2F2',
     borderWidth: 1, borderColor: '#F2F2F2',
   },
-  categoryChipActive: { backgroundColor: '#3ECBA8', borderColor: '#3ECBA8' },
+  categoryChipActive: { backgroundColor: '#1B7A4A', borderColor: '#1B7A4A' },
   categoryChipLabel: { fontFamily: Font.bodyMedium, fontSize: 12, color: '#666' },
   categoryChipLabelActive: { color: '#fff' },
 
@@ -1127,7 +1135,7 @@ const styles = StyleSheet.create({
     width: 48, height: 26, borderRadius: 13,
     backgroundColor: '#E0E0E0', justifyContent: 'center', padding: 3,
   },
-  toggleTrackOn: { backgroundColor: '#3ECBA8' },
+  toggleTrackOn: { backgroundColor: '#1B7A4A' },
   toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
   toggleThumbOn: { alignSelf: 'flex-end' },
 
@@ -1135,14 +1143,14 @@ const styles = StyleSheet.create({
   freqSection: { marginBottom: 16 },
   freqRow: { flexDirection: 'row', gap: 8 },
   freqChip: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: '#F2F2F2' },
-  freqChipActive: { backgroundColor: '#3ECBA8' },
+  freqChipActive: { backgroundColor: '#1B7A4A' },
   freqChipText: { fontFamily: Font.bodyMedium, fontSize: 12, color: '#888' },
   freqChipTextActive: { fontFamily: Font.bodySemiBold, color: '#fff' },
 
   // ── Icon Grid ─────────────────────────────────────────────────────────────────
   iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
   iconOption: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#F2F2F2', alignItems: 'center', justifyContent: 'center' },
-  iconOptionActive: { backgroundColor: '#3ECBA8' },
+  iconOptionActive: { backgroundColor: '#1B7A4A' },
 
   // ── Modal Actions ─────────────────────────────────────────────────────────────
   modalActions: { flexDirection: 'row', gap: 10, alignItems: 'center' },
@@ -1154,7 +1162,7 @@ const styles = StyleSheet.create({
   archiveBtnText: { fontFamily: Font.bodyMedium, fontSize: 13, color: '#888' },
   cancelBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, backgroundColor: '#F2F2F2' },
   cancelBtnText: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#888' },
-  saveBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, backgroundColor: '#3ECBA8' },
+  saveBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, backgroundColor: '#1B7A4A' },
   saveBtnText: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff' },
 
   // ── Confirm Dialog ────────────────────────────────────────────────────────────
@@ -1168,7 +1176,7 @@ const styles = StyleSheet.create({
   },
   confirmIconWrap: {
     width: 60, height: 60, borderRadius: 30,
-    backgroundColor: 'rgba(62,203,168,0.12)',
+    backgroundColor: 'rgba(27,122,74,0.12)',
     alignItems: 'center', justifyContent: 'center', marginBottom: 16,
   },
   confirmTitle: { fontFamily: Font.headerBold, fontSize: 18, color: '#1A1A1A', marginBottom: 10 },
@@ -1184,7 +1192,7 @@ const styles = StyleSheet.create({
   confirmNoText: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#888' },
   confirmYes: {
     flex: 1, alignItems: 'center', paddingVertical: 14,
-    borderRadius: 14, backgroundColor: '#3ECBA8',
+    borderRadius: 14, backgroundColor: '#1B7A4A',
   },
   confirmYesText: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff' },
 
@@ -1265,7 +1273,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#3ECBA8',
+    backgroundColor: '#1B7A4A',
     borderRadius: 14,
     paddingVertical: 15,
     marginBottom: 10,
@@ -1296,7 +1304,7 @@ const styles = StyleSheet.create({
     bottom: 24,
     left: 24,
     right: 24,
-    backgroundColor: '#1E9C70',
+    backgroundColor: '#115533',
     borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',

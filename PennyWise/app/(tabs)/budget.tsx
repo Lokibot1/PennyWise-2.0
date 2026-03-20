@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { router } from 'expo-router';
 import DatePickerModal from '@/components/DatePickerModal';
+import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -161,8 +163,8 @@ function ConfirmModal({ state, onCancel, theme }: { state: ConfirmState; onCance
         <Pressable style={[ms.card, { backgroundColor: theme.confirmBg }]} onPress={() => {}}>
           <Text style={[ms.msg, { color: theme.textPrimary }]}>{state.message}</Text>
           <View style={ms.row}>
-            <TouchableOpacity style={ms.cancel}  onPress={onCancel}    activeOpacity={0.8}>
-              <Text style={ms.cancelTxt}>Cancel</Text>
+            <TouchableOpacity style={[ms.cancel, { backgroundColor: theme.surface }]}  onPress={onCancel}    activeOpacity={0.8}>
+              <Text style={[ms.cancelTxt, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={ms.confirm} onPress={state.onYes} activeOpacity={0.8}>
               <Text style={ms.confirmTxt}>Yes, Confirm</Text>
@@ -176,12 +178,12 @@ function ConfirmModal({ state, onCancel, theme }: { state: ConfirmState; onCance
 
 const ms = StyleSheet.create({
   overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 36 },
-  card:       { backgroundColor: '#fff', borderRadius: 20, padding: 24, width: '100%' },
-  msg:        { fontFamily: Font.bodyMedium, fontSize: 15, color: '#1A1A1A', textAlign: 'center', lineHeight: 22, marginBottom: 20 },
+  card:       { borderRadius: 20, padding: 24, width: '100%' },
+  msg:        { fontFamily: Font.bodyMedium, fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 20 },
   row:        { flexDirection: 'row', gap: 10 },
-  cancel:     { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: '#F0F0F0', alignItems: 'center' },
-  cancelTxt:  { fontFamily: Font.bodyMedium, fontSize: 14, color: '#666' },
-  confirm:    { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: '#3ECBA8', alignItems: 'center' },
+  cancel:     { flex: 1, paddingVertical: 13, borderRadius: 12, alignItems: 'center' },
+  cancelTxt:  { fontFamily: Font.bodyMedium, fontSize: 14 },
+  confirm:    { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: '#1B7A4A', alignItems: 'center' },
   confirmTxt: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff' },
 });
 
@@ -210,10 +212,14 @@ function BalanceHeader({
   return (
     <View style={[bh.wrap, { backgroundColor: theme.headerBg }]}>
       <View style={bh.nav}>
-        <TouchableOpacity style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} onPress={onBack} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]}
+          onPress={onBack ?? (() => router.replace('/(tabs)'))}
+          activeOpacity={0.8}
+        >
           {onBack
             ? <Ionicons name="chevron-back" size={22} color={theme.iconBtnColor} />
-            : <View style={{ width: 22 }} />}
+            : <PennyWiseLogo size="xs" />}
         </TouchableOpacity>
         <Text style={[bh.title, { color: theme.iconBtnColor }]}>{title}</Text>
         <TouchableOpacity style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
@@ -221,22 +227,25 @@ function BalanceHeader({
         </TouchableOpacity>
       </View>
 
-      <View style={bh.card}>
-        <View style={bh.balRow}>
+      <View style={[bh.card, {
+        backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)',
+        borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)',
+      }]}>
+        <View style={[bh.balRow, { borderBottomColor: theme.divider }]}>
           <View style={{ flex: 1 }}>
             <View style={bh.lblRow}>
-              <Ionicons name="trending-up-outline" size={11} color="#666" />
-              <Text style={bh.lbl}> Total Income</Text>
+              <Ionicons name="trending-up-outline" size={11} color={theme.isDark ? theme.textMuted : '#666'} />
+              <Text style={[bh.lbl, { color: theme.isDark ? theme.textMuted : '#666' }]}> Total Income</Text>
             </View>
-            <Text style={[bh.amt, { color: '#1E9C70' }]}>{fmtAmt(budgetLimit)}</Text>
+            <Text style={[bh.amt, { color: theme.textPrimary }]}>{fmtAmt(budgetLimit)}</Text>
           </View>
-          <View style={bh.divider} />
+          <View style={[bh.divider, { backgroundColor: theme.divider }]} />
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <View style={bh.lblRow}>
-              <Ionicons name="wallet-outline" size={11} color="#666" />
-              <Text style={bh.lbl}> Remaining</Text>
+              <Ionicons name="wallet-outline" size={11} color={theme.isDark ? theme.textMuted : '#666'} />
+              <Text style={[bh.lbl, { color: theme.isDark ? theme.textMuted : '#666' }]}> Remaining</Text>
             </View>
-            <Text style={[bh.amt, { color: remaining >= 0 ? '#1A1A1A' : '#E05858' }]}>
+            <Text style={[bh.amt, { color: remaining >= 0 ? theme.textPrimary : '#E05858' }]}>
               {fmtAmt(remaining)}
             </Text>
           </View>
@@ -245,12 +254,14 @@ function BalanceHeader({
         <View style={{ paddingTop: 12 }}>
           <View style={bh.progRow}>
             <View style={bh.pctBadge}><Text style={bh.pctTxt}>{pctStr}%</Text></View>
-            <Text style={bh.budgetLbl}>Spent of {fmtAmt(budgetLimit)}</Text>
+            <Text style={[bh.budgetLbl, { color: theme.isDark ? theme.textMuted : '#666' }]}>Spent of {fmtAmt(budgetLimit)}</Text>
           </View>
-          <View style={bh.track}><View style={[bh.fill, { width: `${pct}%` as any }]} /></View>
+          <View style={[bh.track, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }]}>
+            <View style={[bh.fill, { width: `${pct}%` as any }]} />
+          </View>
           <View style={bh.lblRow}>
-            <Ionicons name="checkbox-outline" size={14} color="#4A8A6A" />
-            <Text style={bh.checkTxt}> {pctMsg}</Text>
+            <Ionicons name="checkbox-outline" size={14} color={theme.textSecondary} />
+            <Text style={[bh.checkTxt, { color: theme.textSecondary }]}> {pctMsg}</Text>
           </View>
         </View>
       </View>
@@ -259,7 +270,7 @@ function BalanceHeader({
 }
 
 const bh = StyleSheet.create({
-  wrap:      { backgroundColor: '#7CB898', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
+  wrap:      { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
   nav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   iconBtn:   { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
   title:     { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A' },
@@ -296,7 +307,7 @@ function FormHeader({ title, onBack, theme }: { title: string; onBack: () => voi
 }
 
 const fh = StyleSheet.create({
-  wrap:    { backgroundColor: '#7CB898', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
+  wrap:    { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
   nav:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
   title:   { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A' },
@@ -331,12 +342,12 @@ function PickerSheet<T extends string>({
             {options.map(opt => (
               <TouchableOpacity
                 key={opt}
-                style={pk.item}
+                style={[pk.item, { borderBottomColor: theme.divider }]}
                 onPress={() => { onSelect(opt); onClose(); }}
                 activeOpacity={0.8}
               >
-                {renderItem ? renderItem(opt) : <Text style={pk.itemTxt}>{opt}</Text>}
-                {selected === opt && <Ionicons name="checkmark" size={18} color="#3ECBA8" />}
+                {renderItem ? renderItem(opt) : <Text style={[pk.itemTxt, { color: theme.textPrimary }]}>{opt}</Text>}
+                {selected === opt && <Ionicons name="checkmark" size={18} color="#1B7A4A" />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -466,7 +477,7 @@ function MainScreen({
         >
           <Text style={[s.sectionTitle, { color: theme.textPrimary }]}>What would you like to do?</Text>
 
-          <AnimCard delay={0} style={main.optionCard} onPress={onNew}>
+          <AnimCard delay={0} style={[main.optionCard, { backgroundColor: theme.surface, borderColor: theme.divider }]} onPress={onNew}>
             <View style={[main.optionIcon, { backgroundColor: '#E05858' }]}>
               <Ionicons name="add-circle-outline" size={30} color="#fff" />
             </View>
@@ -477,7 +488,7 @@ function MainScreen({
             <Ionicons name="chevron-forward" size={18} color="#aaa" />
           </AnimCard>
 
-          <AnimCard delay={80} style={main.optionCard} onPress={onUpdate}>
+          <AnimCard delay={80} style={[main.optionCard, { backgroundColor: theme.surface, borderColor: theme.divider }]} onPress={onUpdate}>
             <View style={[main.optionIcon, { backgroundColor: '#4B78E0' }]}>
               <Ionicons name="pencil-outline" size={28} color="#fff" />
             </View>
@@ -488,7 +499,7 @@ function MainScreen({
             <Ionicons name="chevron-forward" size={18} color="#aaa" />
           </AnimCard>
 
-          <AnimCard delay={160} style={main.optionCard} onPress={onViewArchived}>
+          <AnimCard delay={160} style={[main.optionCard, { backgroundColor: theme.surface, borderColor: theme.divider }]} onPress={onViewArchived}>
             <View style={[main.optionIcon, { backgroundColor: '#9AA5B4' }]}>
               <Ionicons name="archive-outline" size={28} color="#fff" />
             </View>
@@ -547,7 +558,7 @@ function CategoriesScreen({
           showsVerticalScrollIndicator={false}
         >
           {mode === 'new' && (
-            <Text style={s.hint}>
+            <Text style={[s.hint, { color: theme.textMuted }]}>
               Select an existing category or tap <Text style={{ color: '#E05858', fontFamily: Font.bodySemiBold }}>More</Text> to create a new one.
             </Text>
           )}
@@ -620,22 +631,22 @@ function CategoryDetailScreen({
         >
           {grouped.length === 0 && (
             <View style={s.empty}>
-              <Ionicons name="receipt-outline" size={48} color="#D0D0D0" />
-              <Text style={s.emptyTxt}>No expense entries yet</Text>
+              <Ionicons name="receipt-outline" size={48} color={theme.textMuted} />
+              <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No expense entries yet</Text>
             </View>
           )}
 
           {grouped.map(group => (
             <View key={group.key} style={{ marginBottom: 8 }}>
               <View style={s.monthHeader}>
-                <Text style={s.monthLabel}>{group.label}</Text>
-                <Ionicons name="calendar-outline" size={20} color="#3ECBA8" />
+                <Text style={[s.monthLabel, { color: theme.textPrimary }]}>{group.label}</Text>
+                <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
               </View>
 
               {group.items.map((exp, idx) => (
                 <TouchableOpacity
                   key={exp.id}
-                  style={[s.expRow, idx < group.items.length - 1 && s.expRowBorder]}
+                  style={[s.expRow, idx < group.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.divider }]}
                   onPress={() => onEditExpense(exp.id)}
                   activeOpacity={0.85}
                 >
@@ -734,7 +745,7 @@ function ExpenseFormScreen({
               <Text style={[s.fieldTxt, { flex: 1, color: vals.date ? theme.textPrimary : '#aaa' }]}>
                 {vals.date || 'Select a date'}
               </Text>
-              <Ionicons name="calendar-outline" size={20} color="#3ECBA8" />
+              <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
             </TouchableOpacity>
 
             {/* Category */}
@@ -1326,7 +1337,7 @@ export default function ManageExpenseScreen() {
 
 // ── Shared Styles ─────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#7CB898' },
+  safeArea: { flex: 1, backgroundColor: '#1B3D2B' },
 
   white:        { flex: 1, backgroundColor: '#fff' },
   whiteContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
@@ -1353,13 +1364,13 @@ const s = StyleSheet.create({
   expAmt:       { fontFamily: Font.bodySemiBold, fontSize: 13, color: '#E05858' },
 
   addBtnWrapper: { position: 'absolute', bottom: 20, left: 20, right: 20 },
-  addBtn:        { backgroundColor: '#3ECBA8', borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
+  addBtn:        { backgroundColor: '#1B7A4A', borderRadius: 50, paddingVertical: 16, alignItems: 'center' },
   addBtnTxt:     { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
 
   empty:    { alignItems: 'center', paddingTop: 60, paddingBottom: 40 },
   emptyTxt: { fontFamily: Font.bodyRegular, fontSize: 14, color: '#aaa', marginTop: 12 },
 
-  formScroll:  { flex: 1, backgroundColor: '#F0FAF6' },
+  formScroll:  { flex: 1, backgroundColor: '#EDF7F1' },
   formContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 48 },
   label:       { fontFamily: Font.bodyMedium, fontSize: 14, color: '#1A1A1A', marginBottom: 8, marginTop: 16 },
   fieldRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5EAEA', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14 },
@@ -1367,27 +1378,27 @@ const s = StyleSheet.create({
   selectRow:   { justifyContent: 'space-between' },
 
   recurRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 20 },
-  checkbox:   { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#3ECBA8', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
-  checkboxOn: { backgroundColor: '#3ECBA8' },
+  checkbox:   { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: '#1B7A4A', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  checkboxOn: { backgroundColor: '#1B7A4A' },
   recurTxt:   { fontFamily: Font.bodyMedium, fontSize: 14, color: '#1A1A1A' },
 
   archiveBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 24, paddingVertical: 12 },
   archiveBtnTxt: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#E05858' },
 
-  saveBtn:    { backgroundColor: '#3ECBA8', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 28 },
+  saveBtn:    { backgroundColor: '#1B7A4A', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 28 },
   saveBtnTxt: { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
 
   pickerIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#E05858', alignItems: 'center', justifyContent: 'center' },
 
   archiveRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   archiveRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F2' },
-  restoreBtn:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#3ECBA8' },
-  restoreTxt:       { fontFamily: Font.bodyMedium, fontSize: 13, color: '#3ECBA8' },
+  restoreBtn:       { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: '#1B7A4A' },
+  restoreTxt:       { fontFamily: Font.bodyMedium, fontSize: 13, color: '#1B7A4A' },
 
   iconGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
   iconOpt:       { width: 50, height: 50, borderRadius: 14, borderWidth: 2, borderColor: '#E05858', alignItems: 'center', justifyContent: 'center' },
   iconOptActive: { backgroundColor: '#E05858', borderColor: '#E05858' },
 
-  toast:    { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#1E9C70', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', elevation: 8 },
+  toast:    { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#115533', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', elevation: 8 },
   toastTxt: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#fff' },
 });

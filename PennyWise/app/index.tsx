@@ -42,7 +42,7 @@ export default function SplashScreen() {
       <Animated.View style={{ opacity, transform: [{ scale }] }}>
         <PennyWiseLogo size="lg" />
       </Animated.View>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
     </View>
   );
 }
@@ -50,7 +50,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#7CB898',
+    backgroundColor: '#1B3D2B',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -10,6 +10,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { Font } from '@/constants/fonts';
+import { useAppTheme } from '@/contexts/AppTheme';
 
 interface FormInputProps {
   label: string;
@@ -33,16 +34,17 @@ export function FormInput({
   autoCapitalize = 'none',
 }: FormInputProps) {
   const [showPassword, setShowPassword] = useState(false);
+  const { theme } = useAppTheme();
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputWrapper}>
-        <Ionicons name={iconName} size={17} color="#96BAA8" style={styles.leftIcon} />
+      <Text style={[styles.label, { color: theme.textSecondary }]}>{label}</Text>
+      <View style={[styles.inputWrapper, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+        <Ionicons name={iconName} size={17} color={theme.textMuted} style={styles.leftIcon} />
         <TextInput
-          style={styles.input}
+          style={[styles.input, { color: theme.textPrimary }]}
           placeholder={placeholder}
-          placeholderTextColor="#AABDB5"
+          placeholderTextColor={theme.textMuted}
           value={value}
           onChangeText={onChangeText}
           secureTextEntry={isPassword && !showPassword}
@@ -58,7 +60,7 @@ export function FormInput({
             <Ionicons
               name={showPassword ? 'eye-outline' : 'eye-off-outline'}
               size={18}
-              color="#96BAA8"
+              color={theme.textMuted}
             />
           </TouchableOpacity>
         )}
@@ -74,14 +76,13 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: Font.bodySemiBold,
     fontSize: 13,
-    color: '#3A5A4A',
     marginLeft: 2,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E6F4ED',
     borderRadius: 12,
+    borderWidth: 1,
     paddingHorizontal: 14,
     height: 50,
   },
@@ -92,6 +93,5 @@ const styles = StyleSheet.create({
     flex: 1,
     fontFamily: Font.bodyRegular,
     fontSize: 14,
-    color: '#2D4A3E',
   },
 });
