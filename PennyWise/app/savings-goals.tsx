@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { supabase } from '@/lib/supabase';
+import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 
@@ -115,6 +116,14 @@ export default function SavingsGoalsScreen() {
     setNewTarget('');
     setNewIcon('wallet-outline');
     fetchGoals(userId);
+    logActivity({
+      user_id:     userId,
+      action_type: ACTION.SAVINGS_GOAL_CREATED,
+      entity_type: ENTITY.SAVINGS_GOAL,
+      title:       `New Goal: ${newTitle.trim()}`,
+      description: `Target: ₱${target.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
+      icon:        newIcon,
+    });
   };
 
   const handleAddFunds = async () => {
@@ -143,6 +152,26 @@ export default function SavingsGoalsScreen() {
     setFundsAmount('');
     setSelectedGoal(null);
     fetchGoals(userId);
+
+    if (isComplete) {
+      logActivity({
+        user_id:     userId,
+        action_type: ACTION.SAVINGS_GOAL_COMPLETED,
+        entity_type: ENTITY.SAVINGS_GOAL,
+        title:       `Goal Achieved: ${selectedGoal.title}`,
+        description: `Target of ₱${selectedGoal.target_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} reached!`,
+        icon:        selectedGoal.icon,
+      });
+    } else {
+      logActivity({
+        user_id:     userId,
+        action_type: ACTION.SAVINGS_GOAL_FUNDED,
+        entity_type: ENTITY.SAVINGS_GOAL,
+        title:       `Goal Funded: ${selectedGoal.title}`,
+        description: `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} added · ₱${newCurrent.toLocaleString('en-PH', { minimumFractionDigits: 2 })} of ₱${selectedGoal.target_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
+        icon:        selectedGoal.icon,
+      });
+    }
 
     if (isComplete) {
       setTimeout(() => {

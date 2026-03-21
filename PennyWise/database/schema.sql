@@ -154,6 +154,28 @@ create table public.savings_goals (
 );
 
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ACTIVITY LOGS
+-- Audit trail of user actions across Income, Expenses, and Savings Goals.
+-- Written to by the app after successful Supabase mutations.
+-- ─────────────────────────────────────────────────────────────────────────────
+create table public.activity_logs (
+  id           uuid        primary key default gen_random_uuid(),
+  user_id      uuid        not null references public.profiles(id) on delete cascade,
+  action_type  text        not null,
+  -- INCOME_CATEGORY_CREATED | INCOME_SOURCE_ADDED | INCOME_SOURCE_UPDATED
+  -- INCOME_CATEGORY_ARCHIVED | EXPENSE_CATEGORY_CREATED | EXPENSE_ADDED
+  -- EXPENSE_UPDATED | EXPENSE_CATEGORY_ARCHIVED
+  -- SAVINGS_GOAL_CREATED | SAVINGS_GOAL_FUNDED | SAVINGS_GOAL_COMPLETED
+  entity_type  text        not null,
+  -- income_category | income_source | expense_category | expense | savings_goal
+  title        text        not null,
+  description  text        not null default '',
+  icon         text        not null default 'receipt-outline',
+  created_at   timestamptz not null default now()
+);
+
+
 -- =============================================================================
 -- ROW LEVEL SECURITY (RLS)
 -- Every user can only read/write their own data.
@@ -166,6 +188,7 @@ alter table public.expenses           enable row level security;
 alter table public.income_categories  enable row level security;
 alter table public.income_sources     enable row level security;
 alter table public.savings_goals      enable row level security;
+alter table public.activity_logs      enable row level security;
 
 -- profiles
 create policy "Users can view own profile"
@@ -204,6 +227,11 @@ create policy "Users manage own income sources"
 -- savings_goals
 create policy "Users manage own savings goals"
   on public.savings_goals for all
+  using (auth.uid() = user_id);
+
+-- activity_logs
+create policy "Users manage own activity logs"
+  on public.activity_logs for all
   using (auth.uid() = user_id);
 
 

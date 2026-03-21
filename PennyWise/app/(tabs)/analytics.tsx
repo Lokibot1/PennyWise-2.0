@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import DatePickerModal from '@/components/DatePickerModal';
+import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import {
   ActivityIndicator,
@@ -756,6 +757,15 @@ export default function IncomeSourcesScreen() {
             frequency: data.frequency as Frequency | null, isArchived: data.is_archived,
           }]);
           showToast('Income source added successfully.');
+          const cat = categories.find(c => c.id === vals.categoryId);
+          logActivity({
+            user_id:     userIdRef.current!,
+            action_type: ACTION.INCOME_SOURCE_ADDED,
+            entity_type: ENTITY.INCOME_SOURCE,
+            title:       `Income Added: ${vals.title.trim()}`,
+            description: `₱${(parseFloat(vals.amount) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Income'}`,
+            icon:        cat?.icon ?? 'cash-outline',
+          });
           setScreen({ name: 'categories' });
         }
 
@@ -780,6 +790,15 @@ export default function IncomeSourcesScreen() {
               : i,
           ));
           showToast('Income source updated successfully.');
+          const catU = categories.find(c => c.id === vals.categoryId);
+          logActivity({
+            user_id:     userIdRef.current!,
+            action_type: ACTION.INCOME_SOURCE_UPDATED,
+            entity_type: ENTITY.INCOME_SOURCE,
+            title:       `Income Updated: ${vals.title.trim()}`,
+            description: `₱${(parseFloat(vals.amount) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${catU?.label ?? 'Income'}`,
+            icon:        catU?.icon ?? 'cash-outline',
+          });
           setScreen({ name: 'categories' });
         }
       }
@@ -793,8 +812,17 @@ export default function IncomeSourcesScreen() {
       hideConfirm();
       const { error } = await supabase.from('income_categories').update({ is_archived: true }).eq('id', categoryId);
       if (!error) {
+        const archivedCat = categories.find(c => c.id === categoryId);
         setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
         showToast('Income category archived successfully.');
+        logActivity({
+          user_id:     userIdRef.current!,
+          action_type: ACTION.INCOME_CATEGORY_ARCHIVED,
+          entity_type: ENTITY.INCOME_CATEGORY,
+          title:       `Category Archived: ${archivedCat?.label ?? 'Income Category'}`,
+          description: 'Income category and its sources archived.',
+          icon:        archivedCat?.icon ?? 'archive-outline',
+        });
         setScreen({ name: 'categories' });
       }
     });
@@ -822,6 +850,14 @@ export default function IncomeSourcesScreen() {
       const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
       setCategories(prev => [...prev, newCat]);
       showToast(`Category "${label}" created.`);
+      logActivity({
+        user_id:     userIdRef.current!,
+        action_type: ACTION.INCOME_CATEGORY_CREATED,
+        entity_type: ENTITY.INCOME_CATEGORY,
+        title:       `New Income Category: ${label}`,
+        description: 'Income source category created.',
+        icon:        icon,
+      });
     }
   };
 

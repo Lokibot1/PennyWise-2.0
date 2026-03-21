@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import DatePickerModal from '@/components/DatePickerModal';
+import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import {
   ActivityIndicator,
@@ -1077,6 +1078,15 @@ export default function ManageExpenseScreen() {
             isArchived:  data.is_archived,
           }]);
           showToast('Expense added successfully.');
+          const cat = categories.find(c => c.id === vals.categoryId);
+          logActivity({
+            user_id:     userIdRef.current!,
+            action_type: ACTION.EXPENSE_ADDED,
+            entity_type: ENTITY.EXPENSE,
+            title:       `Expense Added: ${vals.title.trim()}`,
+            description: `₱${(parseFloat(vals.amount) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Expense'}`,
+            icon:        cat?.icon ?? 'receipt-outline',
+          });
           setScreen({ name: 'main' });
         }
 
@@ -1110,6 +1120,15 @@ export default function ManageExpenseScreen() {
               : e,
           ));
           showToast('Expense updated successfully.');
+          const catU = categories.find(c => c.id === vals.categoryId);
+          logActivity({
+            user_id:     userIdRef.current!,
+            action_type: ACTION.EXPENSE_UPDATED,
+            entity_type: ENTITY.EXPENSE,
+            title:       `Expense Updated: ${vals.title.trim()}`,
+            description: `₱${(parseFloat(vals.amount) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${catU?.label ?? 'Expense'}`,
+            icon:        catU?.icon ?? 'receipt-outline',
+          });
           setScreen({ name: 'main' });
         }
       }
@@ -1127,8 +1146,17 @@ export default function ManageExpenseScreen() {
         .eq('id', categoryId);
 
       if (!error) {
+        const archivedCat = categories.find(c => c.id === categoryId);
         setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
         showToast('Expense category archived successfully.');
+        logActivity({
+          user_id:     userIdRef.current!,
+          action_type: ACTION.EXPENSE_CATEGORY_ARCHIVED,
+          entity_type: ENTITY.EXPENSE_CATEGORY,
+          title:       `Category Archived: ${archivedCat?.label ?? 'Expense Category'}`,
+          description: 'Expense category and its entries archived.',
+          icon:        archivedCat?.icon ?? 'archive-outline',
+        });
         setScreen({ name: 'main' });
       }
     });
@@ -1160,6 +1188,14 @@ export default function ManageExpenseScreen() {
       const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
       setCategories(prev => [...prev, newCat]);
       showToast(`Category "${label}" created.`);
+      logActivity({
+        user_id:     userIdRef.current!,
+        action_type: ACTION.EXPENSE_CATEGORY_CREATED,
+        entity_type: ENTITY.EXPENSE_CATEGORY,
+        title:       `New Expense Category: ${label}`,
+        description: 'Expense category created.',
+        icon:        icon,
+      });
       if (screen.name === 'categories') {
         setScreen({ name: 'add', prefillCategoryId: newCat.id });
       }
