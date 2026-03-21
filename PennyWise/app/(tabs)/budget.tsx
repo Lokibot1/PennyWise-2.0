@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import DatePickerModal from '@/components/DatePickerModal';
+import ConfirmModal from '@/components/ConfirmModal';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
@@ -76,7 +77,11 @@ type ExpenseFormValues = {
 
 type ConfirmState = {
   visible: boolean;
+  title: string;
   message: string;
+  icon?: string;
+  confirmLabel?: string;
+  confirmColor?: string;
   onYes: () => void;
 };
 
@@ -157,37 +162,6 @@ function AnimCard({
   );
 }
 
-// ── ConfirmModal ──────────────────────────────────────────────────────────────
-function ConfirmModal({ state, onCancel, theme }: { state: ConfirmState; onCancel: () => void; theme: Theme }) {
-  return (
-    <Modal visible={state.visible} transparent animationType="fade" statusBarTranslucent>
-      <Pressable style={ms.overlay} onPress={onCancel}>
-        <Pressable style={[ms.card, { backgroundColor: theme.confirmBg }]} onPress={() => {}}>
-          <Text style={[ms.msg, { color: theme.textPrimary }]}>{state.message}</Text>
-          <View style={ms.row}>
-            <TouchableOpacity style={[ms.cancel, { backgroundColor: theme.surface }]}  onPress={onCancel}    activeOpacity={0.8}>
-              <Text style={[ms.cancelTxt, { color: theme.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={ms.confirm} onPress={state.onYes} activeOpacity={0.8}>
-              <Text style={ms.confirmTxt}>Yes, Confirm</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-const ms = StyleSheet.create({
-  overlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 36 },
-  card:       { borderRadius: 20, padding: 24, width: '100%' },
-  msg:        { fontFamily: Font.bodyMedium, fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: 20 },
-  row:        { flexDirection: 'row', gap: 10 },
-  cancel:     { flex: 1, paddingVertical: 13, borderRadius: 12, alignItems: 'center' },
-  cancelTxt:  { fontFamily: Font.bodyMedium, fontSize: 14 },
-  confirm:    { flex: 1, paddingVertical: 13, borderRadius: 12, backgroundColor: '#1B7A4A', alignItems: 'center' },
-  confirmTxt: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff' },
-});
 
 // ── BalanceHeader ─────────────────────────────────────────────────────────────
 function BalanceHeader({
@@ -962,7 +936,7 @@ export default function ManageExpenseScreen() {
   const [budgetLimit, setBudgetLimit] = useState(20000);
   const [loading,     setLoading]     = useState(true);
   const [saving,      setSaving]      = useState(false);
-  const [confirm,     setConfirm]     = useState<ConfirmState>({ visible: false, message: '', onYes: () => {} });
+  const [confirm,     setConfirm]     = useState<ConfirmState>({ visible: false, title: '', message: '', onYes: () => {} });
   const [showNewCat,  setShowNewCat]  = useState(false);
   const [toast,       setToast]       = useState('');
 
@@ -1032,21 +1006,22 @@ export default function ManageExpenseScreen() {
     setTimeout(() => setToast(''), 2800);
   };
 
-  const showConfirm = (message: string, onYes: () => void) =>
-    setConfirm({ visible: true, message, onYes });
-
+  const showConfirm = (opts: Omit<ConfirmState, 'visible'>) => setConfirm({ visible: true, ...opts });
   const hideConfirm = () => setConfirm(prev => ({ ...prev, visible: false }));
 
   // ── Action Handlers ───────────────────────────────────────────────────────────
   const handleSave = (vals: ExpenseFormValues) => {
-    const msg =
-      screen.name === 'add'
+    showConfirm({
+      title:        screen.name === 'add' ? 'Save Expense?' : 'Update Expense?',
+      message:      screen.name === 'add'
         ? 'Are you sure you want to save this new Expense?'
-        : 'Are you sure you want to save the updated Expense?';
-
-    showConfirm(msg, async () => {
-      hideConfirm();
-      setSaving(true);
+        : 'Are you sure you want to save the updated Expense?',
+      icon:         'save-outline',
+      confirmLabel: 'Save',
+      confirmColor: '#3ECBA8',
+      onYes: async () => {
+        hideConfirm();
+        setSaving(true);
 
       if (screen.name === 'add') {
         const { data, error } = await supabase
@@ -1135,11 +1110,18 @@ export default function ManageExpenseScreen() {
       }
 
       setSaving(false);
+      },
     });
   };
 
   const handleArchiveCategory = (categoryId: string) => {
-    showConfirm('Are you sure you want to archive this Expense Category?', async () => {
+    showConfirm({
+      title:        'Archive Category?',
+      message:      'Are you sure you want to archive this Expense Category?',
+      icon:         'archive-outline',
+      confirmLabel: 'Archive',
+      confirmColor: '#F59E0B',
+      onYes: async () => {
       hideConfirm();
       const { error } = await supabase
         .from('expense_categories')
@@ -1160,21 +1142,29 @@ export default function ManageExpenseScreen() {
         });
         setScreen({ name: 'main' });
       }
+      },
     });
   };
 
   const handleRestore = (categoryId: string) => {
-    showConfirm('Are you sure you want to restore this Expense Category?', async () => {
-      hideConfirm();
-      const { error } = await supabase
-        .from('expense_categories')
-        .update({ is_archived: false })
-        .eq('id', categoryId);
+    showConfirm({
+      title:        'Restore Category?',
+      message:      'Are you sure you want to restore this Expense Category?',
+      icon:         'refresh-outline',
+      confirmLabel: 'Restore',
+      confirmColor: '#3ECBA8',
+      onYes: async () => {
+        hideConfirm();
+        const { error } = await supabase
+          .from('expense_categories')
+          .update({ is_archived: false })
+          .eq('id', categoryId);
 
-      if (!error) {
-        setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
-        showToast('Expense category restored successfully.');
-      }
+        if (!error) {
+          setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
+          showToast('Expense category restored successfully.');
+        }
+      },
     });
   };
 
@@ -1354,7 +1344,16 @@ export default function ManageExpenseScreen() {
       <StatusBar style={theme.statusBar} />
       {renderScreen()}
 
-      <ConfirmModal state={confirm} onCancel={hideConfirm} theme={theme} />
+      <ConfirmModal
+        visible={confirm.visible}
+        onClose={hideConfirm}
+        onConfirm={confirm.onYes}
+        title={confirm.title}
+        message={confirm.message}
+        icon={confirm.icon}
+        confirmLabel={confirm.confirmLabel}
+        confirmColor={confirm.confirmColor}
+      />
 
       <NewCategoryModal
         visible={showNewCat}

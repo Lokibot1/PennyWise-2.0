@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
+import ConfirmModal from '@/components/ConfirmModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Goal = {
@@ -78,7 +79,7 @@ function IconPicker({
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function SavingsGoalsScreen() {
   const { theme } = useAppTheme();
-  const [activeTab, setActiveTab] = useState<'Active' | 'Completed'>('Active');
+  const [activeTab, setActiveTab] = useState<'Active' | 'Completed' | 'Archived'>('Active');
   const [goals, setGoals]         = useState<Goal[]>([]);
   const [loading, setLoading]     = useState(true);
   const [userId, setUserId]       = useState<string | null>(null);
@@ -103,6 +104,10 @@ export default function SavingsGoalsScreen() {
   const [selectedGoal, setSelectedGoal]     = useState<Goal | null>(null);
   const [fundsAmount, setFundsAmount]       = useState('');
   const [addingFunds, setAddingFunds]       = useState(false);
+
+  // ── Kebab menu state ───────────────────────────────────────────────────────
+  const [menuGoalId, setMenuGoalId]           = useState<string | null>(null);
+  const [pendingArchiveGoal, setPendingArchiveGoal] = useState<Goal | null>(null);
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const fetchGoals = useCallback(async (uid: string) => {
@@ -280,10 +285,46 @@ export default function SavingsGoalsScreen() {
     setSelectedGoal(goal); setFundsAmount(''); setShowFundsModal(true);
   };
 
+  /* Archive — show confirm modal */
+  const handleArchiveGoal = (goal: Goal) => {
+    setPendingArchiveGoal(goal);
+  };
+
+  /* Confirmed archive */
+  const confirmArchive = async () => {
+    if (!pendingArchiveGoal || !userId) return;
+    const goal = pendingArchiveGoal;
+    setPendingArchiveGoal(null);
+    await supabase.from('savings_goals').update({ is_archived: true }).eq('id', goal.id);
+    fetchGoals(userId);
+    logActivity({
+      user_id: userId, action_type: ACTION.SAVINGS_GOAL_ARCHIVED, entity_type: ENTITY.SAVINGS_GOAL,
+      title: `Goal Archived: ${goal.title}`,
+      description: `${formatCurrency(goal.current_amount)} of ${formatCurrency(goal.target_amount)} saved`,
+      icon: goal.icon,
+    });
+  };
+
+  /* Restore */
+  const handleRestoreGoal = async (goal: Goal) => {
+    if (!userId) return;
+    await supabase.from('savings_goals').update({ is_archived: false }).eq('id', goal.id);
+    fetchGoals(userId);
+    logActivity({
+      user_id: userId, action_type: ACTION.SAVINGS_GOAL_RESTORED, entity_type: ENTITY.SAVINGS_GOAL,
+      title: `Goal Restored: ${goal.title}`,
+      description: `${formatCurrency(goal.current_amount)} of ${formatCurrency(goal.target_amount)} saved`,
+      icon: goal.icon,
+    });
+  };
+
   // ── Derived ───────────────────────────────────────────────────────────────
   const activeGoals    = goals.filter(g => !g.is_completed && !g.is_archived);
-  const completedGoals = goals.filter(g => g.is_completed || g.is_archived);
-  const displayedGoals = activeTab === 'Active' ? activeGoals : completedGoals;
+  const completedGoals = goals.filter(g => g.is_completed);
+  const archivedGoals  = goals.filter(g => g.is_archived && !g.is_completed);
+  const displayedGoals = activeTab === 'Active' ? activeGoals
+    : activeTab === 'Completed' ? completedGoals
+    : archivedGoals;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -303,23 +344,28 @@ export default function SavingsGoalsScreen() {
 
       {/* Tab Pills */}
       <View style={styles.tabRow}>
-        {(['Active', 'Completed'] as const).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
-            onPress={() => setActiveTab(tab)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabPillText, activeTab === tab && styles.tabPillTextActive]}>{tab}</Text>
-            {tab === 'Completed' && completedGoals.length > 0 && (
-              <View style={[styles.countBadge, activeTab === tab && styles.countBadgeActive]}>
-                <Text style={[styles.countBadgeText, activeTab === tab && styles.countBadgeTextActive]}>
-                  {completedGoals.length}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+        {(['Active', 'Completed', 'Archived'] as const).map(tab => {
+          const count = tab === 'Completed' ? completedGoals.length
+            : tab === 'Archived' ? archivedGoals.length
+            : 0;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
+              onPress={() => setActiveTab(tab)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabPillText, activeTab === tab && styles.tabPillTextActive]}>{tab}</Text>
+              {count > 0 && (
+                <View style={[styles.countBadge, activeTab === tab && styles.countBadgeActive]}>
+                  <Text style={[styles.countBadgeText, activeTab === tab && styles.countBadgeTextActive]}>
+                    {count}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Content */}
@@ -329,14 +375,22 @@ export default function SavingsGoalsScreen() {
         ) : displayedGoals.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons
-              name={activeTab === 'Active' ? 'flag-outline' : 'checkmark-circle-outline'}
+              name={
+                activeTab === 'Active' ? 'flag-outline'
+                  : activeTab === 'Completed' ? 'checkmark-circle-outline'
+                  : 'archive-outline'
+              }
               size={52} color={theme.divider}
             />
             <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-              {activeTab === 'Active' ? 'No active goals yet' : 'No completed goals'}
+              {activeTab === 'Active' ? 'No active goals yet'
+                : activeTab === 'Completed' ? 'No completed goals'
+                : 'No archived goals'}
             </Text>
             <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-              {activeTab === 'Active' ? 'Tap + to create your first savings goal' : 'Keep saving to reach your goals!'}
+              {activeTab === 'Active' ? 'Tap + to create your first savings goal'
+                : activeTab === 'Completed' ? 'Keep saving to reach your goals!'
+                : 'Goals you archive will appear here.'}
             </Text>
             {activeTab === 'Active' && (
               <TouchableOpacity style={styles.emptyAddBtn} onPress={openAddModal} activeOpacity={0.8}>
@@ -348,65 +402,135 @@ export default function SavingsGoalsScreen() {
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
             {displayedGoals.map((goal) => {
               const pct         = goal.target_amount > 0 ? Math.min(100, (goal.current_amount / goal.target_amount) * 100) : 0;
-              const isCompleted = goal.is_completed || goal.is_archived;
+              const isCompleted = goal.is_completed;
+              const isArchived  = goal.is_archived && !goal.is_completed;
+              const menuOpen    = menuGoalId === goal.id;
+              const hasMenu     = !isCompleted;
 
               return (
-                <View key={goal.id} style={[styles.goalCard, { backgroundColor: theme.surface }]}>
-                  {/* Icon */}
-                  <View style={[styles.goalIcon, isCompleted && styles.goalIconCompleted]}>
-                    <Ionicons name={goal.icon as any} size={22} color="#fff" />
-                  </View>
+                <View key={goal.id} style={[styles.goalCard, { backgroundColor: theme.surface, zIndex: menuOpen ? 100 : 1 }]}>
+                  {/* ── Main row ── */}
+                  <View style={styles.goalCardRow}>
+                    {/* Icon */}
+                    <View style={[
+                      styles.goalIcon,
+                      isCompleted && styles.goalIconCompleted,
+                      isArchived  && styles.goalIconArchived,
+                    ]}>
+                      <Ionicons name={goal.icon as any} size={22} color="#fff" />
+                    </View>
 
-                  {/* Info */}
-                  <View style={styles.goalInfo}>
-                    <View style={styles.goalTitleRow}>
-                      <Text style={[styles.goalTitle, { color: theme.textPrimary }]} numberOfLines={1}>
-                        {goal.title}
+                    {/* Info */}
+                    <View style={styles.goalInfo}>
+                      <View style={styles.goalTitleRow}>
+                        <Text style={[styles.goalTitle, { color: theme.textPrimary }]} numberOfLines={1}>
+                          {goal.title}
+                        </Text>
+                        {isCompleted && (
+                          <View style={styles.doneBadge}>
+                            <Ionicons name="checkmark-circle" size={13} color="#3ECBA8" />
+                            <Text style={styles.doneBadgeText}>Done</Text>
+                          </View>
+                        )}
+                        {isArchived && (
+                          <View style={styles.archivedBadge}>
+                            <Ionicons name="archive-outline" size={12} color="#9AA5B4" />
+                            <Text style={styles.archivedBadgeText}>Archived</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <Text style={[styles.goalAmounts, { color: theme.textSecondary }]}>
+                        {formatCurrency(goal.current_amount)}
+                        <Text style={{ color: theme.textMuted }}> / {formatCurrency(goal.target_amount)}</Text>
                       </Text>
-                      {isCompleted && (
-                        <View style={styles.doneBadge}>
-                          <Ionicons name="checkmark-circle" size={13} color="#3ECBA8" />
-                          <Text style={styles.doneBadgeText}>Done</Text>
-                        </View>
-                      )}
+
+                      <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+                        <View style={[
+                          styles.progressFill,
+                          {
+                            width: `${pct}%` as any,
+                            backgroundColor: isCompleted ? '#3ECBA8' : isArchived ? '#9AA5B4' : '#4895EF',
+                          },
+                        ]} />
+                      </View>
+
+                      <Text style={[styles.pctText, { color: theme.textMuted }]}>
+                        {isCompleted
+                          ? `Completed${goal.completed_at ? ' · ' + formatDate(goal.completed_at) : ''}`
+                          : `${pct.toFixed(0)}% of goal reached`}
+                      </Text>
                     </View>
-
-                    <Text style={[styles.goalAmounts, { color: theme.textSecondary }]}>
-                      {formatCurrency(goal.current_amount)}
-                      <Text style={{ color: theme.textMuted }}> / {formatCurrency(goal.target_amount)}</Text>
-                    </Text>
-
-                    <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
-                      <View style={[
-                        styles.progressFill,
-                        { width: `${pct}%` as any, backgroundColor: isCompleted ? '#3ECBA8' : '#4895EF' },
-                      ]} />
-                    </View>
-
-                    <Text style={[styles.pctText, { color: theme.textMuted }]}>
-                      {isCompleted
-                        ? `Completed${goal.completed_at ? ' · ' + formatDate(goal.completed_at) : ''}`
-                        : `${pct.toFixed(0)}% of goal reached`}
-                    </Text>
                   </View>
 
-                  {/* Action buttons — only for active goals */}
-                  {!isCompleted && (
-                    <View style={styles.actionBtns}>
-                      <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => openEditModal(goal)}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="pencil-outline" size={20} color={theme.textSecondary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => openFundsModal(goal)}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="add-circle" size={30} color="#3ECBA8" />
-                      </TouchableOpacity>
+                  {/* ── Kebab button — absolute top-right ── */}
+                  {hasMenu && (
+                    <TouchableOpacity
+                      style={styles.kebabBtn}
+                      onPress={() => setMenuGoalId(menuOpen ? null : goal.id)}
+                      activeOpacity={0.6}
+                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    >
+                      <Ionicons name="ellipsis-horizontal" size={18} color={theme.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* ── Floating action menu ── */}
+                  {menuOpen && (
+                    <View style={[styles.menuPanel, { backgroundColor: theme.modalBg }]}>
+                      {!isArchived && (
+                        <>
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => { setMenuGoalId(null); openEditModal(goal); }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(72,149,239,0.12)' }]}>
+                              <Ionicons name="pencil-outline" size={14} color="#4895EF" />
+                            </View>
+                            <Text style={[styles.menuItemLabel, { color: theme.textPrimary }]}>Edit Goal</Text>
+                          </TouchableOpacity>
+
+                          <View style={[styles.menuDivider, { backgroundColor: theme.divider }]} />
+
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => { setMenuGoalId(null); openFundsModal(goal); }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(62,203,168,0.12)' }]}>
+                              <Ionicons name="wallet-outline" size={14} color="#3ECBA8" />
+                            </View>
+                            <Text style={[styles.menuItemLabel, { color: theme.textPrimary }]}>Add Funds</Text>
+                          </TouchableOpacity>
+
+                          <View style={[styles.menuDivider, { backgroundColor: theme.divider }]} />
+
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => { setMenuGoalId(null); handleArchiveGoal(goal); }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(154,165,180,0.12)' }]}>
+                              <Ionicons name="archive-outline" size={14} color="#9AA5B4" />
+                            </View>
+                            <Text style={[styles.menuItemLabel, { color: theme.textSecondary }]}>Archive</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+
+                      {isArchived && (
+                        <TouchableOpacity
+                          style={styles.menuItem}
+                          onPress={() => { setMenuGoalId(null); handleRestoreGoal(goal); }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(62,203,168,0.12)' }]}>
+                            <Ionicons name="refresh-outline" size={14} color="#3ECBA8" />
+                          </View>
+                          <Text style={[styles.menuItemLabel, { color: theme.textPrimary }]}>Restore Goal</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   )}
                 </View>
@@ -503,6 +627,22 @@ export default function SavingsGoalsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ── Archive Confirm Modal ──────────────────────────────────────────── */}
+      <ConfirmModal
+        visible={pendingArchiveGoal !== null}
+        onClose={() => setPendingArchiveGoal(null)}
+        onConfirm={confirmArchive}
+        title="Archive Goal?"
+        message={
+          pendingArchiveGoal
+            ? `"${pendingArchiveGoal.title}" will be hidden from your active goals. You can restore it anytime from the Archived tab.`
+            : ''
+        }
+        confirmLabel="Archive"
+        confirmColor="#F59E0B"
+        icon="archive-outline"
+      />
 
       {/* ── Add Funds Modal ────────────────────────────────────────────────── */}
       <Modal visible={showFundsModal} animationType="slide" transparent statusBarTranslucent>
@@ -604,7 +744,11 @@ const styles = StyleSheet.create({
 
   // Goal card
   goalCard: {
-    borderRadius: 18, padding: 16,
+    borderRadius: 18,
+  },
+  goalCardRow: {
+    padding: 16,
+    paddingRight: 36,
     flexDirection: 'row', alignItems: 'center', gap: 14,
   },
   goalIcon: {
@@ -612,6 +756,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4895EF', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   goalIconCompleted: { backgroundColor: '#3ECBA8' },
+  goalIconArchived:  { backgroundColor: '#9AA5B4' },
   goalInfo:          { flex: 1, gap: 4 },
   goalTitleRow:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
   goalTitle:         { fontFamily: Font.bodySemiBold, fontSize: 15, flex: 1 },
@@ -620,14 +765,43 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(62,203,168,0.12)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
   },
   doneBadgeText:  { fontFamily: Font.bodySemiBold, fontSize: 10, color: '#3ECBA8' },
+  archivedBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(154,165,180,0.12)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  archivedBadgeText: { fontFamily: Font.bodySemiBold, fontSize: 10, color: '#9AA5B4' },
   goalAmounts:    { fontFamily: Font.bodyMedium, fontSize: 13 },
   progressTrack:  { height: 6, borderRadius: 3, overflow: 'hidden', marginTop: 2 },
   progressFill:   { height: 6, borderRadius: 3 },
   pctText:        { fontFamily: Font.bodyRegular, fontSize: 11, marginTop: 2 },
 
-  // Action buttons column (edit + add funds)
-  actionBtns: { flexShrink: 0, alignItems: 'center', gap: 6 },
-  actionBtn:  { padding: 4 },
+  // Kebab button — absolute top-right of card
+  kebabBtn: {
+    position: 'absolute', top: 10, right: 10, zIndex: 2,
+    padding: 4,
+  },
+
+  // Floating action menu
+  menuPanel: {
+    position: 'absolute', top: 34, right: 10, zIndex: 200,
+    borderRadius: 12, minWidth: 152,
+    paddingVertical: 4,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+  },
+  menuItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 9, paddingHorizontal: 12,
+  },
+  menuDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 12 },
+  menuItemIcon: {
+    width: 26, height: 26, borderRadius: 8,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  menuItemLabel: { fontFamily: Font.bodyMedium, fontSize: 13 },
 
   // Empty state
   emptyState:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 10 },

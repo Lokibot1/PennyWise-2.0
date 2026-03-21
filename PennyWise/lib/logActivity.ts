@@ -16,6 +16,8 @@ export const ACTION = {
   SAVINGS_GOAL_UPDATED:   'SAVINGS_GOAL_UPDATED',
   SAVINGS_GOAL_FUNDED:    'SAVINGS_GOAL_FUNDED',
   SAVINGS_GOAL_COMPLETED: 'SAVINGS_GOAL_COMPLETED',
+  SAVINGS_GOAL_ARCHIVED:  'SAVINGS_GOAL_ARCHIVED',
+  SAVINGS_GOAL_RESTORED:  'SAVINGS_GOAL_RESTORED',
 } as const;
 
 // ── Entity type constants ─────────────────────────────────────────────────────

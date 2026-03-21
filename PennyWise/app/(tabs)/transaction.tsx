@@ -57,12 +57,16 @@ const LOG_ONLY_ACTIONS = [
   'EXPENSE_CATEGORY_ARCHIVED',
   'SAVINGS_GOAL_UPDATED',
   'SAVINGS_GOAL_FUNDED',
+  'SAVINGS_GOAL_ARCHIVED',
+  'SAVINGS_GOAL_RESTORED',
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function entityColor(entityType: string, actionType: string): string {
   if (entityType === 'savings_goal') {
     if (actionType === 'SAVINGS_GOAL_COMPLETED') return '#3ECBA8';
+    if (actionType === 'SAVINGS_GOAL_RESTORED')  return '#3ECBA8';
+    if (actionType === 'SAVINGS_GOAL_ARCHIVED')  return '#9AA5B4';
     if (actionType === 'SAVINGS_GOAL_FUNDED')    return '#F59E0B';
     return '#F59E0B';
   }
@@ -115,6 +119,8 @@ function actionLabel(actionType: string): string {
     SAVINGS_GOAL_UPDATED:      'Goal Updated',
     SAVINGS_GOAL_FUNDED:       'Goal Funded',
     SAVINGS_GOAL_COMPLETED:    'Goal Achieved',
+    SAVINGS_GOAL_ARCHIVED:     'Goal Archived',
+    SAVINGS_GOAL_RESTORED:     'Goal Restored',
   };
   return labels[actionType] ?? actionType.replace(/_/g, ' ');
 }

@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -20,6 +18,7 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
+import ConfirmModal from '@/components/ConfirmModal';
 import { ProfileInfoSkeleton, ProfileAvatarSkeleton, ProfileCardSkeleton } from '@/components/SkeletonLoader';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -128,10 +127,8 @@ function ProfileView({
 }) {
   const { theme } = useAppTheme();
   const [logoutVisible, setLogoutVisible] = useState(false);
-  const [loggingOut, setLoggingOut]       = useState(false);
 
   async function confirmLogout() {
-    setLoggingOut(true);
     await supabase.auth.signOut();
   }
 
@@ -196,30 +193,16 @@ function ProfileView({
         )}
       </ScrollView>
 
-      {/* Logout modal */}
-      <Modal visible={logoutVisible} transparent animationType="fade" onRequestClose={() => setLogoutVisible(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => !loggingOut && setLogoutVisible(false)}>
-          <Pressable style={[styles.modalBox, { backgroundColor: theme.confirmBg }]} onPress={() => {}}>
-            <View style={styles.modalIconWrap}>
-              <Ionicons name="log-out-outline" size={30} color="#E05555" />
-            </View>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Log Out?</Text>
-            <Text style={[styles.modalMsg, { color: theme.textSecondary }]}>
-              Are you sure you want to log out of your account?
-            </Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={[styles.modalBtnNo, { backgroundColor: theme.surface }]} onPress={() => setLogoutVisible(false)} disabled={loggingOut} activeOpacity={0.8}>
-                <Text style={[styles.modalBtnNoText, { color: theme.textSecondary }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalBtnYes} onPress={confirmLogout} disabled={loggingOut} activeOpacity={0.85}>
-                {loggingOut
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.modalBtnYesText}>Yes, Log Out</Text>}
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ConfirmModal
+        visible={logoutVisible}
+        onClose={() => setLogoutVisible(false)}
+        onConfirm={confirmLogout}
+        title="Log Out?"
+        message="Are you sure you want to log out of your account?"
+        confirmLabel="Log Out"
+        confirmColor="#E05555"
+        icon="log-out-outline"
+      />
     </SafeAreaView>
   );
 }
@@ -368,28 +351,16 @@ function EditProfileView({
         <View style={{ height: 32 }} />
       </ScrollView>
 
-      {/* Save confirm modal */}
-      <Modal visible={confirm} transparent animationType="fade" onRequestClose={() => setConfirm(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setConfirm(false)}>
-          <Pressable style={[styles.modalBox, { backgroundColor: theme.confirmBg }]} onPress={() => {}}>
-            <View style={[styles.modalIconWrap, { backgroundColor: 'rgba(27,122,74,0.12)' }]}>
-              <Ionicons name="save-outline" size={30} color="#1B7A4A" />
-            </View>
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Save Changes?</Text>
-            <Text style={[styles.modalMsg, { color: theme.textSecondary }]}>
-              Are you sure you want to save the changes to your profile?
-            </Text>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={[styles.modalBtnNo, { backgroundColor: theme.surface }]} onPress={() => setConfirm(false)} activeOpacity={0.8}>
-                <Text style={[styles.modalBtnNoText, { color: theme.textSecondary }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtnYes, { backgroundColor: '#1B7A4A' }]} onPress={handleSave} activeOpacity={0.85}>
-                <Text style={styles.modalBtnYesText}>Yes, Save</Text>
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <ConfirmModal
+        visible={confirm}
+        onClose={() => setConfirm(false)}
+        onConfirm={handleSave}
+        title="Save Changes?"
+        message="Are you sure you want to save the changes to your profile?"
+        confirmLabel="Save"
+        confirmColor="#1B7A4A"
+        icon="save-outline"
+      />
 
       {toast && (
         <View style={styles.toast} pointerEvents="none">
@@ -540,18 +511,6 @@ const styles = StyleSheet.create({
   checkbox:      { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   checkboxOn:    { backgroundColor: '#1B7A4A', borderColor: '#1B7A4A' },
   checkLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, flex: 1 },
-
-  // Modals
-  modalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  modalBox:        { width: '100%', borderRadius: 24, padding: 28, alignItems: 'center' },
-  modalIconWrap:   { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(224,85,85,0.1)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  modalTitle:      { fontFamily: Font.headerBold, fontSize: 18, marginBottom: 8, textAlign: 'center' },
-  modalMsg:        { fontFamily: Font.bodyRegular, fontSize: 14, textAlign: 'center', lineHeight: 21, marginBottom: 24 },
-  modalActions:    { flexDirection: 'row', gap: 12, width: '100%' },
-  modalBtnNo:      { flex: 1, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
-  modalBtnNoText:  { fontFamily: Font.bodySemiBold, fontSize: 14 },
-  modalBtnYes:     { flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: '#E05555', alignItems: 'center' },
-  modalBtnYesText: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff' },
 
   toast:     { position: 'absolute', bottom: 28, left: 20, right: 20, backgroundColor: '#115533', borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingVertical: 14, elevation: 10 },
   toastText: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff', flex: 1 },
