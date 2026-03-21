@@ -561,83 +561,192 @@ function CategoriesScreen({
 
 // ── CategoryDetailScreen ──────────────────────────────────────────────────────
 function CategoryDetailScreen({
-  category, income, totalIncome, onBack, onAdd, onEditIncome, theme,
+  category, income, totalIncome, onBack, onAdd, onEditIncome,
+  onArchiveIncome, onRestoreIncome, onDeleteIncome, theme,
 }: {
   category: Category; income: IncomeSource[]; totalIncome: number;
-  onBack: () => void; onAdd: () => void; onEditIncome: (id: string) => void; theme: Theme;
+  onBack: () => void; onAdd: () => void; onEditIncome: (id: string) => void;
+  onArchiveIncome: (id: string) => void; onRestoreIncome: (id: string) => void;
+  onDeleteIncome: (id: string) => void; theme: Theme;
 }) {
-  const active      = income.filter(i => i.categoryId === category.id && !i.isArchived);
-  const grouped     = groupByMonth(active);
+  const [tab, setTab]           = useState<'Active' | 'Archived'>('Active');
+  const [kebabIncId, setKebabId] = useState<string | null>(null);
+
+  const catIncome      = income.filter(i => i.categoryId === category.id);
+  const activeIncome   = catIncome.filter(i => !i.isArchived);
+  const archivedIncome = catIncome.filter(i => i.isArchived);
+  const activeGrouped  = groupByMonth(activeIncome);
+  const archGrouped    = groupByMonth(archivedIncome);
+  const kebabInc       = kebabIncId ? catIncome.find(i => i.id === kebabIncId) : null;
+
   const bodyAnim    = useEntranceAnim();
   const addBtnScale = useSharedValue(1);
   const addBtnAnim  = useAnimatedStyle(() => ({ transform: [{ scale: addBtnScale.value }] }));
+
+  const renderIncRow = (inc: IncomeSource, idx: number, items: IncomeSource[]) => (
+    <View
+      key={inc.id}
+      style={[s.incRow, idx < items.length - 1 && s.incRowBorder, idx < items.length - 1 && { borderBottomColor: theme.divider }]}
+    >
+      <View style={s.incIcon}>
+        <Ionicons name={category.icon} size={20} color="#fff" />
+      </View>
+      <TouchableOpacity style={{ flex: 1 }} onPress={() => onEditIncome(inc.id)} activeOpacity={0.85}>
+        <Text style={[s.incTitle, { color: theme.textPrimary }]}>{inc.title}</Text>
+        <Text style={[s.incMeta, { color: theme.textMuted }]}>
+          {inc.time} · {fmtDateShort(inc.date)}{inc.isRecurring ? ` · ${inc.frequency}` : ''}
+        </Text>
+      </TouchableOpacity>
+      <Text style={[s.incAmt, { color: theme.isDark ? '#52C27A' : '#115533' }]}>+{fmtAmt(inc.amount)}</Text>
+      <TouchableOpacity
+        style={s.rowKebabBtn}
+        onPress={() => setKebabId(inc.id)}
+        activeOpacity={0.75}
+        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+      >
+        <Ionicons name="ellipsis-vertical" size={16} color={theme.textMuted as string} />
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <>
       <BalanceHeader title={category.label} totalIncome={totalIncome} onBack={onBack} theme={theme} />
       <Animated.View style={[s.white, { flex: 1, backgroundColor: theme.cardBg }, bodyAnim]}>
+        <SlideTabBar
+          tabs={['Active', 'Archived']}
+          active={tab}
+          onChange={(t) => setTab(t as 'Active' | 'Archived')}
+          trackColor={theme.isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0'}
+          activeColor="#1B7A4A"
+          inactiveTextColor={theme.textMuted as string}
+          style={{ marginHorizontal: 20, marginTop: 16, marginBottom: 4 }}
+        />
         <ScrollView contentContainerStyle={[s.whiteContent, { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
-          {grouped.length === 0 && (
-            <View style={s.empty}>
-              <Ionicons name="cash-outline" size={48} color="#D0D0D0" />
-              <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No income entries yet</Text>
-            </View>
+          {tab === 'Active' ? (
+            <>
+              {activeGrouped.length === 0 && (
+                <View style={s.empty}>
+                  <Ionicons name="cash-outline" size={48} color="#D0D0D0" />
+                  <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No income entries yet</Text>
+                </View>
+              )}
+              {activeGrouped.map(group => (
+                <View key={group.key} style={{ marginBottom: 8 }}>
+                  <View style={s.monthHeader}>
+                    <Text style={[s.monthLabel, { color: theme.textPrimary }]}>{group.label}</Text>
+                    <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
+                  </View>
+                  {group.items.map((inc, idx) => renderIncRow(inc, idx, group.items))}
+                </View>
+              ))}
+            </>
+          ) : (
+            <>
+              {archivedIncome.length === 0 && (
+                <View style={s.empty}>
+                  <Ionicons name="archive-outline" size={48} color="#D0D0D0" />
+                  <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No archived income sources</Text>
+                </View>
+              )}
+              {archGrouped.map(group => (
+                <View key={group.key} style={{ marginBottom: 8 }}>
+                  <View style={s.monthHeader}>
+                    <Text style={[s.monthLabel, { color: theme.textPrimary }]}>{group.label}</Text>
+                    <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
+                  </View>
+                  {group.items.map((inc, idx) => renderIncRow(inc, idx, group.items))}
+                </View>
+              ))}
+            </>
           )}
-          {grouped.map(group => (
-            <View key={group.key} style={{ marginBottom: 8 }}>
-              <View style={s.monthHeader}>
-                <Text style={[s.monthLabel, { color: theme.textPrimary }]}>{group.label}</Text>
-                <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
-              </View>
-              {group.items.map((inc, idx) => (
-                <TouchableOpacity
-                  key={inc.id}
-                  style={[s.incRow, idx < group.items.length - 1 && s.incRowBorder, idx < group.items.length - 1 && { borderBottomColor: theme.divider }]}
-                  onPress={() => onEditIncome(inc.id)}
-                  activeOpacity={0.85}
-                >
-                  <View style={s.incIcon}>
+        </ScrollView>
+        {tab === 'Active' && (
+          <View style={s.addBtnWrapper}>
+            <Animated.View style={addBtnAnim}>
+              <TouchableOpacity
+                style={s.addBtn}
+                onPressIn={() => { addBtnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
+                onPressOut={() => { addBtnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+                onPress={onAdd}
+                activeOpacity={1}
+              >
+                <Text style={s.addBtnTxt}>Add Income</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        )}
+      </Animated.View>
+
+      {/* Income source kebab action-sheet */}
+      <Modal visible={kebabIncId !== null} transparent animationType="fade">
+        <Pressable style={s.kebabOverlay} onPress={() => setKebabId(null)}>
+          <Pressable style={[s.kebabSheet, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
+            {kebabInc && (
+              <>
+                <View style={s.kebabHeader}>
+                  <View style={s.kebabCatIcon}>
                     <Ionicons name={category.icon} size={20} color="#fff" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.incTitle, { color: theme.textPrimary }]}>{inc.title}</Text>
-                    <Text style={[s.incMeta, { color: theme.textMuted }]}>
-                      {inc.time} · {fmtDateShort(inc.date)}
-                      {inc.isRecurring ? ` · ${inc.frequency}` : ''}
-                    </Text>
+                    <Text style={[s.kebabCatName, { color: theme.textPrimary }]}>{kebabInc.title}</Text>
+                    <Text style={[s.incMeta, { color: theme.textMuted }]}>{fmtAmt(kebabInc.amount)}</Text>
                   </View>
-                  <Text style={[s.incAmt, { color: theme.isDark ? '#52C27A' : '#115533' }]}>+{fmtAmt(inc.amount)}</Text>
+                </View>
+                <View style={[s.kebabDivider, { backgroundColor: theme.divider }]} />
+                <TouchableOpacity
+                  style={s.kebabItem}
+                  onPress={() => { setKebabId(null); onEditIncome(kebabIncId!); }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="create-outline" size={20} color="#1B7A4A" />
+                  <Text style={[s.kebabItemTxt, { color: theme.textPrimary }]}>Edit</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          ))}
-        </ScrollView>
-        <View style={s.addBtnWrapper}>
-          <Animated.View style={addBtnAnim}>
-            <TouchableOpacity
-              style={s.addBtn}
-              onPressIn={() => { addBtnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
-              onPressOut={() => { addBtnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
-              onPress={onAdd}
-              activeOpacity={1}
-            >
-              <Text style={s.addBtnTxt}>Add Income</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </Animated.View>
+                {kebabInc.isArchived ? (
+                  <>
+                    <TouchableOpacity
+                      style={s.kebabItem}
+                      onPress={() => { setKebabId(null); onRestoreIncome(kebabIncId!); }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="refresh-outline" size={20} color="#3ECBA8" />
+                      <Text style={[s.kebabItemTxt, { color: '#3ECBA8' }]}>Restore</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={s.kebabItem}
+                      onPress={() => { setKebabId(null); onDeleteIncome(kebabIncId!); }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#E05858" />
+                      <Text style={[s.kebabItemTxt, { color: '#E05858' }]}>Delete Permanently</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <TouchableOpacity
+                    style={s.kebabItem}
+                    onPress={() => { setKebabId(null); onArchiveIncome(kebabIncId!); }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="archive-outline" size={20} color="#E05858" />
+                    <Text style={[s.kebabItemTxt, { color: '#E05858' }]}>Archive</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 }
 
 // ── IncomeFormScreen ──────────────────────────────────────────────────────────
 function IncomeFormScreen({
-  initial, categories, screenTitle, isEdit, saving, onBack, onSave, onArchive, theme,
+  initial, categories, screenTitle, isEdit, saving, onBack, onSave, theme,
 }: {
   initial: IncomeFormValues; categories: Category[]; screenTitle: string;
   isEdit?: boolean; saving?: boolean;
-  onBack: () => void; onSave: (vals: IncomeFormValues) => void;
-  onArchive?: () => void; theme: Theme;
+  onBack: () => void; onSave: (vals: IncomeFormValues) => void; theme: Theme;
 }) {
   const [vals, setVals]           = useState<IncomeFormValues>(initial);
   const [showCatPicker, setCat]   = useState(false);
@@ -709,13 +818,6 @@ function IncomeFormScreen({
                   <Ionicons name="chevron-down" size={18} color="#aaa" />
                 </TouchableOpacity>
               </>
-            )}
-
-            {isEdit && onArchive && (
-              <TouchableOpacity style={s.archiveBtn} onPress={onArchive} activeOpacity={0.8} disabled={saving}>
-                <Ionicons name="archive-outline" size={16} color="#E05858" />
-                <Text style={s.archiveBtnTxt}> Archive This Income Category</Text>
-              </TouchableOpacity>
             )}
 
             <Animated.View style={btnStyle}>
@@ -870,7 +972,12 @@ export default function IncomeSourcesScreen() {
             description: `₱${(parseFloat(vals.amount) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Income'}`,
             icon:        cat?.icon ?? 'cash-outline',
           });
-          setScreen({ name: 'categories' });
+          // Return to the category detail if we came from one, otherwise go to categories grid
+          setScreen(
+            screen.name === 'add' && screen.prefillCategoryId
+              ? { name: 'detail', categoryId: screen.prefillCategoryId }
+              : { name: 'categories' },
+          );
         }
 
       } else if (screen.name === 'edit') {
@@ -1017,6 +1124,90 @@ export default function IncomeSourcesScreen() {
     });
   };
 
+  const handleArchiveIncome = (incomeId: string) => {
+    const inc = income.find(i => i.id === incomeId);
+    showConfirm({
+      title:        'Archive Income Source?',
+      message:      `Are you sure you want to archive "${inc?.title ?? 'this income source'}"?`,
+      icon:         'archive-outline',
+      confirmLabel: 'Archive',
+      confirmColor: '#F59E0B',
+      onYes: async () => {
+        hideConfirm();
+        const { error } = await supabase.from('income_sources').update({ is_archived: true }).eq('id', incomeId);
+        if (!error) {
+          setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: true } : i));
+          showToast('Income source archived.');
+          const cat = categories.find(c => c.id === inc?.categoryId);
+          logActivity({
+            user_id:     userIdRef.current!,
+            action_type: ACTION.INCOME_SOURCE_ARCHIVED,
+            entity_type: ENTITY.INCOME_SOURCE,
+            title:       `Income Archived: ${inc?.title ?? 'Income Source'}`,
+            description: `${fmtAmt(inc?.amount ?? 0)} · ${cat?.label ?? 'Income'}`,
+            icon:        cat?.icon ?? 'archive-outline',
+          });
+        }
+      },
+    });
+  };
+
+  const handleRestoreIncome = (incomeId: string) => {
+    const inc = income.find(i => i.id === incomeId);
+    showConfirm({
+      title:        'Restore Income Source?',
+      message:      `Are you sure you want to restore "${inc?.title ?? 'this income source'}"?`,
+      icon:         'refresh-outline',
+      confirmLabel: 'Restore',
+      confirmColor: '#3ECBA8',
+      onYes: async () => {
+        hideConfirm();
+        const { error } = await supabase.from('income_sources').update({ is_archived: false }).eq('id', incomeId);
+        if (!error) {
+          setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: false } : i));
+          showToast('Income source restored.');
+          const cat = categories.find(c => c.id === inc?.categoryId);
+          logActivity({
+            user_id:     userIdRef.current!,
+            action_type: ACTION.INCOME_SOURCE_RESTORED,
+            entity_type: ENTITY.INCOME_SOURCE,
+            title:       `Income Restored: ${inc?.title ?? 'Income Source'}`,
+            description: `${fmtAmt(inc?.amount ?? 0)} · ${cat?.label ?? 'Income'}`,
+            icon:        cat?.icon ?? 'refresh-outline',
+          });
+        }
+      },
+    });
+  };
+
+  const handleDeleteIncome = (incomeId: string) => {
+    const inc = income.find(i => i.id === incomeId);
+    showConfirm({
+      title:        'Delete Permanently?',
+      message:      `This will permanently delete "${inc?.title ?? 'this income source'}". This cannot be undone.`,
+      icon:         'trash-outline',
+      confirmLabel: 'Delete',
+      confirmColor: '#E05858',
+      onYes: async () => {
+        hideConfirm();
+        const { error } = await supabase.from('income_sources').delete().eq('id', incomeId);
+        if (!error) {
+          setIncome(prev => prev.filter(i => i.id !== incomeId));
+          showToast('Income source permanently deleted.');
+          const cat = categories.find(c => c.id === inc?.categoryId);
+          logActivity({
+            user_id:     userIdRef.current!,
+            action_type: ACTION.INCOME_SOURCE_DELETED,
+            entity_type: ENTITY.INCOME_SOURCE,
+            title:       `Income Deleted: ${inc?.title ?? 'Income Source'}`,
+            description: `${fmtAmt(inc?.amount ?? 0)} · ${cat?.label ?? 'Income'} · Permanently deleted`,
+            icon:        cat?.icon ?? 'trash-outline',
+          });
+        }
+      },
+    });
+  };
+
   const handleSaveCategory = async (id: string, label: string, icon: IoniconName) => {
     const oldCat = categories.find(c => c.id === id);
 
@@ -1122,6 +1313,9 @@ export default function IncomeSourcesScreen() {
             onBack={() => setScreen({ name: 'categories' })}
             onAdd={() => setScreen({ name: 'add', prefillCategoryId: cat.id })}
             onEditIncome={id => setScreen({ name: 'edit', incomeId: id })}
+            onArchiveIncome={handleArchiveIncome}
+            onRestoreIncome={handleRestoreIncome}
+            onDeleteIncome={handleDeleteIncome}
             theme={theme}
           />
         );
@@ -1145,7 +1339,6 @@ export default function IncomeSourcesScreen() {
             initial={editInitial()} categories={categories} screenTitle="Edit Income Source" isEdit saving={saving}
             onBack={() => { const catId = inc?.categoryId; catId ? setScreen({ name: 'detail', categoryId: catId }) : setScreen({ name: 'categories' }); }}
             onSave={handleSave}
-            onArchive={() => { const catId = inc?.categoryId; if (catId) handleArchiveCategory(catId); }}
             theme={theme}
           />
         );
