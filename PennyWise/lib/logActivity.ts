@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 // ── Action type constants ──────────────────────────────────────────────────────
 export const ACTION = {
   INCOME_CATEGORY_CREATED:  'INCOME_CATEGORY_CREATED',
+  INCOME_CATEGORY_UPDATED:  'INCOME_CATEGORY_UPDATED',
   INCOME_SOURCE_ADDED:      'INCOME_SOURCE_ADDED',
   INCOME_SOURCE_UPDATED:    'INCOME_SOURCE_UPDATED',
   INCOME_CATEGORY_ARCHIVED: 'INCOME_CATEGORY_ARCHIVED',

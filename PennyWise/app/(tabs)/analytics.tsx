@@ -351,18 +351,79 @@ function NewCategoryModal({
   );
 }
 
+// ── EditCategoryModal ─────────────────────────────────────────────────────────
+function EditCategoryModal({
+  visible, category, onClose, onSave, theme,
+}: {
+  visible: boolean; category: Category | null; onClose: () => void;
+  onSave: (id: string, label: string, icon: IoniconName) => void; theme: Theme;
+}) {
+  const [label, setLabel] = useState('');
+  const [icon, setIcon]   = useState<IoniconName>('briefcase-outline');
+
+  useEffect(() => {
+    if (category) {
+      setLabel(category.label);
+      setIcon(category.icon);
+    }
+  }, [category?.id]);
+
+  const handleSave = () => {
+    if (!label.trim() || !category) return;
+    onSave(category.id, label.trim(), icon);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Pressable style={ncm.overlay} onPress={onClose}>
+          <Pressable style={[ncm.card, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
+            <Text style={[pk.heading, { color: theme.textPrimary }]}>Edit Category</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={[s.label, { color: theme.textPrimary }]}>Category Name</Text>
+              <View style={[s.fieldRow, { marginBottom: 4, backgroundColor: theme.inputBg }]}>
+                <TextInput
+                  style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
+                  value={label}
+                  onChangeText={setLabel}
+                  placeholder="Category name"
+                  placeholderTextColor="#aaa"
+                />
+              </View>
+              <Text style={[s.label, { color: theme.textPrimary }]}>Icon</Text>
+              <View style={s.iconGrid}>
+                {NEW_CAT_ICONS.map(ic => (
+                  <TouchableOpacity key={ic} style={[s.iconOpt, icon === ic && s.iconOptActive]} onPress={() => setIcon(ic)} activeOpacity={0.8}>
+                    <Ionicons name={ic} size={22} color={icon === ic ? '#fff' : '#115533'} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity style={[s.saveBtn, { marginTop: 20, marginBottom: 8 }]} onPress={handleSave} activeOpacity={0.9}>
+                <Text style={s.saveBtnTxt}>Save Changes</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 // ── CategoriesScreen ──────────────────────────────────────────────────────────
 function CategoriesScreen({
-  categories, income, totalIncome, onSelectCategory, onAddCategory, onRestore, theme,
+  categories, income, totalIncome, onSelectCategory, onAddCategory, onEditCategory, onRestore, theme,
 }: {
   categories: Category[]; income: IncomeSource[]; totalIncome: number;
   onSelectCategory: (id: string) => void; onAddCategory: () => void;
-  onRestore: (id: string) => void; theme: Theme;
+  onEditCategory: (id: string) => void; onRestore: (id: string) => void; theme: Theme;
 }) {
-  const [tab, setTab]   = useState<'Active' | 'Archived'>('Active');
-  const active          = categories.filter(c => !c.isArchived);
-  const archived        = categories.filter(c => c.isArchived);
-  const bodyAnim        = useEntranceAnim();
+  const [tab, setTab]           = useState<'Active' | 'Archived'>('Active');
+  const [kebabCatId, setKebabId] = useState<string | null>(null);
+  const active                  = categories.filter(c => !c.isArchived);
+  const archived                = categories.filter(c => c.isArchived);
+  const bodyAnim                = useEntranceAnim();
+  const kebabCat                = kebabCatId ? active.find(c => c.id === kebabCatId) : null;
 
   return (
     <>
@@ -383,13 +444,23 @@ function CategoriesScreen({
               {active.map(cat => {
                 const count = income.filter(i => i.categoryId === cat.id && !i.isArchived).length;
                 return (
-                  <TouchableOpacity key={cat.id} style={s.catCard} onPress={() => onSelectCategory(cat.id)} activeOpacity={0.85}>
-                    <View style={s.catIcon}>
-                      <Ionicons name={cat.icon} size={28} color="#fff" />
+                  <View key={cat.id} style={s.catCard}>
+                    <View style={{ position: 'relative' }}>
+                      <TouchableOpacity style={s.catIcon} onPress={() => onSelectCategory(cat.id)} activeOpacity={0.85}>
+                        <Ionicons name={cat.icon} size={28} color="#fff" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={s.kebabBtn}
+                        onPress={() => setKebabId(cat.id)}
+                        activeOpacity={0.75}
+                        hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                      >
+                        <Ionicons name="ellipsis-vertical" size={12} color="#fff" />
+                      </TouchableOpacity>
                     </View>
                     <Text style={[s.catLabel, { color: theme.textPrimary }]}>{cat.label}</Text>
                     {count > 0 && <Text style={[s.catCount, { color: theme.textMuted }]}>{count} item{count !== 1 ? 's' : ''}</Text>}
-                  </TouchableOpacity>
+                  </View>
                 );
               })}
               <TouchableOpacity style={s.catCard} onPress={onAddCategory} activeOpacity={0.85}>
@@ -422,6 +493,37 @@ function CategoriesScreen({
           )}
         </ScrollView>
       </Animated.View>
+
+      {/* Kebab action-sheet */}
+      <Modal visible={kebabCatId !== null} transparent animationType="fade">
+        <Pressable style={s.kebabOverlay} onPress={() => setKebabId(null)}>
+          <Pressable style={[s.kebabSheet, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
+            {kebabCat && (
+              <>
+                <View style={s.kebabHeader}>
+                  <View style={s.kebabCatIcon}>
+                    <Ionicons name={kebabCat.icon} size={20} color="#fff" />
+                  </View>
+                  <Text style={[s.kebabCatName, { color: theme.textPrimary }]}>{kebabCat.label}</Text>
+                </View>
+                <View style={[s.kebabDivider, { backgroundColor: theme.divider }]} />
+                <TouchableOpacity
+                  style={s.kebabItem}
+                  onPress={() => { setKebabId(null); onEditCategory(kebabCatId!); }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="create-outline" size={20} color="#1B7A4A" />
+                  <Text style={[s.kebabItemTxt, { color: theme.textPrimary }]}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.kebabItem, { opacity: 0.35 }]} activeOpacity={0.6} disabled>
+                  <Ionicons name="archive-outline" size={20} color="#E05858" />
+                  <Text style={[s.kebabItemTxt, { color: '#E05858' }]}>Archive</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 }
@@ -638,8 +740,9 @@ export default function IncomeSourcesScreen() {
   const [loading,    setLoading]    = useState(true);
   const [saving,     setSaving]     = useState(false);
   const [confirm,    setConfirm]    = useState<ConfirmState>({ visible: false, title: '', message: '', onYes: () => {} });
-  const [showNewCat, setShowNewCat] = useState(false);
-  const [toast,      setToast]      = useState('');
+  const [showNewCat,  setShowNewCat]  = useState(false);
+  const [editCat,     setEditCat]     = useState<Category | null>(null);
+  const [toast,       setToast]       = useState('');
 
   // ── Load from Supabase ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -824,6 +927,26 @@ export default function IncomeSourcesScreen() {
     });
   };
 
+  const handleSaveCategory = async (id: string, label: string, icon: IoniconName) => {
+    const { error } = await supabase
+      .from('income_categories')
+      .update({ label, icon })
+      .eq('id', id);
+
+    if (!error) {
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, label, icon } : c));
+      showToast('Category updated successfully.');
+      logActivity({
+        user_id:     userIdRef.current!,
+        action_type: ACTION.INCOME_CATEGORY_UPDATED,
+        entity_type: ENTITY.INCOME_CATEGORY,
+        title:       `Category Updated: ${label}`,
+        description: 'Income source category details updated.',
+        icon:        icon,
+      });
+    }
+  };
+
   const handleNewCategory = async (label: string, icon: IoniconName) => {
     const { data, error } = await supabase
       .from('income_categories')
@@ -885,6 +1008,7 @@ export default function IncomeSourcesScreen() {
             categories={categories} income={income} totalIncome={totalIncome}
             onSelectCategory={id => setScreen({ name: 'detail', categoryId: id })}
             onAddCategory={() => setShowNewCat(true)}
+            onEditCategory={id => { const cat = categories.find(c => c.id === id); if (cat) setEditCat(cat); }}
             onRestore={handleRestore}
             theme={theme}
           />
@@ -946,6 +1070,7 @@ export default function IncomeSourcesScreen() {
         confirmColor={confirm.confirmColor}
       />
       <NewCategoryModal visible={showNewCat} onClose={() => setShowNewCat(false)} onCreate={handleNewCategory} theme={theme} />
+      <EditCategoryModal visible={editCat !== null} category={editCat} onClose={() => setEditCat(null)} onSave={handleSaveCategory} theme={theme} />
       {toast !== '' && (
         <View style={s.toast}>
           <Ionicons name="checkmark-circle" size={16} color="#fff" />
@@ -1020,4 +1145,14 @@ const s = StyleSheet.create({
 
   toast:    { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#115533', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', elevation: 8 },
   toastTxt: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#fff' },
+
+  kebabBtn:     { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
+  kebabOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  kebabSheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  kebabHeader:  { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 },
+  kebabCatIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#115533', alignItems: 'center', justifyContent: 'center' },
+  kebabCatName: { fontFamily: Font.headerBold, fontSize: 16, flex: 1 },
+  kebabDivider: { height: 1, marginBottom: 8 },
+  kebabItem:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 14 },
+  kebabItemTxt: { fontFamily: Font.bodyMedium, fontSize: 15, flex: 1 },
 });
