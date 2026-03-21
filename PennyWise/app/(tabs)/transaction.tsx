@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import {
   ActivityIndicator,
@@ -27,75 +27,85 @@ import { supabase } from '@/lib/supabase';
 // ── Types ──────────────────────────────────────────────────────────────────────
 type FilterType = 'All' | 'Income' | 'Expenses' | 'Savings';
 
-type ActivityLog = {
+type ActivityItem = {
   id: string;
   action_type: string;
   entity_type: string;
   title: string;
   description: string;
   icon: string;
-  created_at: string;
+  created_at: string;   // ISO string, used for sorting + display
 };
 
 type Section = {
-  title: string;   // e.g. "Today", "Yesterday", "March 20, 2026"
-  data: ActivityLog[];
+  title: string;
+  data: ActivityItem[];
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const FILTERS: FilterType[] = ['All', 'Income', 'Expenses', 'Savings'];
 
-const ENTITY_FILTER: Record<FilterType, string[]> = {
-  All:      [],
-  Income:   ['income_category', 'income_source'],
-  Expenses: ['expense_category', 'expense'],
-  Savings:  ['savings_goal'],
-};
+// action_types sourced from activity_logs (not from source tables directly)
+// Excluded: INCOME_SOURCE_ADDED, EXPENSE_ADDED, SAVINGS_GOAL_CREATED,
+//           SAVINGS_GOAL_COMPLETED — these come from source tables to cover history.
+const LOG_ONLY_ACTIONS = [
+  'INCOME_SOURCE_UPDATED',
+  'EXPENSE_UPDATED',
+  'INCOME_CATEGORY_CREATED',
+  'INCOME_CATEGORY_ARCHIVED',
+  'EXPENSE_CATEGORY_CREATED',
+  'EXPENSE_CATEGORY_ARCHIVED',
+  'SAVINGS_GOAL_FUNDED',
+];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function entityColor(entityType: string, actionType: string): string {
   if (entityType === 'savings_goal') {
     if (actionType === 'SAVINGS_GOAL_COMPLETED') return '#3ECBA8';
+    if (actionType === 'SAVINGS_GOAL_FUNDED')    return '#F59E0B';
     return '#F59E0B';
   }
-  if (entityType.startsWith('income')) return '#22C55E';
+  if (actionType.includes('ARCHIVED')) return '#9AA5B4';
+  if (entityType.startsWith('income'))  return '#22C55E';
   if (entityType.startsWith('expense')) return '#4895EF';
   return '#9AA5B4';
 }
 
 function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const h = d.getHours();
-  const m = String(d.getMinutes()).padStart(2, '0');
+  const d    = new Date(iso);
+  const h    = d.getHours();
+  const m    = String(d.getMinutes()).padStart(2, '0');
   const ampm = h >= 12 ? 'PM' : 'AM';
   return `${h % 12 === 0 ? 12 : h % 12}:${m} ${ampm}`;
 }
 
-function sectionTitle(iso: string): string {
+function sectionKey(iso: string): string {
   const d     = new Date(iso);
   const today = new Date();
-  const diff  = Math.floor((today.setHours(0,0,0,0) - d.setHours(0,0,0,0)) / 86400000);
+  const diff  = Math.floor(
+    (new Date(today.toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86400000,
+  );
   if (diff === 0) return 'Today';
   if (diff === 1) return 'Yesterday';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
-function groupByDate(logs: ActivityLog[]): Section[] {
-  const map = new Map<string, ActivityLog[]>();
-  for (const log of logs) {
-    const key = sectionTitle(log.created_at);
+function groupByDate(items: ActivityItem[]): Section[] {
+  const map = new Map<string, ActivityItem[]>();
+  for (const item of items) {
+    const key = sectionKey(item.created_at);
     if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(log);
+    map.get(key)!.push(item);
   }
   return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
 }
 
 function actionLabel(actionType: string): string {
   const labels: Record<string, string> = {
-    INCOME_CATEGORY_CREATED:  'Category Created',
-    INCOME_SOURCE_ADDED:      'Income Added',
-    INCOME_SOURCE_UPDATED:    'Income Updated',
-    INCOME_CATEGORY_ARCHIVED: 'Category Archived',
+    INCOME_CATEGORY_CREATED:   'Category Created',
+    INCOME_SOURCE_ADDED:       'Income Added',
+    INCOME_SOURCE_UPDATED:     'Income Updated',
+    INCOME_CATEGORY_ARCHIVED:  'Category Archived',
     EXPENSE_CATEGORY_CREATED:  'Category Created',
     EXPENSE_ADDED:             'Expense Added',
     EXPENSE_UPDATED:           'Expense Updated',
@@ -104,19 +114,129 @@ function actionLabel(actionType: string): string {
     SAVINGS_GOAL_FUNDED:       'Goal Funded',
     SAVINGS_GOAL_COMPLETED:    'Goal Achieved',
   };
-  return labels[actionType] ?? actionType;
+  return labels[actionType] ?? actionType.replace(/_/g, ' ');
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+function fmtAmount(n: number): string {
+  return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ── Build unified activity feed from source tables + activity_logs ─────────────
+async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
+  const [incomeRes, expenseRes, goalsRes, logsRes] = await Promise.all([
+    // All income sources (including archived)
+    supabase
+      .from('income_sources')
+      .select('id, title, amount, created_at, is_archived, income_categories(label, icon)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+
+    // All expenses (including archived)
+    supabase
+      .from('expenses')
+      .select('id, title, amount, created_at, is_archived, expense_categories(label, icon)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+
+    // All savings goals (active + completed + archived)
+    supabase
+      .from('savings_goals')
+      .select('id, icon, title, target_amount, current_amount, is_completed, is_archived, completed_at, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false }),
+
+    // activity_logs — only metadata events not covered by source tables
+    supabase
+      .from('activity_logs')
+      .select('id, action_type, entity_type, title, description, icon, created_at')
+      .eq('user_id', userId)
+      .in('action_type', LOG_ONLY_ACTIONS)
+      .order('created_at', { ascending: false }),
+  ]);
+
+  const items: ActivityItem[] = [];
+
+  // ── Income sources ──────────────────────────────────────────────────────────
+  for (const r of incomeRes.data ?? []) {
+    const cat = (r as any).income_categories;
+    const amt = Number((r as any).amount);
+    items.push({
+      id:          `inc-${r.id}`,
+      action_type: 'INCOME_SOURCE_ADDED',
+      entity_type: 'income_source',
+      title:       `Income: ${(r as any).title}`,
+      description: `${fmtAmount(amt)} · ${cat?.label ?? 'Income'}${(r as any).is_archived ? ' · Archived' : ''}`,
+      icon:        cat?.icon ?? 'cash-outline',
+      created_at:  (r as any).created_at,
+    });
+  }
+
+  // ── Expenses ────────────────────────────────────────────────────────────────
+  for (const r of expenseRes.data ?? []) {
+    const cat = (r as any).expense_categories;
+    const amt = Number((r as any).amount);
+    items.push({
+      id:          `exp-${r.id}`,
+      action_type: 'EXPENSE_ADDED',
+      entity_type: 'expense',
+      title:       `Expense: ${(r as any).title}`,
+      description: `${fmtAmount(amt)} · ${cat?.label ?? 'Expense'}${(r as any).is_archived ? ' · Archived' : ''}`,
+      icon:        cat?.icon ?? 'receipt-outline',
+      created_at:  (r as any).created_at,
+    });
+  }
+
+  // ── Savings goals ───────────────────────────────────────────────────────────
+  for (const r of goalsRes.data ?? []) {
+    const isCompleted = (r as any).is_completed || (r as any).is_archived;
+    // Completion event (uses completed_at as timestamp)
+    if (isCompleted && (r as any).completed_at) {
+      items.push({
+        id:          `goal-done-${r.id}`,
+        action_type: 'SAVINGS_GOAL_COMPLETED',
+        entity_type: 'savings_goal',
+        title:       `Goal Achieved: ${(r as any).title}`,
+        description: `Target of ${fmtAmount((r as any).target_amount)} reached!`,
+        icon:        (r as any).icon ?? 'trophy-outline',
+        created_at:  (r as any).completed_at,
+      });
+    }
+    // Creation event (always shown)
+    items.push({
+      id:          `goal-${r.id}`,
+      action_type: 'SAVINGS_GOAL_CREATED',
+      entity_type: 'savings_goal',
+      title:       `Goal Created: ${(r as any).title}`,
+      description: `Target: ${fmtAmount((r as any).target_amount)}`,
+      icon:        (r as any).icon ?? 'flag-outline',
+      created_at:  (r as any).created_at,
+    });
+  }
+
+  // ── Metadata logs (updates, category events, goal funding) ──────────────────
+  for (const r of logsRes.data ?? []) {
+    items.push({
+      id:          `log-${r.id}`,
+      action_type: r.action_type,
+      entity_type: r.entity_type,
+      title:       r.title,
+      description: r.description ?? '',
+      icon:        r.icon,
+      created_at:  r.created_at,
+    });
+  }
+
+  // Sort all by created_at descending
+  items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  return items;
+}
+
+// ── Filter chip ───────────────────────────────────────────────────────────────
 function FilterChip({
-  label,
-  active,
-  onPress,
-  theme,
+  label, active, onPress, theme,
 }: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
+  label: string; active: boolean; onPress: () => void;
   theme: import('@/contexts/AppTheme').Theme;
 }) {
   const scale = useSharedValue(1);
@@ -124,11 +244,7 @@ function FilterChip({
   return (
     <Animated.View style={anim}>
       <TouchableOpacity
-        style={[
-          styles.filterChip,
-          active && styles.filterChipActive,
-          !active && { backgroundColor: theme.surface },
-        ]}
+        style={[styles.filterChip, active && styles.filterChipActive, !active && { backgroundColor: theme.surface }]}
         onPress={() => {
           scale.value = withSpring(0.88, { damping: 6, stiffness: 600 });
           setTimeout(() => { scale.value = withSpring(1, { damping: 10, stiffness: 400 }); }, 80);
@@ -144,12 +260,11 @@ function FilterChip({
   );
 }
 
-function ActivityItem({
-  item,
-  theme,
+// ── Activity row ──────────────────────────────────────────────────────────────
+function ActivityRow({
+  item, theme,
 }: {
-  item: ActivityLog;
-  theme: import('@/contexts/AppTheme').Theme;
+  item: ActivityItem; theme: import('@/contexts/AppTheme').Theme;
 }) {
   const color = entityColor(item.entity_type, item.action_type);
   return (
@@ -171,7 +286,7 @@ function ActivityItem({
             {item.description}
           </Text>
         )}
-        <View style={[styles.actionBadge, { backgroundColor: color + '20' }]}>
+        <View style={[styles.actionBadge, { backgroundColor: color + '22' }]}>
           <Text style={[styles.actionBadgeText, { color }]}>{actionLabel(item.action_type)}</Text>
         </View>
       </View>
@@ -181,14 +296,14 @@ function ActivityItem({
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export default function TransactionHistoryScreen() {
-  const { theme } = useAppTheme();
-  const [logs, setLogs]           = useState<ActivityLog[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [search, setSearch]       = useState('');
+  const { theme }   = useAppTheme();
+  const [all, setAll]                   = useState<ActivityItem[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [search, setSearch]             = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
   const userIdRef = useRef<string | null>(null);
 
-  // ── Entrance animation ─────────────────────────────────────────────────────
+  // Entrance animation
   const bodyOpacity = useSharedValue(0);
   const bodyTY      = useSharedValue(20);
   useEffect(() => {
@@ -201,57 +316,65 @@ export default function TransactionHistoryScreen() {
     transform: [{ translateY: bodyTY.value }],
   }));
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
-  const fetchLogs = useCallback(async (uid: string) => {
+  // Load data
+  const load = useCallback(async (uid: string) => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('activity_logs')
-      .select('id, action_type, entity_type, title, description, icon, created_at')
-      .eq('user_id', uid)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) setLogs(data as ActivityLog[]);
+    const items = await fetchAllActivity(uid);
+    setAll(items);
     setLoading(false);
   }, []);
 
+  // Auth listener (initial load)
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         userIdRef.current = session.user.id;
-        fetchLogs(session.user.id);
+        load(session.user.id);
       } else {
         setLoading(false);
       }
     });
     return () => subscription.unsubscribe();
-  }, [fetchLogs]);
+  }, [load]);
 
-  // ── Derived data ───────────────────────────────────────────────────────────
-  const filtered = logs.filter(log => {
-    const entityTypes = ENTITY_FILTER[activeFilter];
-    const matchFilter = activeFilter === 'All' || entityTypes.includes(log.entity_type);
+  // Refresh on focus (catches changes made in other tabs)
+  useFocusEffect(
+    useCallback(() => {
+      if (userIdRef.current) load(userIdRef.current);
+    }, [load]),
+  );
+
+  // Filter + search
+  const ENTITY_TYPES: Record<FilterType, string[]> = {
+    All:      [],
+    Income:   ['income_source', 'income_category'],
+    Expenses: ['expense', 'expense_category'],
+    Savings:  ['savings_goal'],
+  };
+
+  const filtered = all.filter(item => {
+    const types = ENTITY_TYPES[activeFilter];
+    const matchFilter = activeFilter === 'All' || types.includes(item.entity_type);
     const q = search.toLowerCase().trim();
     const matchSearch = q === '' ||
-      log.title.toLowerCase().includes(q) ||
-      log.description.toLowerCase().includes(q) ||
-      log.action_type.toLowerCase().includes(q);
+      item.title.toLowerCase().includes(q) ||
+      item.description.toLowerCase().includes(q);
     return matchFilter && matchSearch;
   });
 
   const sections = groupByDate(filtered);
 
-  // ── Stats for summary ──────────────────────────────────────────────────────
-  const incomeCount  = logs.filter(l => l.entity_type.startsWith('income')).length;
-  const expenseCount = logs.filter(l => l.entity_type.startsWith('expense')).length;
-  const savingsCount = logs.filter(l => l.entity_type === 'savings_goal').length;
+  // Stats
+  const incomeCount  = all.filter(i => i.entity_type === 'income_source').length;
+  const expenseCount = all.filter(i => i.entity_type === 'expense').length;
+  const savingsCount = all.filter(i => i.entity_type === 'savings_goal').length;
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
       <StatusBar style={theme.statusBar} />
 
       <Animated.View style={bodyAnim}>
-        {/* ── Header ──────────────────────────────────────────────────────── */}
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
             style={[styles.headerBtn, { backgroundColor: theme.iconBtnBg }]}
@@ -263,14 +386,14 @@ export default function TransactionHistoryScreen() {
           <Text style={[styles.headerTitle, { color: theme.iconBtnColor }]}>Activity History</Text>
           <TouchableOpacity
             style={[styles.headerBtn, { backgroundColor: theme.iconBtnBg }]}
-            onPress={() => userIdRef.current && fetchLogs(userIdRef.current)}
+            onPress={() => userIdRef.current && load(userIdRef.current)}
             activeOpacity={0.8}
           >
             <Ionicons name="refresh-outline" size={20} color={theme.iconBtnColor} />
           </TouchableOpacity>
         </View>
 
-        {/* ── Stats Strip ─────────────────────────────────────────────────── */}
+        {/* Stats strip */}
         <View style={styles.statsStrip}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{incomeCount}</Text>
@@ -288,12 +411,12 @@ export default function TransactionHistoryScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{logs.length}</Text>
+            <Text style={styles.statValue}>{all.length}</Text>
             <Text style={styles.statLabel}>Total</Text>
           </View>
         </View>
 
-        {/* ── Search ──────────────────────────────────────────────────────── */}
+        {/* Search */}
         <View style={styles.searchRow}>
           <View style={[styles.searchBox, { backgroundColor: theme.iconBtnBg }]}>
             <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.6)" />
@@ -313,39 +436,32 @@ export default function TransactionHistoryScreen() {
           </View>
         </View>
 
-        {/* ── White Card ──────────────────────────────────────────────────── */}
+        {/* Card */}
         <View style={[styles.card, { backgroundColor: theme.cardBg }]}>
-          {/* Filter chips */}
+          {/* Filters */}
           <View style={styles.filterRow}>
             {FILTERS.map(f => (
-              <FilterChip
-                key={f}
-                label={f}
-                active={activeFilter === f}
-                onPress={() => setActiveFilter(f)}
-                theme={theme}
-              />
+              <FilterChip key={f} label={f} active={activeFilter === f} onPress={() => setActiveFilter(f)} theme={theme} />
             ))}
           </View>
 
-          {/* Result count */}
+          {/* Count */}
           {!loading && (
             <Text style={[styles.resultCount, { color: theme.textMuted }]}>
               {filtered.length} {filtered.length === 1 ? 'entry' : 'entries'}
             </Text>
           )}
 
-          {/* Content */}
           {loading ? (
             <ActivityIndicator color="#3ECBA8" size="large" style={{ marginTop: 60 }} />
           ) : sections.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="time-outline" size={52} color={theme.divider} />
               <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-                {logs.length === 0 ? 'No activity yet' : 'No results found'}
+                {all.length === 0 ? 'No activity yet' : 'No results found'}
               </Text>
               <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                {logs.length === 0
+                {all.length === 0
                   ? 'Actions across Income, Expenses, and Savings will appear here.'
                   : 'Try a different search or filter.'}
               </Text>
@@ -365,9 +481,7 @@ export default function TransactionHistoryScreen() {
                   <View style={[styles.sectionLine, { backgroundColor: theme.divider }]} />
                 </View>
               )}
-              renderItem={({ item }) => (
-                <ActivityItem item={item} theme={theme} />
-              )}
+              renderItem={({ item }) => <ActivityRow item={item} theme={theme} />}
             />
           )}
         </View>
@@ -378,11 +492,8 @@ export default function TransactionHistoryScreen() {
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
 
-  // ── Header ────────────────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -404,7 +515,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  // ── Stats Strip ───────────────────────────────────────────────────────────────
   statsStrip: {
     flexDirection: 'row',
     marginHorizontal: 20,
@@ -413,32 +523,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 12,
   },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  statValue: {
-    fontFamily: Font.headerBold,
-    fontSize: 18,
-    color: '#fff',
-  },
-  statLabel: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.65)',
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginVertical: 4,
-  },
+  statItem: { flex: 1, alignItems: 'center', gap: 2 },
+  statValue: { fontFamily: Font.headerBold, fontSize: 18, color: '#fff' },
+  statLabel: { fontFamily: Font.bodyRegular, fontSize: 11, color: 'rgba(255,255,255,0.65)' },
+  statDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4 },
 
-  // ── Search ────────────────────────────────────────────────────────────────────
-  searchRow: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
+  searchRow: { paddingHorizontal: 20, marginBottom: 16 },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -447,14 +537,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 8,
   },
-  searchInput: {
-    flex: 1,
-    fontFamily: Font.bodyRegular,
-    fontSize: 14,
-    padding: 0,
-  },
+  searchInput: { flex: 1, fontFamily: Font.bodyRegular, fontSize: 14, padding: 0 },
 
-  // ── White Card ────────────────────────────────────────────────────────────────
   card: {
     flex: 1,
     borderTopLeftRadius: 28,
@@ -462,39 +546,14 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     overflow: 'hidden',
   },
-  filterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 50,
-  },
-  filterChipActive: {
-    backgroundColor: '#3ECBA8',
-  },
-  filterChipText: {
-    fontFamily: Font.bodyMedium,
-    fontSize: 13,
-  },
-  filterChipTextActive: {
-    fontFamily: Font.bodySemiBold,
-    color: '#fff',
-  },
-  resultCount: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 12,
-    paddingHorizontal: 20,
-    marginBottom: 4,
-  },
+  filterRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8 },
+  filterChip: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 50 },
+  filterChipActive: { backgroundColor: '#3ECBA8' },
+  filterChipText: { fontFamily: Font.bodyMedium, fontSize: 13 },
+  filterChipTextActive: { fontFamily: Font.bodySemiBold, color: '#fff' },
+  resultCount: { fontFamily: Font.bodyRegular, fontSize: 12, paddingHorizontal: 20, marginBottom: 4 },
 
-  // ── Section List ─────────────────────────────────────────────────────────────
-  listContent: {
-    paddingBottom: 60,
-  },
+  listContent: { paddingBottom: 60 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -508,12 +567,8 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
-  sectionLine: {
-    flex: 1,
-    height: 1,
-  },
+  sectionLine: { flex: 1, height: 1 },
 
-  // ── Activity Item ─────────────────────────────────────────────────────────────
   activityItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -531,32 +586,16 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     marginTop: 2,
   },
-  activityInfo: {
-    flex: 1,
-    gap: 3,
-  },
+  activityInfo: { flex: 1, gap: 3 },
   activityTitleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 8,
   },
-  activityTitle: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 14,
-    flex: 1,
-  },
-  activityTime: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 11,
-    marginTop: 2,
-    flexShrink: 0,
-  },
-  activityDesc: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 12,
-    lineHeight: 16,
-  },
+  activityTitle: { fontFamily: Font.bodySemiBold, fontSize: 14, flex: 1 },
+  activityTime:  { fontFamily: Font.bodyRegular,  fontSize: 11, marginTop: 2, flexShrink: 0 },
+  activityDesc:  { fontFamily: Font.bodyRegular,  fontSize: 12, lineHeight: 16 },
   actionBadge: {
     alignSelf: 'flex-start',
     borderRadius: 6,
@@ -564,12 +603,8 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     marginTop: 2,
   },
-  actionBadgeText: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 10,
-  },
+  actionBadgeText: { fontFamily: Font.bodySemiBold, fontSize: 10 },
 
-  // ── Empty State ───────────────────────────────────────────────────────────────
   emptyState: {
     flex: 1,
     alignItems: 'center',
@@ -578,16 +613,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     gap: 10,
   },
-  emptyTitle: {
-    fontFamily: Font.headerBold,
-    fontSize: 18,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  emptySubtitle: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  emptyTitle:    { fontFamily: Font.headerBold, fontSize: 18, textAlign: 'center', marginTop: 8 },
+  emptySubtitle: { fontFamily: Font.bodyRegular, fontSize: 14, textAlign: 'center', lineHeight: 20 },
 });
