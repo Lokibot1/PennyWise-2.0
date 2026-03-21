@@ -1067,12 +1067,18 @@ export default function ManageExpenseScreen() {
         }
 
       } else if (screen.name === 'edit') {
+        const oldExp    = expenses.find(e => e.id === screen.expenseId);
+        const newTitle  = vals.title.trim();
+        const newAmount = parseFloat(vals.amount) || 0;
+        const catU      = categories.find(c => c.id === vals.categoryId);
+        const oldCatLbl = categories.find(c => c.id === oldExp?.categoryId)?.label;
+
         const { error } = await supabase
           .from('expenses')
           .update({
             category_id:  vals.categoryId,
-            title:        vals.title.trim(),
-            amount:       parseFloat(vals.amount) || 0,
+            title:        newTitle,
+            amount:       newAmount,
             date:         vals.date,
             description:  vals.description.trim(),
             is_recurring: vals.isRecurring,
@@ -1086,8 +1092,8 @@ export default function ManageExpenseScreen() {
               ? {
                   ...e,
                   categoryId:  vals.categoryId,
-                  title:       vals.title.trim(),
-                  amount:      parseFloat(vals.amount) || 0,
+                  title:       newTitle,
+                  amount:      newAmount,
                   date:        vals.date,
                   description: vals.description.trim(),
                   isRecurring: vals.isRecurring,
@@ -1096,13 +1102,29 @@ export default function ManageExpenseScreen() {
               : e,
           ));
           showToast('Expense updated successfully.');
-          const catU = categories.find(c => c.id === vals.categoryId);
+
+          const changes: string[] = [];
+          if (oldExp) {
+            if (oldExp.title !== newTitle)
+              changes.push(`Title: "${oldExp.title}" → "${newTitle}"`);
+            if (oldExp.amount !== newAmount)
+              changes.push(`Amount: ${fmtAmt(oldExp.amount)} → ${fmtAmt(newAmount)}`);
+            if (oldExp.categoryId !== vals.categoryId)
+              changes.push(`Category: ${oldCatLbl ?? '?'} → ${catU?.label ?? '?'}`);
+            if (oldExp.date !== vals.date)
+              changes.push(`Date: ${fmtDateShort(oldExp.date)} → ${fmtDateShort(vals.date)}`);
+            if (oldExp.isRecurring !== vals.isRecurring)
+              changes.push(vals.isRecurring ? 'Set to recurring' : 'Recurring removed');
+            else if (oldExp.isRecurring && oldExp.frequency !== vals.frequency)
+              changes.push(`Frequency: ${oldExp.frequency} → ${vals.frequency}`);
+          }
+
           logActivity({
             user_id:     userIdRef.current!,
             action_type: ACTION.EXPENSE_UPDATED,
             entity_type: ENTITY.EXPENSE,
-            title:       `Expense Updated: ${vals.title.trim()}`,
-            description: `₱${(parseFloat(vals.amount) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${catU?.label ?? 'Expense'}`,
+            title:       `Expense Updated: ${newTitle}`,
+            description: changes.length > 0 ? changes.join(' · ') : `${fmtAmt(newAmount)} · ${catU?.label ?? 'Expense'}`,
             icon:        catU?.icon ?? 'receipt-outline',
           });
           setScreen({ name: 'main' });

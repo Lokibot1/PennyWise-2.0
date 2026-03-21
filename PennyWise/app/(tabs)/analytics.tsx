@@ -874,12 +874,18 @@ export default function IncomeSourcesScreen() {
         }
 
       } else if (screen.name === 'edit') {
+        const oldInc     = income.find(i => i.id === screen.incomeId);
+        const newTitle   = vals.title.trim();
+        const newAmount  = parseFloat(vals.amount) || 0;
+        const catU       = categories.find(c => c.id === vals.categoryId);
+        const oldCatLbl  = categories.find(c => c.id === oldInc?.categoryId)?.label;
+
         const { error } = await supabase
           .from('income_sources')
           .update({
             category_id:  vals.categoryId,
-            title:        vals.title.trim(),
-            amount:       parseFloat(vals.amount) || 0,
+            title:        newTitle,
+            amount:       newAmount,
             date:         vals.date,
             description:  vals.description.trim(),
             is_recurring: vals.isRecurring,
@@ -890,17 +896,33 @@ export default function IncomeSourcesScreen() {
         if (!error) {
           setIncome(prev => prev.map(i =>
             i.id === screen.incomeId
-              ? { ...i, categoryId: vals.categoryId, title: vals.title.trim(), amount: parseFloat(vals.amount) || 0, date: vals.date, description: vals.description.trim(), isRecurring: vals.isRecurring, frequency: vals.isRecurring ? vals.frequency : null }
+              ? { ...i, categoryId: vals.categoryId, title: newTitle, amount: newAmount, date: vals.date, description: vals.description.trim(), isRecurring: vals.isRecurring, frequency: vals.isRecurring ? vals.frequency : null }
               : i,
           ));
           showToast('Income source updated successfully.');
-          const catU = categories.find(c => c.id === vals.categoryId);
+
+          const changes: string[] = [];
+          if (oldInc) {
+            if (oldInc.title !== newTitle)
+              changes.push(`Title: "${oldInc.title}" → "${newTitle}"`);
+            if (oldInc.amount !== newAmount)
+              changes.push(`Amount: ${fmtAmt(oldInc.amount)} → ${fmtAmt(newAmount)}`);
+            if (oldInc.categoryId !== vals.categoryId)
+              changes.push(`Category: ${oldCatLbl ?? '?'} → ${catU?.label ?? '?'}`);
+            if (oldInc.date !== vals.date)
+              changes.push(`Date: ${fmtDateShort(oldInc.date)} → ${fmtDateShort(vals.date)}`);
+            if (oldInc.isRecurring !== vals.isRecurring)
+              changes.push(vals.isRecurring ? 'Set to recurring' : 'Recurring removed');
+            else if (oldInc.isRecurring && oldInc.frequency !== vals.frequency)
+              changes.push(`Frequency: ${oldInc.frequency} → ${vals.frequency}`);
+          }
+
           logActivity({
             user_id:     userIdRef.current!,
             action_type: ACTION.INCOME_SOURCE_UPDATED,
             entity_type: ENTITY.INCOME_SOURCE,
-            title:       `Income Updated: ${vals.title.trim()}`,
-            description: `₱${(parseFloat(vals.amount) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${catU?.label ?? 'Income'}`,
+            title:       `Income Updated: ${newTitle}`,
+            description: changes.length > 0 ? changes.join(' · ') : `${fmtAmt(newAmount)} · ${catU?.label ?? 'Income'}`,
             icon:        catU?.icon ?? 'cash-outline',
           });
           setScreen({ name: 'categories' });
@@ -996,6 +1018,8 @@ export default function IncomeSourcesScreen() {
   };
 
   const handleSaveCategory = async (id: string, label: string, icon: IoniconName) => {
+    const oldCat = categories.find(c => c.id === id);
+
     const { error } = await supabase
       .from('income_categories')
       .update({ label, icon })
@@ -1004,12 +1028,17 @@ export default function IncomeSourcesScreen() {
     if (!error) {
       setCategories(prev => prev.map(c => c.id === id ? { ...c, label, icon } : c));
       showToast('Category updated successfully.');
+
+      const changes: string[] = [];
+      if (oldCat?.label !== label) changes.push(`Name: "${oldCat?.label}" → "${label}"`);
+      if (oldCat?.icon  !== icon)  changes.push('Icon changed');
+
       logActivity({
         user_id:     userIdRef.current!,
         action_type: ACTION.INCOME_CATEGORY_UPDATED,
         entity_type: ENTITY.INCOME_CATEGORY,
         title:       `Category Updated: ${label}`,
-        description: 'Income source category details updated.',
+        description: changes.length > 0 ? changes.join(' · ') : 'Details updated',
         icon:        icon,
       });
     }
