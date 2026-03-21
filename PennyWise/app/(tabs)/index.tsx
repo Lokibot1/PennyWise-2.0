@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
@@ -23,7 +24,8 @@ type TxRow = {
   value: number;  // positive = income, negative = expense
 };
 
-type SavingsGoal = {
+type SavingsGoalRow = {
+  id: string;
   icon: string;
   title: string;
   target_amount: number;
@@ -71,20 +73,21 @@ export default function HomeScreen() {
   const [activePeriod, setActivePeriod] = useState<Period>('Monthly');
 
   // Dashboard state
-  const [userName, setUserName]                   = useState('');
-  const [totalBalance, setTotalBalance]           = useState(0);
-  const [totalExpense, setTotalExpense]           = useState(0);
-  const [budgetLimit, setBudgetLimit]             = useState(20000);
-  const [savingsGoal, setSavingsGoal]             = useState<SavingsGoal | null>(null);
-  const [revenueLastWeek, setRevenueLastWeek]     = useState(0);
-  const [expenseLastWeek, setExpenseLastWeek]     = useState(0);
-  const [allTransactions, setAllTransactions]     = useState<TxRow[]>([]);
-  const [loading, setLoading]                     = useState(true);
+  const [userName, setUserName]               = useState('');
+  const [totalIncome, setTotalIncome]         = useState(0);
+  const [totalExpense, setTotalExpense]       = useState(0);
+  const [budgetLimit, setBudgetLimit]         = useState(20000);
+  const [savingsGoals, setSavingsGoals]       = useState<SavingsGoalRow[]>([]);
+  const [revenueLastWeek, setRevenueLastWeek] = useState(0);
+  const [expenseLastWeek, setExpenseLastWeek] = useState(0);
+  const [allTransactions, setAllTransactions] = useState<TxRow[]>([]);
+  const [loading, setLoading]                 = useState(true);
+  const userIdRef = useRef<string | null>(null);
 
   // Sliding period indicator
   const [tabWidth, setTabWidth] = useState(0);
   const tabWidthRef = useRef(0);
-  const indicatorX = useSharedValue(0);
+  const indicatorX  = useSharedValue(0);
 
   const indicatorStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: indicatorX.value }],
@@ -105,91 +108,138 @@ export default function HomeScreen() {
     setActivePeriod(period);
   };
 
-  // ── Fetch data on auth ──────────────────────────────────────────────────────
-  // Use onAuthStateChange instead of getUser() to avoid the AsyncStorage
-  // race condition — getUser() can return null if called before the persisted
-  // session has finished loading. onAuthStateChange fires INITIAL_SESSION
-  // only after the session is fully restored.
-  useEffect(() => {
-    async function loadDashboard(userId: string) {
-      const now = new Date();
-      const weekAgo = new Date(now);
-      weekAgo.setDate(now.getDate() - 7);
+  // ── Data loading ───────────────────────────────────────────────────────────
+  const loadDashboard = useCallback(async (userId: string) => {
+    const now     = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(now.getDate() - 7);
+    const weekAgoStr = weekAgo.toISOString().slice(0, 10);
 
-      const [profileRes, txRes, goalsRes] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('full_name, budget_limit')
-          .eq('id', userId)
-          .single(),
-        supabase
-          .from('transactions')
-          .select('id, icon, title, category, value, date, time')
-          .eq('user_id', userId)
-          .eq('is_archived', false)
-          .order('date', { ascending: false })
-          .order('time', { ascending: false }),
-        supabase
-          .from('savings_goals')
-          .select('icon, title, target_amount, current_amount')
-          .eq('user_id', userId)
-          .eq('is_completed', false)
-          .eq('is_archived', false)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ]);
+    const [profileRes, incomeRes, expenseRes, goalsRes] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('full_name, budget_limit')
+        .eq('id', userId)
+        .single(),
 
-      if (profileRes.data) {
-        setUserName(profileRes.data.full_name || '');
-        setBudgetLimit(profileRes.data.budget_limit ?? 20000);
-      }
+      // Income sources with category icon + label
+      supabase
+        .from('income_sources')
+        .select('id, title, amount, date, time, is_archived, income_categories(label, icon)')
+        .eq('user_id', userId)
+        .eq('is_archived', false)
+        .order('date', { ascending: false })
+        .order('time', { ascending: false }),
 
-      if (goalsRes.data) setSavingsGoal(goalsRes.data);
+      // Expenses with category icon + label
+      supabase
+        .from('expenses')
+        .select('id, title, amount, date, time, is_archived, expense_categories(label, icon)')
+        .eq('user_id', userId)
+        .eq('is_archived', false)
+        .order('date', { ascending: false })
+        .order('time', { ascending: false }),
 
-      const txs: TxRow[] = (txRes.data ?? []).map(t => ({
-        id: t.id,
-        icon: t.icon || 'receipt-outline',
-        title: t.title,
-        time: t.time,
-        date: t.date,
-        category: t.category,
-        value: Number(t.value),
-      }));
-      setAllTransactions(txs);
+      // All active savings goals
+      supabase
+        .from('savings_goals')
+        .select('id, icon, title, target_amount, current_amount')
+        .eq('user_id', userId)
+        .eq('is_completed', false)
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false }),
+    ]);
 
-      let balance = 0, expense = 0, revWeek = 0, expWeek = 0;
-      for (const tx of txs) {
-        balance += tx.value;
-        if (tx.value < 0) expense += Math.abs(tx.value);
-        const d = new Date(tx.date);
-        if (d >= weekAgo && d <= now) {
-          if (tx.value > 0) revWeek += tx.value;
-          else expWeek += Math.abs(tx.value);
-        }
-      }
-      setTotalBalance(balance);
-      setTotalExpense(expense);
-      setRevenueLastWeek(revWeek);
-      setExpenseLastWeek(expWeek);
-      setLoading(false);
+    // Profile
+    if (profileRes.data) {
+      setUserName(profileRes.data.full_name || '');
+      setBudgetLimit(profileRes.data.budget_limit ?? 20000);
     }
 
+    // Savings goals
+    if (goalsRes.data) setSavingsGoals(goalsRes.data as SavingsGoalRow[]);
+
+    // Build unified transaction list
+    const incomeTxs: TxRow[] = (incomeRes.data ?? []).map((r: any) => ({
+      id:       `inc-${r.id}`,
+      icon:     r.income_categories?.icon  ?? 'cash-outline',
+      title:    r.title,
+      time:     r.time,
+      date:     r.date,
+      category: r.income_categories?.label ?? 'Income',
+      value:    Number(r.amount),   // positive
+    }));
+
+    const expenseTxs: TxRow[] = (expenseRes.data ?? []).map((r: any) => ({
+      id:       `exp-${r.id}`,
+      icon:     r.expense_categories?.icon  ?? 'receipt-outline',
+      title:    r.title,
+      time:     r.time,
+      date:     r.date,
+      category: r.expense_categories?.label ?? 'Expense',
+      value:    -Number(r.amount),  // negative
+    }));
+
+    // Merge and sort newest first
+    const merged = [...incomeTxs, ...expenseTxs].sort((a, b) => {
+      if (b.date !== a.date) return b.date.localeCompare(a.date);
+      return b.time.localeCompare(a.time);
+    });
+    setAllTransactions(merged);
+
+    // Compute totals
+    let totalInc = 0, totalExp = 0, revWeek = 0, expWeek = 0;
+
+    for (const r of incomeRes.data ?? []) {
+      const amt = Number((r as any).amount);
+      totalInc += amt;
+      if ((r as any).date >= weekAgoStr) revWeek += amt;
+    }
+
+    for (const r of expenseRes.data ?? []) {
+      const amt = Number((r as any).amount);
+      totalExp += amt;
+      if ((r as any).date >= weekAgoStr) expWeek += amt;
+    }
+
+    setTotalIncome(totalInc);
+    setTotalExpense(totalExp);
+    setRevenueLastWeek(revWeek);
+    setExpenseLastWeek(expWeek);
+    setLoading(false);
+  }, []);
+
+  // Initial load on auth
+  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        userIdRef.current = session.user.id;
         loadDashboard(session.user.id);
       } else {
         setLoading(false);
       }
     });
-
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadDashboard]);
+
+  // Refresh when screen comes back into focus (e.g. returning from savings-goals)
+  useFocusEffect(
+    useCallback(() => {
+      if (userIdRef.current) loadDashboard(userIdRef.current);
+    }, [loadDashboard]),
+  );
+
+  // ── Derived values ─────────────────────────────────────────────────────────
+  const totalBalance = totalIncome - totalExpense;
 
   const displayedTransactions = useMemo(
     () => filterByPeriod(allTransactions, activePeriod),
     [allTransactions, activePeriod],
   );
+
+  // Period-scoped income / expense for stats
+  const periodIncome  = useMemo(() => displayedTransactions.filter(t => t.value > 0).reduce((s, t) => s + t.value, 0), [displayedTransactions]);
+  const periodExpense = useMemo(() => displayedTransactions.filter(t => t.value < 0).reduce((s, t) => s + Math.abs(t.value), 0), [displayedTransactions]);
 
   const budgetPercent = budgetLimit > 0 ? Math.min(100, (totalExpense / budgetLimit) * 100) : 0;
   const budgetMsg =
@@ -197,6 +247,14 @@ export default function HomeScreen() {
     : budgetPercent <= 70 ? `${budgetPercent.toFixed(0)}% Of Your Expenses, Be Careful.`
     : `${budgetPercent.toFixed(0)}% Of Your Expenses, Over Budget!`;
 
+  // Savings goals aggregate
+  const goalsCount   = savingsGoals.length;
+  const totalSaved   = savingsGoals.reduce((s, g) => s + g.current_amount, 0);
+  const totalTarget  = savingsGoals.reduce((s, g) => s + g.target_amount, 0);
+  const goalsPct     = totalTarget > 0 ? Math.min(100, (totalSaved / totalTarget) * 100) : 0;
+  const firstGoal    = savingsGoals[0] ?? null;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
       <StatusBar style={theme.statusBar} />
@@ -225,7 +283,7 @@ export default function HomeScreen() {
             <ActivityIndicator color="#fff" size="large" style={{ marginVertical: 40 }} />
           ) : (
             <>
-              {/* Balance Card */}
+              {/* ── Balance Card ─────────────────────────────────────────── */}
               <View style={styles.balanceCard}>
                 <View style={styles.balanceRow}>
                   <View style={styles.balanceItem}>
@@ -249,44 +307,93 @@ export default function HomeScreen() {
                   </View>
                 </View>
 
-                {/* Progress */}
+                {/* Budget progress */}
                 <View style={styles.progressSection}>
                   <View style={styles.progressLabelRow}>
-                    <View style={styles.percentBadge}>
+                    <View style={[
+                      styles.percentBadge,
+                      budgetPercent > 70 && { backgroundColor: '#E85D5D' },
+                      budgetPercent > 30 && budgetPercent <= 70 && { backgroundColor: '#F59E0B' },
+                    ]}>
                       <Text style={styles.percentText}>{budgetPercent.toFixed(0)}%</Text>
                     </View>
                     <Text style={styles.budgetLimit}>{formatCurrency(budgetLimit)}</Text>
                   </View>
                   <View style={styles.progressTrack}>
-                    <View style={[styles.progressFill, { width: `${budgetPercent}%` as any }]} />
+                    <View style={[
+                      styles.progressFill,
+                      { width: `${budgetPercent}%` as any },
+                      budgetPercent > 70 && { backgroundColor: '#E85D5D' },
+                      budgetPercent > 30 && budgetPercent <= 70 && { backgroundColor: '#F59E0B' },
+                    ]} />
                   </View>
                   <View style={styles.checkRow}>
-                    <Ionicons name="checkbox-outline" size={14} color="#4A8A6A" />
-                    <Text style={styles.checkText}> {budgetMsg}</Text>
+                    <Ionicons
+                      name={budgetPercent > 70 ? 'warning-outline' : 'checkbox-outline'}
+                      size={14}
+                      color={budgetPercent > 70 ? '#E85D5D' : '#4A8A6A'}
+                    />
+                    <Text style={[styles.checkText, budgetPercent > 70 && { color: '#E85D5D' }]}>
+                      {' '}{budgetMsg}
+                    </Text>
                   </View>
                 </View>
               </View>
 
-              {/* Savings Card */}
+              {/* ── Savings Card ─────────────────────────────────────────── */}
               <TouchableOpacity
                 style={styles.savingsCard}
                 onPress={() => router.push('/savings-goals')}
                 activeOpacity={0.85}
               >
+                {/* Left: goal summary */}
                 <View style={styles.savingsLeft}>
-                  <View style={styles.donutRing}>
-                    <Ionicons name={(savingsGoal?.icon ?? 'flag-outline') as any} size={26} color="#fff" />
+                  {/* Progress ring */}
+                  <View style={[
+                    styles.donutRing,
+                    goalsCount > 0 && {
+                      borderColor: goalsPct >= 100
+                        ? '#3ECBA8'
+                        : `rgba(255,255,255,${0.3 + (goalsPct / 100) * 0.6})`,
+                    },
+                  ]}>
+                    <Ionicons
+                      name={(goalsCount === 0 ? 'flag-outline' : firstGoal!.icon) as any}
+                      size={26}
+                      color="#fff"
+                    />
+                    {goalsCount > 0 && (
+                      <View style={styles.pctOverlay}>
+                        <Text style={styles.pctOverlayText}>{goalsPct.toFixed(0)}%</Text>
+                      </View>
+                    )}
                   </View>
-                  <Text style={styles.savingsLabel}>
-                    {savingsGoal?.title ?? 'Savings\nOn Goals'}
-                  </Text>
-                  {!savingsGoal && (
-                    <Text style={styles.savingsTapHint}>Tap to set a goal</Text>
+
+                  {goalsCount === 0 ? (
+                    <>
+                      <Text style={styles.savingsLabel}>Savings{'\n'}On Goals</Text>
+                      <Text style={styles.savingsTapHint}>Tap to set a goal</Text>
+                    </>
+                  ) : goalsCount === 1 ? (
+                    <>
+                      <Text style={styles.savingsLabel} numberOfLines={2}>{firstGoal!.title}</Text>
+                      <Text style={styles.savingsProgressText}>
+                        {formatCurrency(firstGoal!.current_amount)}{' / '}{formatCurrency(firstGoal!.target_amount)}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.savingsLabel}>{goalsCount} Active{'\n'}Goals</Text>
+                      <Text style={styles.savingsProgressText}>
+                        {formatCurrency(totalSaved)}{'\n'}of {formatCurrency(totalTarget)}
+                      </Text>
+                    </>
                   )}
                 </View>
 
                 <View style={styles.savingsDivider} />
 
+                {/* Right: weekly stats */}
                 <View style={styles.savingsRight}>
                   <View style={styles.savingsStat}>
                     <Ionicons name="layers-outline" size={18} color="#fff" />
@@ -313,6 +420,35 @@ export default function HomeScreen() {
         {/* ── White Content Section ─────────────────────────────────────── */}
         <View style={[styles.whiteSection, { backgroundColor: theme.cardBg }]}>
 
+          {/* Period summary strip */}
+          {!loading && (
+            <View style={[styles.periodSummary, { backgroundColor: theme.surface }]}>
+              <View style={styles.periodSummaryItem}>
+                <Text style={[styles.periodSummaryLabel, { color: theme.textMuted }]}>Income</Text>
+                <Text style={[styles.periodSummaryValue, { color: '#22C55E' }]}>
+                  +{formatCurrency(periodIncome)}
+                </Text>
+              </View>
+              <View style={[styles.periodSummaryDivider, { backgroundColor: theme.divider }]} />
+              <View style={styles.periodSummaryItem}>
+                <Text style={[styles.periodSummaryLabel, { color: theme.textMuted }]}>Expenses</Text>
+                <Text style={[styles.periodSummaryValue, { color: '#4895EF' }]}>
+                  -{formatCurrency(periodExpense)}
+                </Text>
+              </View>
+              <View style={[styles.periodSummaryDivider, { backgroundColor: theme.divider }]} />
+              <View style={styles.periodSummaryItem}>
+                <Text style={[styles.periodSummaryLabel, { color: theme.textMuted }]}>Net</Text>
+                <Text style={[
+                  styles.periodSummaryValue,
+                  { color: periodIncome - periodExpense >= 0 ? theme.textPrimary : '#E85D5D' },
+                ]}>
+                  {formatCurrency(periodIncome - periodExpense)}
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Period Tabs */}
           <View
             style={styles.periodTabs}
@@ -321,7 +457,6 @@ export default function HomeScreen() {
             <Animated.View
               style={[styles.periodIndicator, { width: tabWidth }, indicatorStyle]}
             />
-
             {PERIODS.map((p) => (
               <TouchableOpacity
                 key={p}
@@ -329,7 +464,11 @@ export default function HomeScreen() {
                 onPress={() => selectPeriod(p)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.periodTabText, activePeriod === p && styles.periodTabTextActive, { color: activePeriod === p ? '#fff' : theme.textSecondary }]}>
+                <Text style={[
+                  styles.periodTabText,
+                  activePeriod === p && styles.periodTabTextActive,
+                  { color: activePeriod === p ? '#fff' : theme.textSecondary },
+                ]}>
                   {p}
                 </Text>
               </TouchableOpacity>
@@ -339,9 +478,12 @@ export default function HomeScreen() {
           {/* Transaction List */}
           <View>
             {displayedTransactions.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                No transactions for this period.
-              </Text>
+              <View style={styles.emptyState}>
+                <Ionicons name="receipt-outline" size={36} color={theme.divider} />
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  No transactions for this period.
+                </Text>
+              </View>
             ) : (
               displayedTransactions.map((tx, index) => (
                 <View
@@ -352,19 +494,23 @@ export default function HomeScreen() {
                     index < displayedTransactions.length - 1 && { borderBottomColor: theme.divider },
                   ]}
                 >
-                  <View style={styles.txIconCircle}>
+                  <View style={[
+                    styles.txIconCircle,
+                    { backgroundColor: tx.value >= 0 ? '#22C55E' : '#4B78E0' },
+                  ]}>
                     <Ionicons name={tx.icon as any} size={20} color="#fff" />
                   </View>
                   <View style={styles.txInfo}>
                     <Text style={[styles.txTitle, { color: theme.textPrimary }]}>{tx.title}</Text>
-                    <Text style={[styles.txMeta, { color: theme.textSecondary }]}>{tx.time} - {formatDate(tx.date)}</Text>
+                    <Text style={[styles.txMeta, { color: theme.textSecondary }]}>
+                      {tx.time} · {formatDate(tx.date)}
+                    </Text>
                   </View>
                   <Text style={[styles.txCategory, { color: theme.textSecondary }]}>{tx.category}</Text>
-                  <View style={styles.txAmtDivider} />
+                  <View style={[styles.txAmtDivider, { backgroundColor: theme.divider }]} />
                   <Text style={[
                     styles.txAmount,
-                    tx.value < 0 && styles.txAmountBlue,
-                    tx.value >= 0 && { color: theme.textPrimary },
+                    { color: tx.value >= 0 ? '#22C55E' : '#4895EF' },
                   ]}>
                     {formatCurrency(tx.value)}
                   </Text>
@@ -384,14 +530,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#1B3D2B',
   },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
 
-  // ── Green Section ────────────────────────────────────────────────────────────
+  // ── Green Section ─────────────────────────────────────────────────────────────
   greenSection: {
     backgroundColor: '#1B3D2B',
     paddingHorizontal: 20,
@@ -407,7 +549,6 @@ const styles = StyleSheet.create({
   greetingTitle: {
     fontFamily: Font.headerBold,
     fontSize: 22,
-    color: '#1A1A1A',
   },
   greetingSubtitle: {
     fontFamily: Font.bodyRegular,
@@ -419,12 +560,12 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // ── Balance Card ─────────────────────────────────────────────────────────────
+  // ── Balance Card ──────────────────────────────────────────────────────────────
   balanceCard: {
     backgroundColor: 'rgba(255,255,255,0.88)',
     borderRadius: 16,
@@ -440,9 +581,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.07)',
   },
-  balanceItem: {
-    flex: 1,
-  },
+  balanceItem: { flex: 1 },
   labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -465,14 +604,10 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     letterSpacing: -0.3,
   },
-  expenseAmount: {
-    color: '#4895EF',
-  },
+  expenseAmount: { color: '#4895EF' },
 
-  // ── Progress ─────────────────────────────────────────────────────────────────
-  progressSection: {
-    paddingTop: 12,
-  },
+  // ── Budget Progress ───────────────────────────────────────────────────────────
+  progressSection: { paddingTop: 12 },
   progressLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -517,7 +652,7 @@ const styles = StyleSheet.create({
     color: '#4A7A5A',
   },
 
-  // ── Savings Card ─────────────────────────────────────────────────────────────
+  // ── Savings Card ──────────────────────────────────────────────────────────────
   savingsCard: {
     backgroundColor: '#115533',
     borderRadius: 20,
@@ -529,12 +664,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
   },
-  savingsTapHint: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 11,
-    color: 'rgba(255,255,255,0.6)',
-    marginTop: 4,
-  },
   donutRing: {
     width: 72,
     height: 72,
@@ -545,12 +674,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
+  pctOverlay: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#3ECBA8',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  pctOverlayText: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 8,
+    color: '#fff',
+  },
   savingsLabel: {
     fontFamily: Font.bodyMedium,
     fontSize: 11,
     color: '#fff',
     textAlign: 'center',
     lineHeight: 16,
+  },
+  savingsProgressText: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.7)',
+    textAlign: 'center',
+    marginTop: 3,
+    lineHeight: 14,
+  },
+  savingsTapHint: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 4,
   },
   savingsDivider: {
     width: 1,
@@ -566,9 +723,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
-  savingsStatText: {
-    marginLeft: 8,
-  },
+  savingsStatText: { marginLeft: 8 },
   savingsStatLabel: {
     fontFamily: Font.bodyRegular,
     fontSize: 10,
@@ -580,9 +735,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
   },
-  negativeText: {
-    color: '#FF8A8A',
-  },
+  negativeText: { color: '#FF8A8A' },
 
   // ── White Section ─────────────────────────────────────────────────────────────
   whiteSection: {
@@ -590,10 +743,36 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     marginTop: -14,
-    paddingTop: 24,
+    paddingTop: 20,
     paddingHorizontal: 20,
     flex: 1,
     minHeight: 480,
+  },
+
+  // ── Period Summary Strip ──────────────────────────────────────────────────────
+  periodSummary: {
+    flexDirection: 'row',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+  },
+  periodSummaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  periodSummaryLabel: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 11,
+  },
+  periodSummaryValue: {
+    fontFamily: Font.headerBold,
+    fontSize: 14,
+    letterSpacing: -0.2,
+  },
+  periodSummaryDivider: {
+    width: 1,
+    marginVertical: 2,
   },
 
   // ── Period Tabs ───────────────────────────────────────────────────────────────
@@ -602,7 +781,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0',
     borderRadius: 50,
     padding: 4,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   periodIndicator: {
     position: 'absolute',
@@ -629,6 +808,15 @@ const styles = StyleSheet.create({
   },
 
   // ── Transactions ──────────────────────────────────────────────────────────────
+  emptyState: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    gap: 10,
+  },
+  emptyText: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 14,
+  },
   txItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -647,9 +835,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  txInfo: {
-    flex: 1,
-  },
+  txInfo: { flex: 1 },
   txTitle: {
     fontFamily: Font.bodySemiBold,
     fontSize: 15,
@@ -676,16 +862,6 @@ const styles = StyleSheet.create({
     fontFamily: Font.bodySemiBold,
     fontSize: 13,
     color: '#1A1A1A',
-    minWidth: 78,
-    textAlign: 'right',
   },
-  txAmountBlue: {
-    color: '#4895EF',
-  },
-  emptyText: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 32,
-  },
+  txAmountBlue: { color: '#4895EF' },
 });
