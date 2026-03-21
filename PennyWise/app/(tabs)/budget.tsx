@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import DatePickerModal from '@/components/DatePickerModal';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
+import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -1197,8 +1198,9 @@ export default function ManageExpenseScreen() {
   // ── Loading State ─────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <SafeAreaView style={[s.safeArea, { backgroundColor: theme.headerBg, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color="#fff" size="large" />
+      <SafeAreaView style={[s.safeArea, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
+        <StatusBar style={theme.statusBar} />
+        <CategoryPageSkeleton />
       </SafeAreaView>
     );
   }
