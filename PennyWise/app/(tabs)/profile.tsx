@@ -20,6 +20,7 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
+import { ProfileInfoSkeleton, ProfileAvatarSkeleton, ProfileCardSkeleton } from '@/components/SkeletonLoader';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = 'profile' | 'edit' | 'terms';
@@ -142,9 +143,9 @@ function ProfileView({
       <View style={[styles.greenSection, { backgroundColor: theme.headerBg }]}>
         <NavHeader title="Profile" />
         <View style={styles.avatarBlock}>
-          <Avatar name={profile.full_name} size={100} />
+          {loading ? <ProfileAvatarSkeleton /> : <Avatar name={profile.full_name} size={100} />}
           {loading ? (
-            <ActivityIndicator color="#9ABAA6" style={{ marginTop: 14 }} />
+            <ProfileInfoSkeleton />
           ) : (
             <>
               <Text style={styles.headerName}>{profile.full_name || 'Your Name'}</Text>
@@ -163,32 +164,36 @@ function ProfileView({
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        {/* Info pills */}
-        {!!profile.phone && (
-          <View style={[styles.infoPill, { backgroundColor: theme.surface }]}>
-            <Ionicons name="call-outline" size={14} color="#1B7A4A" />
-            <Text style={[styles.infoPillText, { color: theme.textSecondary }]}>{profile.phone}</Text>
-          </View>
+        {loading ? <ProfileCardSkeleton /> : (
+          <>
+            {/* Info pills */}
+            {!!profile.phone && (
+              <View style={[styles.infoPill, { backgroundColor: theme.surface }]}>
+                <Ionicons name="call-outline" size={14} color="#1B7A4A" />
+                <Text style={[styles.infoPillText, { color: theme.textSecondary }]}>{profile.phone}</Text>
+              </View>
+            )}
+
+            {/* Account section */}
+            <MenuGroup label="ACCOUNT">
+              <MenuItem icon="person-outline"        iconBg="#1B7A4A" label="Edit Profile"        onPress={() => navigate('edit')} />
+              <MenuItem icon="document-text-outline" iconBg="#2D7A5A" label="Terms & Conditions"  onPress={() => navigate('terms')} last />
+            </MenuGroup>
+
+            {/* General section */}
+            <MenuGroup label="GENERAL">
+              <MenuItem icon="settings-outline" iconBg="#115533" label="Settings" />
+              <MenuItem icon="headset-outline"  iconBg="#43A872" label="Help & Support" last />
+            </MenuGroup>
+
+            {/* Danger zone */}
+            <View style={[styles.dangerCard, { backgroundColor: 'rgba(224,85,85,0.08)' }]}>
+              <MenuItem icon="log-out-outline" iconBg="#E05555" label="Log Out" danger last onPress={() => setLogoutVisible(true)} />
+            </View>
+
+            <View style={{ height: 32 }} />
+          </>
         )}
-
-        {/* Account section */}
-        <MenuGroup label="ACCOUNT">
-          <MenuItem icon="person-outline"        iconBg="#1B7A4A" label="Edit Profile"        onPress={() => navigate('edit')} />
-          <MenuItem icon="document-text-outline" iconBg="#2D7A5A" label="Terms & Conditions"  onPress={() => navigate('terms')} last />
-        </MenuGroup>
-
-        {/* General section */}
-        <MenuGroup label="GENERAL">
-          <MenuItem icon="settings-outline" iconBg="#115533" label="Settings" />
-          <MenuItem icon="headset-outline"  iconBg="#43A872" label="Help & Support" last />
-        </MenuGroup>
-
-        {/* Danger zone */}
-        <View style={[styles.dangerCard, { backgroundColor: 'rgba(224,85,85,0.08)' }]}>
-          <MenuItem icon="log-out-outline" iconBg="#E05555" label="Log Out" danger last onPress={() => setLogoutVisible(true)} />
-        </View>
-
-        <View style={{ height: 32 }} />
       </ScrollView>
 
       {/* Logout modal */}

@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import DatePickerModal from '@/components/DatePickerModal';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
+import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -163,8 +164,8 @@ function ConfirmModal({ state, onCancel, theme }: { state: ConfirmState; onCance
         <Pressable style={[ms.card, { backgroundColor: theme.confirmBg }]} onPress={() => {}}>
           <Text style={[ms.msg, { color: theme.textPrimary }]}>{state.message}</Text>
           <View style={ms.row}>
-            <TouchableOpacity style={ms.cancel}  onPress={onCancel}    activeOpacity={0.8}>
-              <Text style={ms.cancelTxt}>Cancel</Text>
+            <TouchableOpacity style={[ms.cancel, { backgroundColor: theme.surface }]}  onPress={onCancel}    activeOpacity={0.8}>
+              <Text style={[ms.cancelTxt, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={ms.confirm} onPress={state.onYes} activeOpacity={0.8}>
               <Text style={ms.confirmTxt}>Yes, Confirm</Text>
@@ -217,22 +218,22 @@ function BalanceHeader({
         </TouchableOpacity>
       </View>
 
-      <View style={bh.card}>
+      <View style={[bh.card, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
         <View style={bh.balRow}>
           <View style={{ flex: 1 }}>
             <View style={bh.lblRow}>
-              <Ionicons name="trending-up-outline" size={11} color="#666" />
-              <Text style={bh.lbl}> Total Income</Text>
+              <Ionicons name="trending-up-outline" size={11} color={theme.textSecondary} />
+              <Text style={[bh.lbl, { color: theme.textSecondary }]}> Total Income</Text>
             </View>
-            <Text style={[bh.amt, { color: '#115533' }]}>{fmtAmt(totalIncome)}</Text>
+            <Text style={[bh.amt, { color: theme.isDark ? '#52C27A' : '#115533' }]}>{fmtAmt(totalIncome)}</Text>
           </View>
-          <View style={bh.divider} />
+          <View style={[bh.divider, { backgroundColor: theme.divider }]} />
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <View style={bh.lblRow}>
-              <Ionicons name="cash-outline" size={11} color="#666" />
-              <Text style={bh.lbl}> Income Sources</Text>
+              <Ionicons name="cash-outline" size={11} color={theme.textSecondary} />
+              <Text style={[bh.lbl, { color: theme.textSecondary }]}> Income Sources</Text>
             </View>
-            <Text style={bh.amt}>Active</Text>
+            <Text style={[bh.amt, { color: theme.textPrimary }]}>Active</Text>
           </View>
         </View>
       </View>
@@ -292,8 +293,8 @@ function PickerSheet<T extends string>({
           <Text style={[pk.heading, { color: theme.textPrimary }]}>{title}</Text>
           <ScrollView>
             {options.map(opt => (
-              <TouchableOpacity key={opt} style={pk.item} onPress={() => { onSelect(opt); onClose(); }} activeOpacity={0.8}>
-                {renderItem ? renderItem(opt) : <Text style={pk.itemTxt}>{opt}</Text>}
+              <TouchableOpacity key={opt} style={[pk.item, { borderBottomColor: theme.divider }]} onPress={() => { onSelect(opt); onClose(); }} activeOpacity={0.8}>
+                {renderItem ? renderItem(opt) : <Text style={[pk.itemTxt, { color: theme.textPrimary }]}>{opt}</Text>}
                 {selected === opt && <Ionicons name="checkmark" size={18} color="#1B7A4A" />}
               </TouchableOpacity>
             ))}
@@ -347,7 +348,7 @@ function NewCategoryModal({
             <Text style={[pk.heading, { color: theme.textPrimary }]}>New Income Category</Text>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={s.label}>Category Name</Text>
-              <Text style={s.hint}>e.g. Freelance, Remittance, Allowance…</Text>
+              <Text style={[s.hint, { color: theme.textMuted }]}>e.g. Freelance, Remittance, Allowance…</Text>
               <View style={[s.fieldRow, { marginBottom: 4 }]}>
                 <TextInput
                   style={[s.fieldTxt, { flex: 1 }]}
@@ -443,19 +444,19 @@ function CategoryDetailScreen({
           {grouped.length === 0 && (
             <View style={s.empty}>
               <Ionicons name="cash-outline" size={48} color="#D0D0D0" />
-              <Text style={s.emptyTxt}>No income entries yet</Text>
+              <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No income entries yet</Text>
             </View>
           )}
           {grouped.map(group => (
             <View key={group.key} style={{ marginBottom: 8 }}>
               <View style={s.monthHeader}>
-                <Text style={s.monthLabel}>{group.label}</Text>
+                <Text style={[s.monthLabel, { color: theme.textPrimary }]}>{group.label}</Text>
                 <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
               </View>
               {group.items.map((inc, idx) => (
                 <TouchableOpacity
                   key={inc.id}
-                  style={[s.incRow, idx < group.items.length - 1 && s.incRowBorder]}
+                  style={[s.incRow, idx < group.items.length - 1 && s.incRowBorder, idx < group.items.length - 1 && { borderBottomColor: theme.divider }]}
                   onPress={() => onEditIncome(inc.id)}
                   activeOpacity={0.85}
                 >
@@ -469,7 +470,7 @@ function CategoryDetailScreen({
                       {inc.isRecurring ? ` · ${inc.frequency}` : ''}
                     </Text>
                   </View>
-                  <Text style={s.incAmt}>+{fmtAmt(inc.amount)}</Text>
+                  <Text style={[s.incAmt, { color: theme.isDark ? '#52C27A' : '#115533' }]}>+{fmtAmt(inc.amount)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -641,11 +642,11 @@ function ArchivedScreen({
           {archived.length === 0 && (
             <View style={s.empty}>
               <Ionicons name="archive-outline" size={48} color="#D0D0D0" />
-              <Text style={s.emptyTxt}>No archived categories</Text>
+              <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No archived categories</Text>
             </View>
           )}
           {archived.map((cat, idx) => (
-            <View key={cat.id} style={[s.archiveRow, idx < archived.length - 1 && s.archiveRowBorder]}>
+            <View key={cat.id} style={[s.archiveRow, idx < archived.length - 1 && s.archiveRowBorder, idx < archived.length - 1 && { borderBottomColor: theme.divider }]}>
               <View style={s.incIcon}>
                 <Ionicons name={cat.icon} size={20} color="#fff" />
               </View>
@@ -884,8 +885,9 @@ export default function IncomeSourcesScreen() {
   // ── Loading State ─────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <SafeAreaView style={[s.safeArea, { backgroundColor: theme.headerBg, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator color="#fff" size="large" />
+      <SafeAreaView style={[s.safeArea, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
+        <StatusBar style={theme.statusBar} />
+        <CategoryPageSkeleton />
       </SafeAreaView>
     );
   }

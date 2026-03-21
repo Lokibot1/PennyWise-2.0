@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { useCallback } from 'react';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
+import { HomeDashboardSkeleton, TransactionRowSkeleton } from '@/components/SkeletonLoader';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Period = 'Daily' | 'Weekly' | 'Monthly';
@@ -280,26 +281,26 @@ export default function HomeScreen() {
           </View>
 
           {loading ? (
-            <ActivityIndicator color="#fff" size="large" style={{ marginVertical: 40 }} />
+            <HomeDashboardSkeleton />
           ) : (
             <>
-              {/* ── Balance Card ─────────────────────────────────────────── */}
-              <View style={styles.balanceCard}>
-                <View style={styles.balanceRow}>
+              {/* Balance Card */}
+              <View style={[styles.balanceCard, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
+                <View style={[styles.balanceRow, { borderBottomColor: theme.divider }]}>
                   <View style={styles.balanceItem}>
                     <View style={styles.labelRow}>
-                      <Ionicons name="wallet-outline" size={11} color="#666" />
-                      <Text style={styles.balanceLabel}> Total Balance</Text>
+                      <Ionicons name="wallet-outline" size={11} color={theme.textSecondary} />
+                      <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}> Total Balance</Text>
                     </View>
                     <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>
                       {formatCurrency(totalBalance)}
                     </Text>
                   </View>
-                  <View style={styles.balanceDivider} />
+                  <View style={[styles.balanceDivider, { backgroundColor: theme.divider }]} />
                   <View style={[styles.balanceItem, { alignItems: 'flex-end' }]}>
                     <View style={styles.labelRow}>
-                      <Ionicons name="trending-down-outline" size={11} color="#666" />
-                      <Text style={styles.balanceLabel}> Total Expense</Text>
+                      <Ionicons name="trending-down-outline" size={11} color={theme.textSecondary} />
+                      <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}> Total Expense</Text>
                     </View>
                     <Text style={[styles.balanceAmount, styles.expenseAmount]}>
                       {formatCurrency(-totalExpense)}
@@ -317,9 +318,9 @@ export default function HomeScreen() {
                     ]}>
                       <Text style={styles.percentText}>{budgetPercent.toFixed(0)}%</Text>
                     </View>
-                    <Text style={styles.budgetLimit}>{formatCurrency(budgetLimit)}</Text>
+                    <Text style={[styles.budgetLimit, { color: theme.textSecondary }]}>{formatCurrency(budgetLimit)}</Text>
                   </View>
-                  <View style={styles.progressTrack}>
+                  <View style={[styles.progressTrack, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.12)' : '#E0E0E0' }]}>
                     <View style={[
                       styles.progressFill,
                       { width: `${budgetPercent}%` as any },
@@ -451,7 +452,7 @@ export default function HomeScreen() {
 
           {/* Period Tabs */}
           <View
-            style={styles.periodTabs}
+            style={[styles.periodTabs, { backgroundColor: theme.surface }]}
             onLayout={(e) => handlePeriodLayout(e.nativeEvent.layout.width)}
           >
             <Animated.View
@@ -477,7 +478,9 @@ export default function HomeScreen() {
 
           {/* Transaction List */}
           <View>
-            {displayedTransactions.length === 0 ? (
+            {loading ? (
+              [...Array(4)].map((_, i) => <TransactionRowSkeleton key={i} isLast={i === 3} />)
+            ) : displayedTransactions.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="receipt-outline" size={36} color={theme.divider} />
                 <Text style={[styles.emptyText, { color: theme.textSecondary }]}>

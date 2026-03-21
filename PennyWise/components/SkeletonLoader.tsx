@@ -33,7 +33,7 @@ export function SkeletonBox({
 
   useEffect(() => {
     opacity.value = withRepeat(
-      withTiming(0.85, { duration: 850, easing: Easing.inOut(Easing.sine) }),
+      withTiming(0.85, { duration: 850, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     );
@@ -51,22 +51,25 @@ export function SkeletonBox({
 
 // ── Home page: balance card + savings card skeletons ──────────────────────────
 export function HomeDashboardSkeleton() {
+  const { theme } = useAppTheme();
+  const cardBg = theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)';
+  const cardBorder = theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)';
   return (
     <>
       {/* Balance Card */}
       <View style={{
-        backgroundColor: 'rgba(255,255,255,0.88)',
+        backgroundColor: cardBg,
         borderRadius: 16, padding: 16, marginBottom: 14,
-        borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)',
+        borderWidth: 1, borderColor: cardBorder,
       }}>
         {/* Two balance columns */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingBottom: 14,
-          borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.07)' }}>
+          borderBottomWidth: 1, borderBottomColor: theme.divider }}>
           <View style={{ flex: 1, gap: 8 }}>
             <SkeletonBox width={90} height={11} borderRadius={5} />
             <SkeletonBox width={130} height={22} borderRadius={6} />
           </View>
-          <View style={{ width: 1, height: 40, backgroundColor: 'rgba(0,0,0,0.08)', marginHorizontal: 12 }} />
+          <View style={{ width: 1, height: 40, backgroundColor: theme.divider, marginHorizontal: 12 }} />
           <View style={{ flex: 1, alignItems: 'flex-end', gap: 8 }}>
             <SkeletonBox width={90} height={11} borderRadius={5} />
             <SkeletonBox width={110} height={22} borderRadius={6} />
@@ -158,13 +161,13 @@ export function TransactionRowSkeleton({ isLast = false }: { isLast?: boolean })
 // ── Category / Analytics / Budget page skeleton ───────────────────────────────
 export function CategoryPageSkeleton() {
   const { theme } = useAppTheme();
+  const cardBg = theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)';
+  const cardBorder = theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)';
 
   return (
     <>
       {/* Header green section */}
-      <View style={{
-        paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28,
-      }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 }}>
         {/* Nav row */}
         <View style={{ flexDirection: 'row', alignItems: 'center',
           justifyContent: 'space-between', marginBottom: 20 }}>
@@ -177,42 +180,90 @@ export function CategoryPageSkeleton() {
         </View>
 
         {/* Balance card */}
-        <View style={{
-          backgroundColor: 'rgba(255,255,255,0.88)',
-          borderRadius: 16, padding: 16,
-          borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)',
-        }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ backgroundColor: cardBg, borderRadius: 16, padding: 16,
+          borderWidth: 1, borderColor: cardBorder }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingBottom: 14,
+            borderBottomWidth: 1, borderBottomColor: theme.divider }}>
             <View style={{ flex: 1, gap: 8 }}>
               <SkeletonBox width={90} height={11} borderRadius={5} />
               <SkeletonBox width={130} height={22} borderRadius={6} />
             </View>
-            <View style={{ width: 1, height: 40, backgroundColor: 'rgba(0,0,0,0.08)', marginHorizontal: 12 }} />
+            <View style={{ width: 1, height: 40, backgroundColor: theme.divider, marginHorizontal: 12 }} />
             <View style={{ flex: 1, alignItems: 'flex-end', gap: 8 }}>
               <SkeletonBox width={80} height={11} borderRadius={5} />
               <SkeletonBox width={60} height={22} borderRadius={6} />
             </View>
           </View>
+          <View style={{ paddingTop: 12, gap: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <SkeletonBox width={42} height={22} borderRadius={6} />
+              <SkeletonBox width={100} height={12} borderRadius={5} />
+            </View>
+            <SkeletonBox width='100%' height={10} borderRadius={5} />
+            <SkeletonBox width={190} height={12} borderRadius={5} />
+          </View>
         </View>
       </View>
 
-      {/* White section */}
+      {/* Card section */}
       <View style={{
-        flex: 1, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-        marginTop: -14, backgroundColor: theme.cardBg,
+        flex: 1, backgroundColor: theme.cardBg,
         paddingTop: 24, paddingHorizontal: 20,
       }}>
-        {/* Category grid */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 14 }}>
-          {[...Array(6)].map((_, i) => (
-            <View key={i} style={{ width: '30%', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <SkeletonBox width={76} height={76} borderRadius={20} />
-              <SkeletonBox width={60} height={13} borderRadius={5} />
+        {/* Option cards */}
+        {[...Array(3)].map((_, i) => (
+          <View key={i} style={{
+            flexDirection: 'row', alignItems: 'center',
+            backgroundColor: theme.surface, borderRadius: 16,
+            padding: 16, marginBottom: 14, gap: 14,
+          }}>
+            <SkeletonBox width={58} height={58} borderRadius={16} />
+            <View style={{ flex: 1, gap: 8 }}>
+              <SkeletonBox width='55%' height={15} borderRadius={5} />
+              <SkeletonBox width='80%' height={12} borderRadius={5} />
             </View>
-          ))}
-        </View>
+          </View>
+        ))}
       </View>
     </>
+  );
+}
+
+// ── Profile: full card section skeleton ───────────────────────────────────────
+export function ProfileCardSkeleton() {
+  const { theme } = useAppTheme();
+  return (
+    <View style={{ paddingHorizontal: 20, paddingTop: 24 }}>
+      {/* Info pill */}
+      <SkeletonBox width={140} height={32} borderRadius={20} style={{ marginBottom: 20 }} />
+
+      {/* Section group */}
+      {[...Array(2)].map((_, g) => (
+        <View key={g} style={{ marginBottom: 16 }}>
+          <SkeletonBox width={80} height={11} borderRadius={5} style={{ marginBottom: 10, marginLeft: 4 }} />
+          <View style={{ backgroundColor: theme.surface, borderRadius: 16, overflow: 'hidden' }}>
+            {[...Array(2)].map((_, r) => (
+              <View key={r} style={{
+                flexDirection: 'row', alignItems: 'center',
+                paddingVertical: 14, paddingHorizontal: 16,
+                borderBottomWidth: r === 0 ? 1 : 0, borderBottomColor: theme.divider,
+              }}>
+                <SkeletonBox width={38} height={38} borderRadius={19} style={{ marginRight: 14 }} />
+                <SkeletonBox width={`${50 + r * 20}%`} height={14} borderRadius={5} />
+              </View>
+            ))}
+          </View>
+        </View>
+      ))}
+
+      {/* Danger row */}
+      <View style={{ backgroundColor: 'rgba(224,85,85,0.08)', borderRadius: 16, overflow: 'hidden' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
+          <SkeletonBox width={38} height={38} borderRadius={19} style={{ marginRight: 14 }} />
+          <SkeletonBox width='35%' height={14} borderRadius={5} />
+        </View>
+      </View>
+    </View>
   );
 }
 
