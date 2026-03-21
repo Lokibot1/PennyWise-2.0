@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import DatePickerModal from '@/components/DatePickerModal';
 import ConfirmModal from '@/components/ConfirmModal';
+import SlideTabBar from '@/components/SlideTabBar';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
@@ -62,8 +63,7 @@ type Screen =
   | { name: 'categories'; mode: 'new' | 'update' }
   | { name: 'detail';   categoryId: string }
   | { name: 'add';      prefillCategoryId: string }
-  | { name: 'edit';     expenseId: string }
-  | { name: 'archived' };
+  | { name: 'edit';     expenseId: string };
 
 type ExpenseFormValues = {
   date: string;
@@ -425,6 +425,62 @@ function NewCategoryModal({
   );
 }
 
+// ── EditCategoryModal ─────────────────────────────────────────────────────────
+function EditCategoryModal({
+  visible, category, onClose, onSave, theme,
+}: {
+  visible: boolean; category: Category | null; onClose: () => void;
+  onSave: (id: string, label: string, icon: IoniconName) => void; theme: Theme;
+}) {
+  const [label, setLabel] = useState('');
+  const [icon, setIcon]   = useState<IoniconName>('star-outline');
+
+  useEffect(() => {
+    if (category) { setLabel(category.label); setIcon(category.icon); }
+  }, [category?.id]);
+
+  const handleSave = () => {
+    if (!label.trim() || !category) return;
+    onSave(category.id, label.trim(), icon);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Pressable style={ncm.overlay} onPress={onClose}>
+          <Pressable style={[ncm.card, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
+            <Text style={[pk.heading, { color: theme.textPrimary }]}>Edit Category</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={[s.label, { color: theme.textPrimary }]}>Category Name</Text>
+              <View style={[s.fieldRow, { marginBottom: 4, backgroundColor: theme.inputBg }]}>
+                <TextInput
+                  style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
+                  value={label}
+                  onChangeText={setLabel}
+                  placeholder="Category name"
+                  placeholderTextColor="#aaa"
+                />
+              </View>
+              <Text style={[s.label, { color: theme.textPrimary }]}>Icon</Text>
+              <View style={s.iconGrid}>
+                {NEW_CAT_ICONS.map(ic => (
+                  <TouchableOpacity key={ic} style={[s.iconOpt, icon === ic && s.iconOptActive]} onPress={() => setIcon(ic)} activeOpacity={0.8}>
+                    <Ionicons name={ic} size={22} color={icon === ic ? '#fff' : '#E05858'} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TouchableOpacity style={[s.saveBtn, { marginTop: 20, marginBottom: 8 }]} onPress={handleSave} activeOpacity={0.9}>
+                <Text style={s.saveBtnTxt}>Save Changes</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 // ── MainScreen ────────────────────────────────────────────────────────────────
 function MainScreen({
   totalExpenses,
@@ -500,188 +556,323 @@ const main = StyleSheet.create({
 
 // ── CategoriesScreen ──────────────────────────────────────────────────────────
 function CategoriesScreen({
-  categories,
-  expenses,
-  mode,
-  totalExpenses,
-  budgetLimit,
-  onBack,
-  onSelectCategory,
-  onAddCategory,
+  categories, expenses, mode, totalExpenses, budgetLimit,
+  onBack, onSelectCategory, onAddCategory,
+  onEditCategory, onArchiveCategory, onRestoreCategory, onDeleteCategory,
   theme,
 }: {
-  categories: Category[];
-  expenses: ExpenseEntry[];
-  mode: 'new' | 'update';
-  totalExpenses: number;
-  budgetLimit: number;
-  onBack: () => void;
-  onSelectCategory: (id: string) => void;
-  onAddCategory: () => void;
+  categories: Category[]; expenses: ExpenseEntry[];
+  mode: 'new' | 'update'; totalExpenses: number; budgetLimit: number;
+  onBack: () => void; onSelectCategory: (id: string) => void; onAddCategory: () => void;
+  onEditCategory: (id: string) => void; onArchiveCategory: (id: string) => void;
+  onRestoreCategory: (id: string) => void; onDeleteCategory: (id: string) => void;
   theme: Theme;
 }) {
-  const active = categories.filter(c => !c.isArchived);
-  const headerTitle = mode === 'new' ? 'Select Category' : 'Update Expense';
-  const bodyAnim = useEntranceAnim();
+  const [tab, setTab]           = useState<'Active' | 'Archived'>('Active');
+  const [kebabCatId, setKebabId] = useState<string | null>(null);
+  const active                  = categories.filter(c => !c.isArchived);
+  const archived                = categories.filter(c => c.isArchived);
+  const bodyAnim                = useEntranceAnim();
+  const kebabCat                = kebabCatId ? categories.find(c => c.id === kebabCatId) : null;
+  const headerTitle             = mode === 'new' ? 'Select Category' : 'Expense Categories';
 
   return (
     <>
       <BalanceHeader title={headerTitle} totalExpenses={totalExpenses} budgetLimit={budgetLimit} onBack={onBack} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
-        <ScrollView
-          style={[s.white, { backgroundColor: theme.cardBg }]}
-          contentContainerStyle={s.whiteContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {mode === 'new' && (
-            <Text style={[s.hint, { color: theme.textMuted }]}>
-              Select an existing category or tap <Text style={{ color: '#E05858', fontFamily: Font.bodySemiBold }}>More</Text> to create a new one.
-            </Text>
-          )}
-
-          <View style={s.grid}>
-            {active.map(cat => {
-              const count = expenses.filter(e => e.categoryId === cat.id && !e.isArchived).length;
-              return (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={s.catCard}
-                  onPress={() => onSelectCategory(cat.id)}
-                  activeOpacity={0.85}
-                >
-                  <View style={s.catIcon}>
-                    <Ionicons name={cat.icon} size={28} color="#fff" />
+        <SlideTabBar
+          tabs={['Active', 'Archived']}
+          active={tab}
+          onChange={(t) => setTab(t as 'Active' | 'Archived')}
+          trackColor={theme.isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0'}
+          activeColor="#1B7A4A"
+          inactiveTextColor={theme.textMuted as string}
+          style={{ marginHorizontal: 20, marginTop: 16, marginBottom: 4 }}
+        />
+        <ScrollView style={[s.white, { backgroundColor: theme.cardBg }]} contentContainerStyle={s.whiteContent} showsVerticalScrollIndicator={false}>
+          {tab === 'Active' ? (
+            <>
+              {mode === 'new' && (
+                <Text style={[s.hint, { color: theme.textMuted }]}>
+                  Select an existing category or tap <Text style={{ color: '#E05858', fontFamily: Font.bodySemiBold }}>More</Text> to create a new one.
+                </Text>
+              )}
+              <View style={s.grid}>
+                {active.map(cat => {
+                  const count = expenses.filter(e => e.categoryId === cat.id && !e.isArchived).length;
+                  return (
+                    <View key={cat.id} style={s.catCard}>
+                      <View style={{ position: 'relative' }}>
+                        <TouchableOpacity style={s.catIcon} onPress={() => onSelectCategory(cat.id)} activeOpacity={0.85}>
+                          <Ionicons name={cat.icon} size={28} color="#fff" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={s.kebabBtn}
+                          onPress={() => setKebabId(cat.id)}
+                          activeOpacity={0.75}
+                          hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                        >
+                          <Ionicons name="ellipsis-vertical" size={12} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={[s.catLabel, { color: theme.textPrimary }]}>{cat.label}</Text>
+                      {count > 0 && <Text style={[s.catCount, { color: theme.textMuted }]}>{count} item{count !== 1 ? 's' : ''}</Text>}
+                    </View>
+                  );
+                })}
+                <TouchableOpacity style={s.catCard} onPress={onAddCategory} activeOpacity={0.85}>
+                  <View style={[s.catIcon, s.catIconMore]}>
+                    <Ionicons name="add" size={32} color="#E05858" />
                   </View>
-                  <Text style={[s.catLabel, { color: theme.textPrimary }]}>{cat.label}</Text>
-                  {count > 0 && <Text style={[s.catCount, { color: theme.textMuted }]}>{count} item{count !== 1 ? 's' : ''}</Text>}
+                  <Text style={[s.catLabel, { color: theme.textPrimary }]}>More</Text>
                 </TouchableOpacity>
-              );
-            })}
-
-            <TouchableOpacity style={s.catCard} onPress={onAddCategory} activeOpacity={0.85}>
-              <View style={[s.catIcon, s.catIconMore]}>
-                <Ionicons name="add" size={32} color="#E05858" />
               </View>
-              <Text style={[s.catLabel, { color: theme.textPrimary }]}>More</Text>
-            </TouchableOpacity>
-          </View>
+            </>
+          ) : (
+            <>
+              {archived.length === 0 && (
+                <View style={s.empty}>
+                  <Ionicons name="archive-outline" size={48} color="#D0D0D0" />
+                  <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No archived categories</Text>
+                </View>
+              )}
+              {archived.map((cat, idx) => (
+                <View key={cat.id} style={[s.archiveRow, idx < archived.length - 1 && s.archiveRowBorder, idx < archived.length - 1 && { borderBottomColor: theme.divider }]}>
+                  <View style={[s.expIcon, { backgroundColor: '#9AA5B4' }]}>
+                    <Ionicons name={cat.icon} size={20} color="#fff" />
+                  </View>
+                  <Text style={[s.expTitle, { flex: 1, color: theme.textPrimary }]}>{cat.label}</Text>
+                  <TouchableOpacity
+                    style={s.rowKebabBtn}
+                    onPress={() => setKebabId(cat.id)}
+                    activeOpacity={0.75}
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={16} color={theme.textMuted as string} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
         </ScrollView>
       </Animated.View>
+
+      {/* Category kebab action-sheet */}
+      <Modal visible={kebabCatId !== null} transparent animationType="fade">
+        <Pressable style={s.kebabOverlay} onPress={() => setKebabId(null)}>
+          <Pressable style={[s.kebabSheet, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
+            {kebabCat && (
+              <>
+                <View style={s.kebabHeader}>
+                  <View style={s.kebabCatIcon}>
+                    <Ionicons name={kebabCat.icon} size={20} color="#fff" />
+                  </View>
+                  <Text style={[s.kebabCatName, { color: theme.textPrimary }]}>{kebabCat.label}</Text>
+                </View>
+                <View style={[s.kebabDivider, { backgroundColor: theme.divider }]} />
+                <TouchableOpacity style={s.kebabItem} onPress={() => { setKebabId(null); onEditCategory(kebabCatId!); }} activeOpacity={0.8}>
+                  <Ionicons name="create-outline" size={20} color="#1B7A4A" />
+                  <Text style={[s.kebabItemTxt, { color: theme.textPrimary }]}>Edit</Text>
+                </TouchableOpacity>
+                {kebabCat.isArchived ? (
+                  <>
+                    <TouchableOpacity style={s.kebabItem} onPress={() => { setKebabId(null); onRestoreCategory(kebabCatId!); }} activeOpacity={0.8}>
+                      <Ionicons name="refresh-outline" size={20} color="#3ECBA8" />
+                      <Text style={[s.kebabItemTxt, { color: '#3ECBA8' }]}>Restore</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.kebabItem} onPress={() => { setKebabId(null); onDeleteCategory(kebabCatId!); }} activeOpacity={0.8}>
+                      <Ionicons name="trash-outline" size={20} color="#E05858" />
+                      <Text style={[s.kebabItemTxt, { color: '#E05858' }]}>Delete Permanently</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <TouchableOpacity style={s.kebabItem} onPress={() => { setKebabId(null); onArchiveCategory(kebabCatId!); }} activeOpacity={0.8}>
+                    <Ionicons name="archive-outline" size={20} color="#E05858" />
+                    <Text style={[s.kebabItemTxt, { color: '#E05858' }]}>Archive</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 }
 
 // ── CategoryDetailScreen ──────────────────────────────────────────────────────
 function CategoryDetailScreen({
-  category,
-  expenses,
-  totalExpenses,
-  budgetLimit,
-  onBack,
-  onAdd,
-  onEditExpense,
-  theme,
+  category, expenses, totalExpenses, budgetLimit,
+  onBack, onAdd, onEditExpense, onArchiveExpense, onRestoreExpense, onDeleteExpense, theme,
 }: {
-  category: Category;
-  expenses: ExpenseEntry[];
-  totalExpenses: number;
-  budgetLimit: number;
-  onBack: () => void;
-  onAdd: () => void;
-  onEditExpense: (id: string) => void;
-  theme: Theme;
+  category: Category; expenses: ExpenseEntry[];
+  totalExpenses: number; budgetLimit: number;
+  onBack: () => void; onAdd: () => void; onEditExpense: (id: string) => void;
+  onArchiveExpense: (id: string) => void; onRestoreExpense: (id: string) => void;
+  onDeleteExpense: (id: string) => void; theme: Theme;
 }) {
-  const active  = expenses.filter(e => e.categoryId === category.id && !e.isArchived);
-  const grouped = groupByMonth(active);
+  const [tab, setTab]           = useState<'Active' | 'Archived'>('Active');
+  const [kebabExpId, setKebabId] = useState<string | null>(null);
+
+  const catExpenses    = expenses.filter(e => e.categoryId === category.id);
+  const activeExpenses = catExpenses.filter(e => !e.isArchived);
+  const archExpenses   = catExpenses.filter(e => e.isArchived);
+  const activeGrouped  = groupByMonth(activeExpenses);
+  const archGrouped    = groupByMonth(archExpenses);
+  const kebabExp       = kebabExpId ? catExpenses.find(e => e.id === kebabExpId) : null;
+
   const bodyAnim    = useEntranceAnim();
   const addBtnScale = useSharedValue(1);
   const addBtnAnim  = useAnimatedStyle(() => ({ transform: [{ scale: addBtnScale.value }] }));
+
+  const renderExpRow = (exp: ExpenseEntry, idx: number, items: ExpenseEntry[]) => (
+    <View
+      key={exp.id}
+      style={[s.expRow, idx < items.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.divider }]}
+    >
+      <View style={[s.expIcon, { backgroundColor: '#E05858' }]}>
+        <Ionicons name={category.icon} size={20} color="#fff" />
+      </View>
+      <TouchableOpacity style={{ flex: 1 }} onPress={() => onEditExpense(exp.id)} activeOpacity={0.85}>
+        <Text style={[s.expTitle, { color: theme.textPrimary }]}>{exp.title}</Text>
+        <Text style={[s.expMeta, { color: theme.textMuted }]}>
+          {exp.time} · {fmtDateShort(exp.date)}{exp.isRecurring ? ` · ${exp.frequency}` : ''}
+        </Text>
+      </TouchableOpacity>
+      <Text style={s.expAmt}>-{fmtAmt(exp.amount)}</Text>
+      <TouchableOpacity
+        style={s.rowKebabBtn}
+        onPress={() => setKebabId(exp.id)}
+        activeOpacity={0.75}
+        hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+      >
+        <Ionicons name="ellipsis-vertical" size={16} color={theme.textMuted as string} />
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <>
       <BalanceHeader title={category.label} totalExpenses={totalExpenses} budgetLimit={budgetLimit} onBack={onBack} theme={theme} />
       <Animated.View style={[s.white, { flex: 1, backgroundColor: theme.cardBg }, bodyAnim]}>
-        <ScrollView
-          contentContainerStyle={[s.whiteContent, { paddingBottom: 100 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {grouped.length === 0 && (
-            <View style={s.empty}>
-              <Ionicons name="receipt-outline" size={48} color={theme.textMuted} />
-              <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No expense entries yet</Text>
-            </View>
+        <SlideTabBar
+          tabs={['Active', 'Archived']}
+          active={tab}
+          onChange={(t) => setTab(t as 'Active' | 'Archived')}
+          trackColor={theme.isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0'}
+          activeColor="#1B7A4A"
+          inactiveTextColor={theme.textMuted as string}
+          style={{ marginHorizontal: 20, marginTop: 16, marginBottom: 4 }}
+        />
+        <ScrollView contentContainerStyle={[s.whiteContent, { paddingBottom: 100 }]} showsVerticalScrollIndicator={false}>
+          {tab === 'Active' ? (
+            <>
+              {activeGrouped.length === 0 && (
+                <View style={s.empty}>
+                  <Ionicons name="receipt-outline" size={48} color={theme.textMuted} />
+                  <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No expense entries yet</Text>
+                </View>
+              )}
+              {activeGrouped.map(group => (
+                <View key={group.key} style={{ marginBottom: 8 }}>
+                  <View style={s.monthHeader}>
+                    <Text style={[s.monthLabel, { color: theme.textPrimary }]}>{group.label}</Text>
+                    <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
+                  </View>
+                  {group.items.map((exp, idx) => renderExpRow(exp, idx, group.items))}
+                </View>
+              ))}
+            </>
+          ) : (
+            <>
+              {archExpenses.length === 0 && (
+                <View style={s.empty}>
+                  <Ionicons name="archive-outline" size={48} color="#D0D0D0" />
+                  <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No archived expenses</Text>
+                </View>
+              )}
+              {archGrouped.map(group => (
+                <View key={group.key} style={{ marginBottom: 8 }}>
+                  <View style={s.monthHeader}>
+                    <Text style={[s.monthLabel, { color: theme.textPrimary }]}>{group.label}</Text>
+                    <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
+                  </View>
+                  {group.items.map((exp, idx) => renderExpRow(exp, idx, group.items))}
+                </View>
+              ))}
+            </>
           )}
+        </ScrollView>
+        {tab === 'Active' && (
+          <View style={s.addBtnWrapper}>
+            <Animated.View style={addBtnAnim}>
+              <TouchableOpacity
+                style={s.addBtn}
+                onPressIn={() => { addBtnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
+                onPressOut={() => { addBtnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
+                onPress={onAdd}
+                activeOpacity={1}
+              >
+                <Text style={s.addBtnTxt}>Add Expense</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
+        )}
+      </Animated.View>
 
-          {grouped.map(group => (
-            <View key={group.key} style={{ marginBottom: 8 }}>
-              <View style={s.monthHeader}>
-                <Text style={[s.monthLabel, { color: theme.textPrimary }]}>{group.label}</Text>
-                <Ionicons name="calendar-outline" size={20} color="#1B7A4A" />
-              </View>
-
-              {group.items.map((exp, idx) => (
-                <TouchableOpacity
-                  key={exp.id}
-                  style={[s.expRow, idx < group.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.divider }]}
-                  onPress={() => onEditExpense(exp.id)}
-                  activeOpacity={0.85}
-                >
-                  <View style={[s.expIcon, { backgroundColor: '#E05858' }]}>
+      {/* Expense kebab action-sheet */}
+      <Modal visible={kebabExpId !== null} transparent animationType="fade">
+        <Pressable style={s.kebabOverlay} onPress={() => setKebabId(null)}>
+          <Pressable style={[s.kebabSheet, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
+            {kebabExp && (
+              <>
+                <View style={s.kebabHeader}>
+                  <View style={s.kebabCatIcon}>
                     <Ionicons name={category.icon} size={20} color="#fff" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.expTitle, { color: theme.textPrimary }]}>{exp.title}</Text>
-                    <Text style={[s.expMeta, { color: theme.textMuted }]}>
-                      {exp.time} · {fmtDateShort(exp.date)}
-                      {exp.isRecurring ? ` · ${exp.frequency}` : ''}
-                    </Text>
+                    <Text style={[s.kebabCatName, { color: theme.textPrimary }]}>{kebabExp.title}</Text>
+                    <Text style={[s.expMeta, { color: theme.textMuted }]}>{fmtAmt(kebabExp.amount)}</Text>
                   </View>
-                  <Text style={s.expAmt}>-{fmtAmt(exp.amount)}</Text>
+                </View>
+                <View style={[s.kebabDivider, { backgroundColor: theme.divider }]} />
+                <TouchableOpacity style={s.kebabItem} onPress={() => { setKebabId(null); onEditExpense(kebabExpId!); }} activeOpacity={0.8}>
+                  <Ionicons name="create-outline" size={20} color="#1B7A4A" />
+                  <Text style={[s.kebabItemTxt, { color: theme.textPrimary }]}>Edit</Text>
                 </TouchableOpacity>
-              ))}
-            </View>
-          ))}
-        </ScrollView>
-
-        <View style={s.addBtnWrapper}>
-          <Animated.View style={addBtnAnim}>
-            <TouchableOpacity
-              style={s.addBtn}
-              onPressIn={() => { addBtnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
-              onPressOut={() => { addBtnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
-              onPress={onAdd}
-              activeOpacity={1}
-            >
-              <Text style={s.addBtnTxt}>Add Expense</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </Animated.View>
+                {kebabExp.isArchived ? (
+                  <>
+                    <TouchableOpacity style={s.kebabItem} onPress={() => { setKebabId(null); onRestoreExpense(kebabExpId!); }} activeOpacity={0.8}>
+                      <Ionicons name="refresh-outline" size={20} color="#3ECBA8" />
+                      <Text style={[s.kebabItemTxt, { color: '#3ECBA8' }]}>Restore</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.kebabItem} onPress={() => { setKebabId(null); onDeleteExpense(kebabExpId!); }} activeOpacity={0.8}>
+                      <Ionicons name="trash-outline" size={20} color="#E05858" />
+                      <Text style={[s.kebabItemTxt, { color: '#E05858' }]}>Delete Permanently</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <TouchableOpacity style={s.kebabItem} onPress={() => { setKebabId(null); onArchiveExpense(kebabExpId!); }} activeOpacity={0.8}>
+                    <Ionicons name="archive-outline" size={20} color="#E05858" />
+                    <Text style={[s.kebabItemTxt, { color: '#E05858' }]}>Archive</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </>
   );
 }
 
 // ── ExpenseFormScreen ─────────────────────────────────────────────────────────
 function ExpenseFormScreen({
-  initial,
-  categories,
-  screenTitle,
-  isEdit,
-  saving,
-  onBack,
-  onSave,
-  onArchive,
-  theme,
+  initial, categories, screenTitle, isEdit, saving, onBack, onSave, theme,
 }: {
-  initial: ExpenseFormValues;
-  categories: Category[];
-  screenTitle: string;
-  isEdit?: boolean;
-  saving?: boolean;
-  onBack: () => void;
-  onSave: (vals: ExpenseFormValues) => void;
-  onArchive?: () => void;
-  theme: Theme;
+  initial: ExpenseFormValues; categories: Category[]; screenTitle: string;
+  isEdit?: boolean; saving?: boolean;
+  onBack: () => void; onSave: (vals: ExpenseFormValues) => void; theme: Theme;
 }) {
   const [vals, setVals]           = useState<ExpenseFormValues>(initial);
   const [showCatPicker, setCat]   = useState(false);
@@ -802,14 +993,6 @@ function ExpenseFormScreen({
               </>
             )}
 
-            {/* Archive button (edit only) */}
-            {isEdit && onArchive && (
-              <TouchableOpacity style={s.archiveBtn} onPress={onArchive} activeOpacity={0.8} disabled={saving}>
-                <Ionicons name="archive-outline" size={16} color="#E05858" />
-                <Text style={s.archiveBtnTxt}> Archive This Expense Category</Text>
-              </TouchableOpacity>
-            )}
-
             {/* Save */}
             <Animated.View style={btnStyle}>
               <TouchableOpacity
@@ -870,61 +1053,6 @@ function ExpenseFormScreen({
   );
 }
 
-// ── ArchivedScreen ────────────────────────────────────────────────────────────
-function ArchivedScreen({
-  categories,
-  totalExpenses,
-  budgetLimit,
-  onBack,
-  onRestore,
-  theme,
-}: {
-  categories: Category[];
-  totalExpenses: number;
-  budgetLimit: number;
-  onBack: () => void;
-  onRestore: (id: string) => void;
-  theme: Theme;
-}) {
-  const archived = categories.filter(c => c.isArchived);
-  const bodyAnim = useEntranceAnim();
-
-  return (
-    <>
-      <BalanceHeader title="Archived Expenses" totalExpenses={totalExpenses} budgetLimit={budgetLimit} onBack={onBack} theme={theme} />
-      <Animated.View style={[{ flex: 1 }, bodyAnim]}>
-        <ScrollView
-          style={[s.white, { backgroundColor: theme.cardBg }]}
-          contentContainerStyle={s.whiteContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {archived.length === 0 && (
-            <View style={s.empty}>
-              <Ionicons name="archive-outline" size={48} color="#D0D0D0" />
-              <Text style={s.emptyTxt}>No archived categories</Text>
-            </View>
-          )}
-
-          {archived.map((cat, idx) => (
-            <View
-              key={cat.id}
-              style={[s.archiveRow, idx < archived.length - 1 && s.archiveRowBorder]}
-            >
-              <View style={[s.expIcon, { backgroundColor: '#9AA5B4' }]}>
-                <Ionicons name={cat.icon} size={20} color="#fff" />
-              </View>
-              <Text style={[s.expTitle, { flex: 1, color: theme.textPrimary }]}>{cat.label}</Text>
-              <TouchableOpacity style={s.restoreBtn} onPress={() => onRestore(cat.id)} activeOpacity={0.75}>
-                <Text style={s.restoreTxt}>Restore</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </ScrollView>
-      </Animated.View>
-    </>
-  );
-}
-
 // ── Root Screen ───────────────────────────────────────────────────────────────
 export default function ManageExpenseScreen() {
   const { theme } = useAppTheme();
@@ -938,6 +1066,7 @@ export default function ManageExpenseScreen() {
   const [saving,      setSaving]      = useState(false);
   const [confirm,     setConfirm]     = useState<ConfirmState>({ visible: false, title: '', message: '', onYes: () => {} });
   const [showNewCat,  setShowNewCat]  = useState(false);
+  const [editCat,     setEditCat]     = useState<Category | null>(null);
   const [toast,       setToast]       = useState('');
 
   // ── Load from Supabase ──────────────────────────────────────────────────────
@@ -1063,7 +1192,7 @@ export default function ManageExpenseScreen() {
             description: `₱${(parseFloat(vals.amount) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Expense'}`,
             icon:        cat?.icon ?? 'receipt-outline',
           });
-          setScreen({ name: 'main' });
+          setScreen({ name: 'detail', categoryId: screen.prefillCategoryId });
         }
 
       } else if (screen.name === 'edit') {
@@ -1127,7 +1256,7 @@ export default function ManageExpenseScreen() {
             description: changes.length > 0 ? changes.join(' · ') : `${fmtAmt(newAmount)} · ${catU?.label ?? 'Expense'}`,
             icon:        catU?.icon ?? 'receipt-outline',
           });
-          setScreen({ name: 'main' });
+          setScreen({ name: 'detail', categoryId: vals.categoryId });
         }
       }
 
@@ -1136,55 +1265,165 @@ export default function ManageExpenseScreen() {
     });
   };
 
-  const handleArchiveCategory = (categoryId: string) => {
-    showConfirm({
-      title:        'Archive Category?',
-      message:      'Are you sure you want to archive this Expense Category?',
-      icon:         'archive-outline',
-      confirmLabel: 'Archive',
-      confirmColor: '#F59E0B',
-      onYes: async () => {
-      hideConfirm();
-      const { error } = await supabase
-        .from('expense_categories')
-        .update({ is_archived: true })
-        .eq('id', categoryId);
+  const handleSaveCategory = async (id: string, label: string, icon: IoniconName) => {
+    const oldCat = categories.find(c => c.id === id);
+    const { error } = await supabase.from('expense_categories').update({ label, icon }).eq('id', id);
+    if (!error) {
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, label, icon } : c));
+      showToast('Category updated successfully.');
+      const changes: string[] = [];
+      if (oldCat?.label !== label) changes.push(`Name: "${oldCat?.label}" → "${label}"`);
+      if (oldCat?.icon  !== icon)  changes.push('Icon changed');
+      logActivity({
+        user_id:     userIdRef.current!,
+        action_type: ACTION.EXPENSE_CATEGORY_UPDATED,
+        entity_type: ENTITY.EXPENSE_CATEGORY,
+        title:       `Category Updated: ${label}`,
+        description: changes.length > 0 ? changes.join(' · ') : 'Details updated',
+        icon,
+      });
+    }
+  };
 
-      if (!error) {
-        const archivedCat = categories.find(c => c.id === categoryId);
-        setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
-        showToast('Expense category archived successfully.');
-        logActivity({
-          user_id:     userIdRef.current!,
-          action_type: ACTION.EXPENSE_CATEGORY_ARCHIVED,
-          entity_type: ENTITY.EXPENSE_CATEGORY,
-          title:       `Category Archived: ${archivedCat?.label ?? 'Expense Category'}`,
-          description: 'Expense category and its entries archived.',
-          icon:        archivedCat?.icon ?? 'archive-outline',
-        });
-        setScreen({ name: 'main' });
-      }
+  const handleArchiveCategory = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
+    showConfirm({
+      title: 'Archive Category?', message: 'Are you sure you want to archive this Expense Category?',
+      icon: 'archive-outline', confirmLabel: 'Archive', confirmColor: '#F59E0B',
+      onYes: async () => {
+        hideConfirm();
+        const { error } = await supabase.from('expense_categories').update({ is_archived: true }).eq('id', categoryId);
+        if (!error) {
+          setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
+          showToast('Expense category archived.');
+          logActivity({
+            user_id: userIdRef.current!, action_type: ACTION.EXPENSE_CATEGORY_ARCHIVED,
+            entity_type: ENTITY.EXPENSE_CATEGORY,
+            title: `Category Archived: ${cat?.label ?? 'Expense Category'}`,
+            description: 'Expense category and its entries archived.',
+            icon: cat?.icon ?? 'archive-outline',
+          });
+        }
       },
     });
   };
 
-  const handleRestore = (categoryId: string) => {
+  const handleRestoreCategory = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
     showConfirm({
-      title:        'Restore Category?',
-      message:      'Are you sure you want to restore this Expense Category?',
-      icon:         'refresh-outline',
-      confirmLabel: 'Restore',
-      confirmColor: '#3ECBA8',
+      title: 'Restore Category?', message: 'Are you sure you want to restore this Expense Category?',
+      icon: 'refresh-outline', confirmLabel: 'Restore', confirmColor: '#3ECBA8',
       onYes: async () => {
         hideConfirm();
-        const { error } = await supabase
-          .from('expense_categories')
-          .update({ is_archived: false })
-          .eq('id', categoryId);
-
+        const { error } = await supabase.from('expense_categories').update({ is_archived: false }).eq('id', categoryId);
         if (!error) {
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
-          showToast('Expense category restored successfully.');
+          showToast('Expense category restored.');
+          logActivity({
+            user_id: userIdRef.current!, action_type: ACTION.EXPENSE_CATEGORY_RESTORED,
+            entity_type: ENTITY.EXPENSE_CATEGORY,
+            title: `Category Restored: ${cat?.label ?? 'Expense Category'}`,
+            description: 'Expense category restored from archive.',
+            icon: cat?.icon ?? 'refresh-outline',
+          });
+        }
+      },
+    });
+  };
+
+  const handleDeleteCategory = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
+    showConfirm({
+      title: 'Delete Permanently?',
+      message: `This will permanently delete "${cat?.label ?? 'this category'}" and all its expenses. This cannot be undone.`,
+      icon: 'trash-outline', confirmLabel: 'Delete', confirmColor: '#E05858',
+      onYes: async () => {
+        hideConfirm();
+        const { error } = await supabase.from('expense_categories').delete().eq('id', categoryId);
+        if (!error) {
+          setCategories(prev => prev.filter(c => c.id !== categoryId));
+          setExpenses(prev => prev.filter(e => e.categoryId !== categoryId));
+          showToast('Category permanently deleted.');
+          logActivity({
+            user_id: userIdRef.current!, action_type: ACTION.EXPENSE_CATEGORY_DELETED,
+            entity_type: ENTITY.EXPENSE_CATEGORY,
+            title: `Category Deleted: ${cat?.label ?? 'Expense Category'}`,
+            description: 'Expense category and all its entries permanently deleted.',
+            icon: cat?.icon ?? 'trash-outline',
+          });
+        }
+      },
+    });
+  };
+
+  const handleArchiveExpense = (expenseId: string) => {
+    const exp = expenses.find(e => e.id === expenseId);
+    showConfirm({
+      title: 'Archive Expense?', message: `Archive "${exp?.title ?? 'this expense'}"?`,
+      icon: 'archive-outline', confirmLabel: 'Archive', confirmColor: '#F59E0B',
+      onYes: async () => {
+        hideConfirm();
+        const { error } = await supabase.from('expenses').update({ is_archived: true }).eq('id', expenseId);
+        if (!error) {
+          setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: true } : e));
+          showToast('Expense archived.');
+          const cat = categories.find(c => c.id === exp?.categoryId);
+          logActivity({
+            user_id: userIdRef.current!, action_type: ACTION.EXPENSE_ARCHIVED,
+            entity_type: ENTITY.EXPENSE,
+            title: `Expense Archived: ${exp?.title ?? 'Expense'}`,
+            description: `${fmtAmt(exp?.amount ?? 0)} · ${cat?.label ?? 'Expense'}`,
+            icon: cat?.icon ?? 'archive-outline',
+          });
+        }
+      },
+    });
+  };
+
+  const handleRestoreExpense = (expenseId: string) => {
+    const exp = expenses.find(e => e.id === expenseId);
+    showConfirm({
+      title: 'Restore Expense?', message: `Restore "${exp?.title ?? 'this expense'}"?`,
+      icon: 'refresh-outline', confirmLabel: 'Restore', confirmColor: '#3ECBA8',
+      onYes: async () => {
+        hideConfirm();
+        const { error } = await supabase.from('expenses').update({ is_archived: false }).eq('id', expenseId);
+        if (!error) {
+          setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: false } : e));
+          showToast('Expense restored.');
+          const cat = categories.find(c => c.id === exp?.categoryId);
+          logActivity({
+            user_id: userIdRef.current!, action_type: ACTION.EXPENSE_RESTORED,
+            entity_type: ENTITY.EXPENSE,
+            title: `Expense Restored: ${exp?.title ?? 'Expense'}`,
+            description: `${fmtAmt(exp?.amount ?? 0)} · ${cat?.label ?? 'Expense'}`,
+            icon: cat?.icon ?? 'refresh-outline',
+          });
+        }
+      },
+    });
+  };
+
+  const handleDeleteExpense = (expenseId: string) => {
+    const exp = expenses.find(e => e.id === expenseId);
+    showConfirm({
+      title: 'Delete Permanently?',
+      message: `This will permanently delete "${exp?.title ?? 'this expense'}". This cannot be undone.`,
+      icon: 'trash-outline', confirmLabel: 'Delete', confirmColor: '#E05858',
+      onYes: async () => {
+        hideConfirm();
+        const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
+        if (!error) {
+          setExpenses(prev => prev.filter(e => e.id !== expenseId));
+          showToast('Expense permanently deleted.');
+          const cat = categories.find(c => c.id === exp?.categoryId);
+          logActivity({
+            user_id: userIdRef.current!, action_type: ACTION.EXPENSE_DELETED,
+            entity_type: ENTITY.EXPENSE,
+            title: `Expense Deleted: ${exp?.title ?? 'Expense'}`,
+            description: `${fmtAmt(exp?.amount ?? 0)} · ${cat?.label ?? 'Expense'} · Permanently deleted`,
+            icon: cat?.icon ?? 'trash-outline',
+          });
         }
       },
     });
@@ -1264,7 +1503,7 @@ export default function ManageExpenseScreen() {
             budgetLimit={budgetLimit}
             onNew={() => setScreen({ name: 'categories', mode: 'new' })}
             onUpdate={() => setScreen({ name: 'categories', mode: 'update' })}
-            onViewArchived={() => setScreen({ name: 'archived' })}
+            onViewArchived={() => setScreen({ name: 'categories', mode: 'update' })}
             theme={theme}
           />
         );
@@ -1286,6 +1525,10 @@ export default function ManageExpenseScreen() {
               }
             }}
             onAddCategory={() => setShowNewCat(true)}
+            onEditCategory={id => setEditCat(categories.find(c => c.id === id) ?? null)}
+            onArchiveCategory={handleArchiveCategory}
+            onRestoreCategory={handleRestoreCategory}
+            onDeleteCategory={handleDeleteCategory}
             theme={theme}
           />
         );
@@ -1302,6 +1545,9 @@ export default function ManageExpenseScreen() {
             onBack={() => setScreen({ name: 'categories', mode: 'update' })}
             onAdd={() => setScreen({ name: 'add', prefillCategoryId: cat.id })}
             onEditExpense={id => setScreen({ name: 'edit', expenseId: id })}
+            onArchiveExpense={handleArchiveExpense}
+            onRestoreExpense={handleRestoreExpense}
+            onDeleteExpense={handleDeleteExpense}
             theme={theme}
           />
         );
@@ -1315,7 +1561,7 @@ export default function ManageExpenseScreen() {
             categories={categories}
             screenTitle="New Expense"
             saving={saving}
-            onBack={() => setScreen({ name: 'categories', mode: 'new' })}
+            onBack={() => setScreen({ name: 'detail', categoryId: screen.prefillCategoryId })}
             onSave={handleSave}
             theme={theme}
           />
@@ -1338,26 +1584,10 @@ export default function ManageExpenseScreen() {
                 : setScreen({ name: 'categories', mode: 'update' });
             }}
             onSave={handleSave}
-            onArchive={() => {
-              const catId = exp?.categoryId;
-              if (catId) handleArchiveCategory(catId);
-            }}
             theme={theme}
           />
         );
       }
-
-      case 'archived':
-        return (
-          <ArchivedScreen
-            categories={categories}
-            totalExpenses={totalExpenses}
-            budgetLimit={budgetLimit}
-            onBack={() => setScreen({ name: 'main' })}
-            onRestore={handleRestore}
-            theme={theme}
-          />
-        );
     }
   };
 
@@ -1381,6 +1611,14 @@ export default function ManageExpenseScreen() {
         visible={showNewCat}
         onClose={() => setShowNewCat(false)}
         onCreate={handleNewCategory}
+        theme={theme}
+      />
+
+      <EditCategoryModal
+        visible={editCat !== null}
+        category={editCat}
+        onClose={() => setEditCat(null)}
+        onSave={handleSaveCategory}
         theme={theme}
       />
 
@@ -1460,4 +1698,15 @@ const s = StyleSheet.create({
 
   toast:    { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#115533', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', elevation: 8 },
   toastTxt: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#fff' },
+
+  kebabBtn:     { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
+  rowKebabBtn:  { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  kebabOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  kebabSheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  kebabHeader:  { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 },
+  kebabCatIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#E05858', alignItems: 'center', justifyContent: 'center' },
+  kebabCatName: { fontFamily: Font.headerBold, fontSize: 16, flex: 1 },
+  kebabDivider: { height: 1, marginBottom: 8 },
+  kebabItem:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 14 },
+  kebabItemTxt: { fontFamily: Font.bodyMedium, fontSize: 15, flex: 1 },
 });
