@@ -412,18 +412,19 @@ function EditCategoryModal({
 
 // ── CategoriesScreen ──────────────────────────────────────────────────────────
 function CategoriesScreen({
-  categories, income, totalIncome, onSelectCategory, onAddCategory, onEditCategory, onRestore, theme,
+  categories, income, totalIncome, onSelectCategory, onAddCategory, onEditCategory, onArchiveCategory, onRestore, theme,
 }: {
   categories: Category[]; income: IncomeSource[]; totalIncome: number;
   onSelectCategory: (id: string) => void; onAddCategory: () => void;
-  onEditCategory: (id: string) => void; onRestore: (id: string) => void; theme: Theme;
+  onEditCategory: (id: string) => void; onArchiveCategory: (id: string) => void;
+  onRestore: (id: string) => void; theme: Theme;
 }) {
   const [tab, setTab]           = useState<'Active' | 'Archived'>('Active');
   const [kebabCatId, setKebabId] = useState<string | null>(null);
   const active                  = categories.filter(c => !c.isArchived);
   const archived                = categories.filter(c => c.isArchived);
   const bodyAnim                = useEntranceAnim();
-  const kebabCat                = kebabCatId ? active.find(c => c.id === kebabCatId) : null;
+  const kebabCat                = kebabCatId ? categories.find(c => c.id === kebabCatId) : null;
 
   return (
     <>
@@ -484,8 +485,13 @@ function CategoriesScreen({
                     <Ionicons name={cat.icon} size={20} color="#fff" />
                   </View>
                   <Text style={[s.incTitle, { flex: 1, color: theme.textPrimary }]}>{cat.label}</Text>
-                  <TouchableOpacity style={s.restoreBtn} onPress={() => onRestore(cat.id)} activeOpacity={0.75}>
-                    <Text style={s.restoreTxt}>Restore</Text>
+                  <TouchableOpacity
+                    style={s.rowKebabBtn}
+                    onPress={() => setKebabId(cat.id)}
+                    activeOpacity={0.75}
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                  >
+                    <Ionicons name="ellipsis-vertical" size={16} color={theme.textMuted as string} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -515,10 +521,25 @@ function CategoriesScreen({
                   <Ionicons name="create-outline" size={20} color="#1B7A4A" />
                   <Text style={[s.kebabItemTxt, { color: theme.textPrimary }]}>Edit</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.kebabItem, { opacity: 0.35 }]} activeOpacity={0.6} disabled>
-                  <Ionicons name="archive-outline" size={20} color="#E05858" />
-                  <Text style={[s.kebabItemTxt, { color: '#E05858' }]}>Archive</Text>
-                </TouchableOpacity>
+                {kebabCat.isArchived ? (
+                  <TouchableOpacity
+                    style={s.kebabItem}
+                    onPress={() => { setKebabId(null); onRestore(kebabCatId!); }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="refresh-outline" size={20} color="#3ECBA8" />
+                    <Text style={[s.kebabItemTxt, { color: '#3ECBA8' }]}>Restore</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={s.kebabItem}
+                    onPress={() => { setKebabId(null); onArchiveCategory(kebabCatId!); }}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="archive-outline" size={20} color="#E05858" />
+                    <Text style={[s.kebabItemTxt, { color: '#E05858' }]}>Archive</Text>
+                  </TouchableOpacity>
+                )}
               </>
             )}
           </Pressable>
@@ -1009,6 +1030,7 @@ export default function IncomeSourcesScreen() {
             onSelectCategory={id => setScreen({ name: 'detail', categoryId: id })}
             onAddCategory={() => setShowNewCat(true)}
             onEditCategory={id => { const cat = categories.find(c => c.id === id); if (cat) setEditCat(cat); }}
+            onArchiveCategory={handleArchiveCategory}
             onRestore={handleRestore}
             theme={theme}
           />
@@ -1147,6 +1169,7 @@ const s = StyleSheet.create({
   toastTxt: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#fff' },
 
   kebabBtn:     { position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.28)', alignItems: 'center', justifyContent: 'center' },
+  rowKebabBtn:  { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   kebabOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   kebabSheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
   kebabHeader:  { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 },
