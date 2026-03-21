@@ -45,28 +45,66 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+// ── Shared modal sub-component ────────────────────────────────────────────────
+function IconPicker({
+  selected,
+  onSelect,
+  theme,
+}: {
+  selected: string;
+  onSelect: (icon: string) => void;
+  theme: import('@/contexts/AppTheme').Theme;
+}) {
+  return (
+    <View style={styles.iconGrid}>
+      {ICON_OPTIONS.map(icon => (
+        <TouchableOpacity
+          key={icon}
+          style={[
+            styles.iconOption,
+            { backgroundColor: theme.inputBg, borderColor: theme.inputBorder },
+            selected === icon && styles.iconOptionActive,
+          ]}
+          onPress={() => onSelect(icon)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name={icon as any} size={20} color={selected === icon ? '#fff' : theme.textSecondary} />
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function SavingsGoalsScreen() {
   const { theme } = useAppTheme();
   const [activeTab, setActiveTab] = useState<'Active' | 'Completed'>('Active');
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [goals, setGoals]         = useState<Goal[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [userId, setUserId]       = useState<string | null>(null);
 
-  // Add Goal modal
+  // ── Add Goal modal state ───────────────────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newTarget, setNewTarget] = useState('');
-  const [newIcon, setNewIcon] = useState('wallet-outline');
-  const [saving, setSaving] = useState(false);
+  const [newTitle, setNewTitle]         = useState('');
+  const [newTarget, setNewTarget]       = useState('');
+  const [newIcon, setNewIcon]           = useState('wallet-outline');
+  const [saving, setSaving]             = useState(false);
 
-  // Add Funds modal
+  // ── Edit Goal modal state ──────────────────────────────────────────────────
+  const [showEditModal, setShowEditModal]   = useState(false);
+  const [editingGoal, setEditingGoal]       = useState<Goal | null>(null);
+  const [editTitle, setEditTitle]           = useState('');
+  const [editTarget, setEditTarget]         = useState('');
+  const [editIcon, setEditIcon]             = useState('wallet-outline');
+  const [editSaving, setEditSaving]         = useState(false);
+
+  // ── Add Funds modal state ──────────────────────────────────────────────────
   const [showFundsModal, setShowFundsModal] = useState(false);
-  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
-  const [fundsAmount, setFundsAmount] = useState('');
-  const [addingFunds, setAddingFunds] = useState(false);
+  const [selectedGoal, setSelectedGoal]     = useState<Goal | null>(null);
+  const [fundsAmount, setFundsAmount]       = useState('');
+  const [addingFunds, setAddingFunds]       = useState(false);
 
-  // ── Data ──────────────────────────────────────────────────────────────────────
+  // ── Data ──────────────────────────────────────────────────────────────────
   const fetchGoals = useCallback(async (uid: string) => {
     const { data, error } = await supabase
       .from('savings_goals')
@@ -90,7 +128,9 @@ export default function SavingsGoalsScreen() {
     return () => subscription.unsubscribe();
   }, [fetchGoals]);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  /* Create */
   const handleSaveGoal = async () => {
     if (!newTitle.trim()) { Alert.alert('Missing info', 'Please enter a goal name.'); return; }
     const target = parseFloat(newTarget);
@@ -99,33 +139,91 @@ export default function SavingsGoalsScreen() {
 
     setSaving(true);
     const { error } = await supabase.from('savings_goals').insert({
-      user_id: userId,
-      title: newTitle.trim(),
-      icon: newIcon,
-      target_amount: target,
-      current_amount: 0,
-      is_completed: false,
-      is_archived: false,
+      user_id: userId, title: newTitle.trim(), icon: newIcon,
+      target_amount: target, current_amount: 0,
+      is_completed: false, is_archived: false,
     });
     setSaving(false);
-
     if (error) { Alert.alert('Error', error.message); return; }
 
     setShowAddModal(false);
-    setNewTitle('');
-    setNewTarget('');
-    setNewIcon('wallet-outline');
+    setNewTitle(''); setNewTarget(''); setNewIcon('wallet-outline');
     fetchGoals(userId);
     logActivity({
-      user_id:     userId,
-      action_type: ACTION.SAVINGS_GOAL_CREATED,
-      entity_type: ENTITY.SAVINGS_GOAL,
-      title:       `New Goal: ${newTitle.trim()}`,
-      description: `Target: ₱${target.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
-      icon:        newIcon,
+      user_id: userId, action_type: ACTION.SAVINGS_GOAL_CREATED, entity_type: ENTITY.SAVINGS_GOAL,
+      title: `New Goal: ${newTitle.trim()}`,
+      description: `Target: ${formatCurrency(target)}`,
+      icon: newIcon,
     });
   };
 
+  /* Open edit modal pre-filled */
+  const openEditModal = (goal: Goal) => {
+    setEditingGoal(goal);
+    setEditTitle(goal.title);
+    setEditTarget(String(goal.target_amount));
+    setEditIcon(goal.icon);
+    setShowEditModal(true);
+  };
+
+  /* Save edit */
+  const handleEditGoal = async () => {
+    if (!editingGoal || !userId) return;
+    if (!editTitle.trim()) { Alert.alert('Missing info', 'Please enter a goal name.'); return; }
+    const target = parseFloat(editTarget);
+    if (!target || target <= 0) { Alert.alert('Missing info', 'Please enter a valid target amount.'); return; }
+    if (target < editingGoal.current_amount) {
+      Alert.alert('Invalid target', `Target can't be less than the amount already saved (${formatCurrency(editingGoal.current_amount)}).`);
+      return;
+    }
+
+    setEditSaving(true);
+
+    // Check if this edit makes the goal complete
+    const isNowComplete = editingGoal.current_amount >= target;
+
+    const { error } = await supabase
+      .from('savings_goals')
+      .update({
+        title:         editTitle.trim(),
+        icon:          editIcon,
+        target_amount: target,
+        is_completed:  isNowComplete,
+        is_archived:   isNowComplete,
+        completed_at:  isNowComplete ? new Date().toISOString() : editingGoal.completed_at,
+      })
+      .eq('id', editingGoal.id);
+
+    setEditSaving(false);
+    if (error) { Alert.alert('Error', error.message); return; }
+
+    // Build change description
+    const changes: string[] = [];
+    if (editTitle.trim() !== editingGoal.title)           changes.push(`Name → "${editTitle.trim()}"`);
+    if (target          !== editingGoal.target_amount)    changes.push(`Target → ${formatCurrency(target)}`);
+    if (editIcon        !== editingGoal.icon)             changes.push('Icon changed');
+
+    setShowEditModal(false);
+    setEditingGoal(null);
+    fetchGoals(userId);
+
+    logActivity({
+      user_id:     userId,
+      action_type: ACTION.SAVINGS_GOAL_UPDATED,
+      entity_type: ENTITY.SAVINGS_GOAL,
+      title:       `Goal Updated: ${editTitle.trim()}`,
+      description: changes.length > 0 ? changes.join(' · ') : 'Goal details updated',
+      icon:        editIcon,
+    });
+
+    if (isNowComplete && !editingGoal.is_completed) {
+      setTimeout(() => {
+        Alert.alert('Goal Achieved!', `"${editTitle.trim()}" has reached its target!`);
+      }, 400);
+    }
+  };
+
+  /* Add funds */
   const handleAddFunds = async () => {
     if (!selectedGoal || !userId) return;
     const amount = parseFloat(fundsAmount);
@@ -139,15 +237,15 @@ export default function SavingsGoalsScreen() {
       .from('savings_goals')
       .update({
         current_amount: newCurrent,
-        is_completed: isComplete,
-        is_archived: isComplete,
-        completed_at: isComplete ? new Date().toISOString() : null,
+        is_completed:   isComplete,
+        is_archived:    isComplete,
+        completed_at:   isComplete ? new Date().toISOString() : null,
       })
       .eq('id', selectedGoal.id);
     setAddingFunds(false);
-
     if (error) { Alert.alert('Error', error.message); return; }
 
+    const goal = selectedGoal;
     setShowFundsModal(false);
     setFundsAmount('');
     setSelectedGoal(null);
@@ -155,50 +253,39 @@ export default function SavingsGoalsScreen() {
 
     if (isComplete) {
       logActivity({
-        user_id:     userId,
-        action_type: ACTION.SAVINGS_GOAL_COMPLETED,
-        entity_type: ENTITY.SAVINGS_GOAL,
-        title:       `Goal Achieved: ${selectedGoal.title}`,
-        description: `Target of ₱${selectedGoal.target_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} reached!`,
-        icon:        selectedGoal.icon,
+        user_id: userId, action_type: ACTION.SAVINGS_GOAL_COMPLETED, entity_type: ENTITY.SAVINGS_GOAL,
+        title: `Goal Achieved: ${goal.title}`,
+        description: `Target of ${formatCurrency(goal.target_amount)} reached!`,
+        icon: goal.icon,
       });
+      setTimeout(() => {
+        Alert.alert('Goal Achieved!', `Congratulations! You have reached your "${goal.title}" savings goal!`);
+      }, 400);
     } else {
       logActivity({
-        user_id:     userId,
-        action_type: ACTION.SAVINGS_GOAL_FUNDED,
-        entity_type: ENTITY.SAVINGS_GOAL,
-        title:       `Goal Funded: ${selectedGoal.title}`,
-        description: `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} added · ₱${newCurrent.toLocaleString('en-PH', { minimumFractionDigits: 2 })} of ₱${selectedGoal.target_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`,
-        icon:        selectedGoal.icon,
+        user_id: userId, action_type: ACTION.SAVINGS_GOAL_FUNDED, entity_type: ENTITY.SAVINGS_GOAL,
+        title: `Goal Funded: ${goal.title}`,
+        description: `${formatCurrency(amount)} added · ${formatCurrency(newCurrent)} of ${formatCurrency(goal.target_amount)}`,
+        icon: goal.icon,
       });
-    }
-
-    if (isComplete) {
-      setTimeout(() => {
-        Alert.alert('Goal Achieved!', `Congratulations! You have reached your "${selectedGoal.title}" savings goal!`);
-      }, 400);
     }
   };
 
   const openAddModal = () => {
-    setNewTitle('');
-    setNewTarget('');
-    setNewIcon('wallet-outline');
+    setNewTitle(''); setNewTarget(''); setNewIcon('wallet-outline');
     setShowAddModal(true);
   };
 
   const openFundsModal = (goal: Goal) => {
-    setSelectedGoal(goal);
-    setFundsAmount('');
-    setShowFundsModal(true);
+    setSelectedGoal(goal); setFundsAmount(''); setShowFundsModal(true);
   };
 
-  // ── Derived ───────────────────────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
   const activeGoals    = goals.filter(g => !g.is_completed && !g.is_archived);
   const completedGoals = goals.filter(g => g.is_completed || g.is_archived);
   const displayedGoals = activeTab === 'Active' ? activeGoals : completedGoals;
 
-  // ── Render ────────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
       <StatusBar style={theme.statusBar} />
@@ -223,9 +310,7 @@ export default function SavingsGoalsScreen() {
             onPress={() => setActiveTab(tab)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabPillText, activeTab === tab && styles.tabPillTextActive]}>
-              {tab}
-            </Text>
+            <Text style={[styles.tabPillText, activeTab === tab && styles.tabPillTextActive]}>{tab}</Text>
             {tab === 'Completed' && completedGoals.length > 0 && (
               <View style={[styles.countBadge, activeTab === tab && styles.countBadgeActive]}>
                 <Text style={[styles.countBadgeText, activeTab === tab && styles.countBadgeTextActive]}>
@@ -237,7 +322,7 @@ export default function SavingsGoalsScreen() {
         ))}
       </View>
 
-      {/* Content Area */}
+      {/* Content */}
       <View style={[styles.content, { backgroundColor: theme.cardBg }]}>
         {loading ? (
           <ActivityIndicator color="#3ECBA8" size="large" style={{ marginTop: 60 }} />
@@ -245,16 +330,13 @@ export default function SavingsGoalsScreen() {
           <View style={styles.emptyState}>
             <Ionicons
               name={activeTab === 'Active' ? 'flag-outline' : 'checkmark-circle-outline'}
-              size={52}
-              color={theme.divider}
+              size={52} color={theme.divider}
             />
             <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
               {activeTab === 'Active' ? 'No active goals yet' : 'No completed goals'}
             </Text>
             <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-              {activeTab === 'Active'
-                ? 'Tap + to create your first savings goal'
-                : 'Keep saving to reach your goals!'}
+              {activeTab === 'Active' ? 'Tap + to create your first savings goal' : 'Keep saving to reach your goals!'}
             </Text>
             {activeTab === 'Active' && (
               <TouchableOpacity style={styles.emptyAddBtn} onPress={openAddModal} activeOpacity={0.8}>
@@ -265,9 +347,7 @@ export default function SavingsGoalsScreen() {
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent}>
             {displayedGoals.map((goal) => {
-              const pct = goal.target_amount > 0
-                ? Math.min(100, (goal.current_amount / goal.target_amount) * 100)
-                : 0;
+              const pct         = goal.target_amount > 0 ? Math.min(100, (goal.current_amount / goal.target_amount) * 100) : 0;
               const isCompleted = goal.is_completed || goal.is_archived;
 
               return (
@@ -297,12 +377,10 @@ export default function SavingsGoalsScreen() {
                     </Text>
 
                     <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
-                      <View
-                        style={[
-                          styles.progressFill,
-                          { width: `${pct}%` as any, backgroundColor: isCompleted ? '#3ECBA8' : '#4895EF' },
-                        ]}
-                      />
+                      <View style={[
+                        styles.progressFill,
+                        { width: `${pct}%` as any, backgroundColor: isCompleted ? '#3ECBA8' : '#4895EF' },
+                      ]} />
                     </View>
 
                     <Text style={[styles.pctText, { color: theme.textMuted }]}>
@@ -312,15 +390,24 @@ export default function SavingsGoalsScreen() {
                     </Text>
                   </View>
 
-                  {/* Add funds button */}
+                  {/* Action buttons — only for active goals */}
                   {!isCompleted && (
-                    <TouchableOpacity
-                      style={styles.addFundsBtn}
-                      onPress={() => openFundsModal(goal)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="add-circle" size={30} color="#3ECBA8" />
-                    </TouchableOpacity>
+                    <View style={styles.actionBtns}>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => openEditModal(goal)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="pencil-outline" size={20} color={theme.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionBtn}
+                        onPress={() => openFundsModal(goal)}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="add-circle" size={30} color="#3ECBA8" />
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               );
@@ -329,12 +416,9 @@ export default function SavingsGoalsScreen() {
         )}
       </View>
 
-      {/* ── Add Goal Modal ──────────────────────────────────────────────────── */}
+      {/* ── Add Goal Modal ─────────────────────────────────────────────────── */}
       <Modal visible={showAddModal} animationType="slide" transparent statusBarTranslucent>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowAddModal(false)} />
           <View style={[styles.modalSheet, { backgroundColor: theme.modalBg }]}>
             <View style={[styles.modalHandle, { backgroundColor: theme.divider }]} />
@@ -343,52 +427,26 @@ export default function SavingsGoalsScreen() {
             <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Goal Name</Text>
             <TextInput
               style={[styles.input, { backgroundColor: theme.inputBg, color: theme.textPrimary, borderColor: theme.inputBorder }]}
-              placeholder="e.g. Buy a Car"
-              placeholderTextColor={theme.textMuted}
-              value={newTitle}
-              onChangeText={setNewTitle}
+              placeholder="e.g. Buy a Car" placeholderTextColor={theme.textMuted}
+              value={newTitle} onChangeText={setNewTitle}
             />
 
             <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Target Amount (₱)</Text>
             <TextInput
               style={[styles.input, { backgroundColor: theme.inputBg, color: theme.textPrimary, borderColor: theme.inputBorder }]}
-              placeholder="0.00"
-              placeholderTextColor={theme.textMuted}
-              value={newTarget}
-              onChangeText={setNewTarget}
-              keyboardType="decimal-pad"
+              placeholder="0.00" placeholderTextColor={theme.textMuted}
+              value={newTarget} onChangeText={setNewTarget} keyboardType="decimal-pad"
             />
 
             <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon</Text>
-            <View style={styles.iconGrid}>
-              {ICON_OPTIONS.map(icon => (
-                <TouchableOpacity
-                  key={icon}
-                  style={[
-                    styles.iconOption,
-                    { backgroundColor: theme.inputBg, borderColor: theme.inputBorder },
-                    newIcon === icon && styles.iconOptionActive,
-                  ]}
-                  onPress={() => setNewIcon(icon)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name={icon as any} size={20} color={newIcon === icon ? '#fff' : theme.textSecondary} />
-                </TouchableOpacity>
-              ))}
-            </View>
+            <IconPicker selected={newIcon} onSelect={setNewIcon} theme={theme} />
 
             <TouchableOpacity
               style={[styles.primaryBtn, saving && { opacity: 0.6 }]}
-              onPress={handleSaveGoal}
-              disabled={saving}
-              activeOpacity={0.85}
+              onPress={handleSaveGoal} disabled={saving} activeOpacity={0.85}
             >
-              {saving
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.primaryBtnText}>Create Goal</Text>
-              }
+              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create Goal</Text>}
             </TouchableOpacity>
-
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddModal(false)}>
               <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
@@ -396,12 +454,59 @@ export default function SavingsGoalsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ── Add Funds Modal ─────────────────────────────────────────────────── */}
+      {/* ── Edit Goal Modal ────────────────────────────────────────────────── */}
+      <Modal visible={showEditModal} animationType="slide" transparent statusBarTranslucent>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowEditModal(false)} />
+          <View style={[styles.modalSheet, { backgroundColor: theme.modalBg }]}>
+            <View style={[styles.modalHandle, { backgroundColor: theme.divider }]} />
+
+            {/* Modal header row */}
+            <View style={styles.editModalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.textPrimary, marginBottom: 0 }]}>Edit Goal</Text>
+              {editingGoal && (
+                <View style={[styles.editCurrentBadge, { backgroundColor: theme.surface }]}>
+                  <Text style={[styles.editCurrentLabel, { color: theme.textMuted }]}>Saved</Text>
+                  <Text style={[styles.editCurrentValue, { color: theme.textPrimary }]}>
+                    {formatCurrency(editingGoal.current_amount)}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Goal Name</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBg, color: theme.textPrimary, borderColor: theme.inputBorder }]}
+              placeholder="e.g. Buy a Car" placeholderTextColor={theme.textMuted}
+              value={editTitle} onChangeText={setEditTitle}
+            />
+
+            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Target Amount (₱)</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: theme.inputBg, color: theme.textPrimary, borderColor: theme.inputBorder }]}
+              placeholder="0.00" placeholderTextColor={theme.textMuted}
+              value={editTarget} onChangeText={setEditTarget} keyboardType="decimal-pad"
+            />
+
+            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon</Text>
+            <IconPicker selected={editIcon} onSelect={setEditIcon} theme={theme} />
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, editSaving && { opacity: 0.6 }]}
+              onPress={handleEditGoal} disabled={editSaving} activeOpacity={0.85}
+            >
+              {editSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Save Changes</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditModal(false)}>
+              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* ── Add Funds Modal ────────────────────────────────────────────────── */}
       <Modal visible={showFundsModal} animationType="slide" transparent statusBarTranslucent>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowFundsModal(false)} />
           <View style={[styles.modalSheet, { backgroundColor: theme.modalBg }]}>
             <View style={[styles.modalHandle, { backgroundColor: theme.divider }]} />
@@ -409,7 +514,6 @@ export default function SavingsGoalsScreen() {
 
             {selectedGoal && (
               <>
-                {/* Goal summary */}
                 <View style={[styles.goalSummary, { backgroundColor: theme.surface }]}>
                   <View style={styles.goalIcon}>
                     <Ionicons name={selectedGoal.icon as any} size={20} color="#fff" />
@@ -420,25 +524,16 @@ export default function SavingsGoalsScreen() {
                       {formatCurrency(selectedGoal.current_amount)} / {formatCurrency(selectedGoal.target_amount)}
                     </Text>
                   </View>
-                  <Text style={[styles.pctBadge, { color: '#3ECBA8' }]}>
+                  <Text style={styles.pctBadge}>
                     {Math.min(100, (selectedGoal.current_amount / selectedGoal.target_amount) * 100).toFixed(0)}%
                   </Text>
                 </View>
-
-                {/* Progress bar */}
                 <View style={[styles.progressTrack, { backgroundColor: theme.divider, marginBottom: 4 }]}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: `${Math.min(100, (selectedGoal.current_amount / selectedGoal.target_amount) * 100)}%` as any,
-                        backgroundColor: '#4895EF',
-                      },
-                    ]}
-                  />
+                  <View style={[
+                    styles.progressFill,
+                    { width: `${Math.min(100, (selectedGoal.current_amount / selectedGoal.target_amount) * 100)}%` as any, backgroundColor: '#4895EF' },
+                  ]} />
                 </View>
-
-                {/* Remaining hint */}
                 {selectedGoal.current_amount < selectedGoal.target_amount && (
                   <Text style={[styles.remainingHint, { color: theme.textMuted }]}>
                     {formatCurrency(selectedGoal.target_amount - selectedGoal.current_amount)} remaining to goal
@@ -450,26 +545,16 @@ export default function SavingsGoalsScreen() {
             <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: 16 }]}>Amount to Add (₱)</Text>
             <TextInput
               style={[styles.input, { backgroundColor: theme.inputBg, color: theme.textPrimary, borderColor: theme.inputBorder }]}
-              placeholder="0.00"
-              placeholderTextColor={theme.textMuted}
-              value={fundsAmount}
-              onChangeText={setFundsAmount}
-              keyboardType="decimal-pad"
-              autoFocus
+              placeholder="0.00" placeholderTextColor={theme.textMuted}
+              value={fundsAmount} onChangeText={setFundsAmount} keyboardType="decimal-pad" autoFocus
             />
 
             <TouchableOpacity
               style={[styles.primaryBtn, addingFunds && { opacity: 0.6 }]}
-              onPress={handleAddFunds}
-              disabled={addingFunds}
-              activeOpacity={0.85}
+              onPress={handleAddFunds} disabled={addingFunds} activeOpacity={0.85}
             >
-              {addingFunds
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.primaryBtnText}>Add Funds</Text>
-              }
+              {addingFunds ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Add Funds</Text>}
             </TouchableOpacity>
-
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowFundsModal(false)}>
               <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
@@ -482,301 +567,110 @@ export default function SavingsGoalsScreen() {
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
 
-  // ── Header ────────────────────────────────────────────────────────────────────
+  // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14,
   },
-  headerTitle: {
-    fontFamily: Font.headerBold,
-    fontSize: 20,
-    color: '#fff',
-    letterSpacing: 0.2,
-  },
+  headerTitle: { fontFamily: Font.headerBold, fontSize: 20, color: '#fff', letterSpacing: 0.2 },
   iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center',
   },
 
-  // ── Tab Pills ─────────────────────────────────────────────────────────────────
-  tabRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    gap: 10,
-    paddingBottom: 18,
-  },
+  // Tabs
+  tabRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, paddingBottom: 18 },
   tabPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    gap: 6,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.12)', gap: 6,
   },
-  tabPillActive: {
-    backgroundColor: '#3ECBA8',
-  },
-  tabPillText: {
-    fontFamily: Font.bodyMedium,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  tabPillTextActive: {
-    fontFamily: Font.bodySemiBold,
-    color: '#fff',
-  },
+  tabPillActive:          { backgroundColor: '#3ECBA8' },
+  tabPillText:            { fontFamily: Font.bodyMedium, fontSize: 13, color: 'rgba(255,255,255,0.7)' },
+  tabPillTextActive:      { fontFamily: Font.bodySemiBold, color: '#fff' },
   countBadge: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
+    minWidth: 18, height: 18, borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
   },
-  countBadgeActive: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  countBadgeText: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  countBadgeTextActive: {
-    color: '#fff',
-  },
+  countBadgeActive:     { backgroundColor: 'rgba(255,255,255,0.3)' },
+  countBadgeText:       { fontFamily: Font.bodySemiBold, fontSize: 10, color: 'rgba(255,255,255,0.8)' },
+  countBadgeTextActive: { color: '#fff' },
 
-  // ── Content ───────────────────────────────────────────────────────────────────
-  content: {
-    flex: 1,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    overflow: 'hidden',
-  },
-  listContent: {
-    padding: 20,
-    paddingBottom: 40,
-    gap: 14,
-  },
+  // Content
+  content: { flex: 1, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
+  listContent: { padding: 20, paddingBottom: 40, gap: 14 },
 
-  // ── Goal Card ─────────────────────────────────────────────────────────────────
+  // Goal card
   goalCard: {
-    borderRadius: 18,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
+    borderRadius: 18, padding: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
   },
   goalIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#4895EF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: '#4895EF', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  goalIconCompleted: {
-    backgroundColor: '#3ECBA8',
-  },
-  goalInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  goalTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  goalTitle: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 15,
-    flex: 1,
-  },
+  goalIconCompleted: { backgroundColor: '#3ECBA8' },
+  goalInfo:          { flex: 1, gap: 4 },
+  goalTitleRow:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  goalTitle:         { fontFamily: Font.bodySemiBold, fontSize: 15, flex: 1 },
   doneBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(62,203,168,0.12)',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: 'rgba(62,203,168,0.12)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
   },
-  doneBadgeText: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 10,
-    color: '#3ECBA8',
-  },
-  goalAmounts: {
-    fontFamily: Font.bodyMedium,
-    fontSize: 13,
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginTop: 2,
-  },
-  progressFill: {
-    height: 6,
-    borderRadius: 3,
-  },
-  pctText: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 11,
-    marginTop: 2,
-  },
-  addFundsBtn: {
-    padding: 2,
-    flexShrink: 0,
-  },
+  doneBadgeText:  { fontFamily: Font.bodySemiBold, fontSize: 10, color: '#3ECBA8' },
+  goalAmounts:    { fontFamily: Font.bodyMedium, fontSize: 13 },
+  progressTrack:  { height: 6, borderRadius: 3, overflow: 'hidden', marginTop: 2 },
+  progressFill:   { height: 6, borderRadius: 3 },
+  pctText:        { fontFamily: Font.bodyRegular, fontSize: 11, marginTop: 2 },
 
-  // ── Empty State ───────────────────────────────────────────────────────────────
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-    gap: 10,
-  },
-  emptyTitle: {
-    fontFamily: Font.headerBold,
-    fontSize: 18,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  emptySubtitle: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  emptyAddBtn: {
-    marginTop: 8,
-    backgroundColor: '#3ECBA8',
-    borderRadius: 50,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  emptyAddBtnText: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 14,
-    color: '#fff',
-  },
+  // Action buttons column (edit + add funds)
+  actionBtns: { flexShrink: 0, alignItems: 'center', gap: 6 },
+  actionBtn:  { padding: 4 },
 
-  // ── Modals ────────────────────────────────────────────────────────────────────
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  modalSheet: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontFamily: Font.headerBold,
-    fontSize: 20,
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontFamily: Font.bodyMedium,
-    fontSize: 13,
-    marginBottom: 6,
-  },
+  // Empty state
+  emptyState:     { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 10 },
+  emptyTitle:     { fontFamily: Font.headerBold, fontSize: 18, textAlign: 'center', marginTop: 8 },
+  emptySubtitle:  { fontFamily: Font.bodyRegular, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  emptyAddBtn:    { marginTop: 8, backgroundColor: '#3ECBA8', borderRadius: 50, paddingHorizontal: 24, paddingVertical: 12 },
+  emptyAddBtnText:{ fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff' },
+
+  // Modals
+  modalOverlay:  { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalSheet:    { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
+  modalHandle:   { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  modalTitle:    { fontFamily: Font.headerBold, fontSize: 20, marginBottom: 20 },
+  inputLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, marginBottom: 6 },
   input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontFamily: Font.bodyRegular,
-    fontSize: 15,
-    marginBottom: 16,
+    borderWidth: 1, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    fontFamily: Font.bodyRegular, fontSize: 15, marginBottom: 16,
   },
 
-  // ── Icon Grid ─────────────────────────────────────────────────────────────────
-  iconGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
+  // Edit modal header
+  editModalHeader: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: 20,
   },
-  iconOption: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconOptionActive: {
-    backgroundColor: '#3ECBA8',
-    borderColor: '#3ECBA8',
-  },
+  editCurrentBadge: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'flex-end' },
+  editCurrentLabel: { fontFamily: Font.bodyRegular, fontSize: 10 },
+  editCurrentValue: { fontFamily: Font.headerBold, fontSize: 15 },
 
-  // ── Buttons ───────────────────────────────────────────────────────────────────
-  primaryBtn: {
-    backgroundColor: '#3ECBA8',
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  primaryBtnText: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 16,
-    color: '#fff',
-  },
-  cancelBtn: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  cancelBtnText: {
-    fontFamily: Font.bodyMedium,
-    fontSize: 14,
-  },
+  // Icon grid
+  iconGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  iconOption:     { width: 44, height: 44, borderRadius: 12, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  iconOptionActive:{ backgroundColor: '#3ECBA8', borderColor: '#3ECBA8' },
 
-  // ── Add Funds extras ──────────────────────────────────────────────────────────
-  goalSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 14,
-    padding: 12,
-    gap: 12,
-    marginBottom: 12,
-  },
-  pctBadge: {
-    fontFamily: Font.headerBold,
-    fontSize: 16,
-  },
-  remainingHint: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 12,
-    marginBottom: 4,
-  },
+  // Buttons
+  primaryBtn:     { backgroundColor: '#3ECBA8', borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
+  primaryBtnText: { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
+  cancelBtn:      { alignItems: 'center', paddingVertical: 10 },
+  cancelBtnText:  { fontFamily: Font.bodyMedium, fontSize: 14 },
+
+  // Funds modal extras
+  goalSummary:    { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 12, gap: 12, marginBottom: 12 },
+  pctBadge:       { fontFamily: Font.headerBold, fontSize: 16, color: '#3ECBA8' },
+  remainingHint:  { fontFamily: Font.bodyRegular, fontSize: 12, marginBottom: 4 },
 });

@@ -55,6 +55,7 @@ const LOG_ONLY_ACTIONS = [
   'INCOME_CATEGORY_ARCHIVED',
   'EXPENSE_CATEGORY_CREATED',
   'EXPENSE_CATEGORY_ARCHIVED',
+  'SAVINGS_GOAL_UPDATED',
   'SAVINGS_GOAL_FUNDED',
 ];
 
@@ -111,6 +112,7 @@ function actionLabel(actionType: string): string {
     EXPENSE_UPDATED:           'Expense Updated',
     EXPENSE_CATEGORY_ARCHIVED: 'Category Archived',
     SAVINGS_GOAL_CREATED:      'Goal Created',
+    SAVINGS_GOAL_UPDATED:      'Goal Updated',
     SAVINGS_GOAL_FUNDED:       'Goal Funded',
     SAVINGS_GOAL_COMPLETED:    'Goal Achieved',
   };
