@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
 import DatePickerModal from '@/components/DatePickerModal';
 import ConfirmModal from '@/components/ConfirmModal';
+import SlideTabBar from '@/components/SlideTabBar';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
@@ -61,8 +62,7 @@ type Screen =
   | { name: 'categories' }
   | { name: 'detail';   categoryId: string }
   | { name: 'add';      prefillCategoryId?: string }
-  | { name: 'edit';     incomeId: string }
-  | { name: 'archived' };
+  | { name: 'edit';     incomeId: string };
 
 type IncomeFormValues = {
   date: string;
@@ -353,44 +353,73 @@ function NewCategoryModal({
 
 // ── CategoriesScreen ──────────────────────────────────────────────────────────
 function CategoriesScreen({
-  categories, income, totalIncome, onSelectCategory, onAddCategory, onViewArchived, theme,
+  categories, income, totalIncome, onSelectCategory, onAddCategory, onRestore, theme,
 }: {
   categories: Category[]; income: IncomeSource[]; totalIncome: number;
   onSelectCategory: (id: string) => void; onAddCategory: () => void;
-  onViewArchived: () => void; theme: Theme;
+  onRestore: (id: string) => void; theme: Theme;
 }) {
-  const active   = categories.filter(c => !c.isArchived);
-  const bodyAnim = useEntranceAnim();
+  const [tab, setTab]   = useState<'Active' | 'Archived'>('Active');
+  const active          = categories.filter(c => !c.isArchived);
+  const archived        = categories.filter(c => c.isArchived);
+  const bodyAnim        = useEntranceAnim();
 
   return (
     <>
       <BalanceHeader title="Income Sources" totalIncome={totalIncome} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
+        <SlideTabBar
+          tabs={['Active', 'Archived']}
+          active={tab}
+          onChange={(t) => setTab(t as 'Active' | 'Archived')}
+          trackColor={theme.isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0'}
+          activeColor="#1B7A4A"
+          inactiveTextColor={theme.textMuted as string}
+          style={{ marginHorizontal: 20, marginTop: 16, marginBottom: 4 }}
+        />
         <ScrollView style={[s.white, { backgroundColor: theme.cardBg }]} contentContainerStyle={s.whiteContent} showsVerticalScrollIndicator={false}>
-          <View style={s.grid}>
-            {active.map(cat => {
-              const count = income.filter(i => i.categoryId === cat.id && !i.isArchived).length;
-              return (
-                <TouchableOpacity key={cat.id} style={s.catCard} onPress={() => onSelectCategory(cat.id)} activeOpacity={0.85}>
-                  <View style={s.catIcon}>
-                    <Ionicons name={cat.icon} size={28} color="#fff" />
+          {tab === 'Active' ? (
+            <View style={s.grid}>
+              {active.map(cat => {
+                const count = income.filter(i => i.categoryId === cat.id && !i.isArchived).length;
+                return (
+                  <TouchableOpacity key={cat.id} style={s.catCard} onPress={() => onSelectCategory(cat.id)} activeOpacity={0.85}>
+                    <View style={s.catIcon}>
+                      <Ionicons name={cat.icon} size={28} color="#fff" />
+                    </View>
+                    <Text style={[s.catLabel, { color: theme.textPrimary }]}>{cat.label}</Text>
+                    {count > 0 && <Text style={[s.catCount, { color: theme.textMuted }]}>{count} item{count !== 1 ? 's' : ''}</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+              <TouchableOpacity style={s.catCard} onPress={onAddCategory} activeOpacity={0.85}>
+                <View style={[s.catIcon, s.catIconMore]}>
+                  <Ionicons name="add" size={32} color="#115533" />
+                </View>
+                <Text style={[s.catLabel, { color: theme.textPrimary }]}>More</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {archived.length === 0 && (
+                <View style={s.empty}>
+                  <Ionicons name="archive-outline" size={48} color="#D0D0D0" />
+                  <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No archived categories</Text>
+                </View>
+              )}
+              {archived.map((cat, idx) => (
+                <View key={cat.id} style={[s.archiveRow, idx < archived.length - 1 && s.archiveRowBorder, idx < archived.length - 1 && { borderBottomColor: theme.divider }]}>
+                  <View style={s.incIcon}>
+                    <Ionicons name={cat.icon} size={20} color="#fff" />
                   </View>
-                  <Text style={[s.catLabel, { color: theme.textPrimary }]}>{cat.label}</Text>
-                  {count > 0 && <Text style={[s.catCount, { color: theme.textMuted }]}>{count} item{count !== 1 ? 's' : ''}</Text>}
-                </TouchableOpacity>
-              );
-            })}
-            <TouchableOpacity style={s.catCard} onPress={onAddCategory} activeOpacity={0.85}>
-              <View style={[s.catIcon, s.catIconMore]}>
-                <Ionicons name="add" size={32} color="#115533" />
-              </View>
-              <Text style={[s.catLabel, { color: theme.textPrimary }]}>More</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity style={s.archivedLink} onPress={onViewArchived} activeOpacity={0.8}>
-            <Ionicons name="archive-outline" size={15} color="#4A8A6A" />
-            <Text style={s.archivedLinkTxt}> View Archived Income Sources</Text>
-          </TouchableOpacity>
+                  <Text style={[s.incTitle, { flex: 1, color: theme.textPrimary }]}>{cat.label}</Text>
+                  <TouchableOpacity style={s.restoreBtn} onPress={() => onRestore(cat.id)} activeOpacity={0.75}>
+                    <Text style={s.restoreTxt}>Restore</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
         </ScrollView>
       </Animated.View>
     </>
@@ -594,44 +623,6 @@ function IncomeFormScreen({
         onSelect={id => set('categoryId', id)} onClose={() => setCat(false)} theme={theme}
       />
       <PickerSheet visible={showFreqPicker} title="Set Frequency" options={FREQUENCIES} selected={vals.frequency} onSelect={f => set('frequency', f)} onClose={() => setFreq(false)} theme={theme} />
-    </>
-  );
-}
-
-// ── ArchivedScreen ────────────────────────────────────────────────────────────
-function ArchivedScreen({
-  categories, totalIncome, onBack, onRestore, theme,
-}: {
-  categories: Category[]; totalIncome: number;
-  onBack: () => void; onRestore: (id: string) => void; theme: Theme;
-}) {
-  const archived = categories.filter(c => c.isArchived);
-  const bodyAnim = useEntranceAnim();
-
-  return (
-    <>
-      <BalanceHeader title="Archived Income Sources" totalIncome={totalIncome} onBack={onBack} theme={theme} />
-      <Animated.View style={[{ flex: 1 }, bodyAnim]}>
-        <ScrollView style={[s.white, { backgroundColor: theme.cardBg }]} contentContainerStyle={s.whiteContent} showsVerticalScrollIndicator={false}>
-          {archived.length === 0 && (
-            <View style={s.empty}>
-              <Ionicons name="archive-outline" size={48} color="#D0D0D0" />
-              <Text style={[s.emptyTxt, { color: theme.textMuted }]}>No archived categories</Text>
-            </View>
-          )}
-          {archived.map((cat, idx) => (
-            <View key={cat.id} style={[s.archiveRow, idx < archived.length - 1 && s.archiveRowBorder, idx < archived.length - 1 && { borderBottomColor: theme.divider }]}>
-              <View style={s.incIcon}>
-                <Ionicons name={cat.icon} size={20} color="#fff" />
-              </View>
-              <Text style={[s.incTitle, { flex: 1, color: theme.textPrimary }]}>{cat.label}</Text>
-              <TouchableOpacity style={s.restoreBtn} onPress={() => onRestore(cat.id)} activeOpacity={0.75}>
-                <Text style={s.restoreTxt}>Restore</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </ScrollView>
-      </Animated.View>
     </>
   );
 }
@@ -894,7 +885,7 @@ export default function IncomeSourcesScreen() {
             categories={categories} income={income} totalIncome={totalIncome}
             onSelectCategory={id => setScreen({ name: 'detail', categoryId: id })}
             onAddCategory={() => setShowNewCat(true)}
-            onViewArchived={() => setScreen({ name: 'archived' })}
+            onRestore={handleRestore}
             theme={theme}
           />
         );
@@ -937,14 +928,6 @@ export default function IncomeSourcesScreen() {
         );
       }
 
-      case 'archived':
-        return (
-          <ArchivedScreen
-            categories={categories} totalIncome={totalIncome}
-            onBack={() => setScreen({ name: 'categories' })}
-            onRestore={handleRestore} theme={theme}
-          />
-        );
     }
   };
 
@@ -988,9 +971,6 @@ const s = StyleSheet.create({
   catIconMore: { backgroundColor: 'rgba(17,85,51,0.12)' },
   catLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, color: '#1A1A1A', textAlign: 'center' },
   catCount:    { fontFamily: Font.bodyRegular, fontSize: 11, color: '#888', marginTop: 2 },
-
-  archivedLink:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
-  archivedLinkTxt: { fontFamily: Font.bodyMedium, fontSize: 13, color: '#4A8A6A' },
 
   monthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   monthLabel:  { fontFamily: Font.headerBold, fontSize: 16, color: '#1A1A1A' },

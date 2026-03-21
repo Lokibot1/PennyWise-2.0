@@ -13,6 +13,7 @@ import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import ConfirmModal from '@/components/ConfirmModal';
+import SlideTabBar from '@/components/SlideTabBar';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Goal = {
@@ -361,30 +362,16 @@ export default function SavingsGoalsScreen() {
       </View>
 
       {/* Tab Pills */}
-      <View style={styles.tabRow}>
-        {(['Active', 'Completed', 'Archived'] as const).map(tab => {
-          const count = tab === 'Completed' ? completedGoals.length
-            : tab === 'Archived' ? archivedGoals.length
-            : 0;
-          return (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
-              onPress={() => setActiveTab(tab)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.tabPillText, activeTab === tab && styles.tabPillTextActive]}>{tab}</Text>
-              {count > 0 && (
-                <View style={[styles.countBadge, activeTab === tab && styles.countBadgeActive]}>
-                  <Text style={[styles.countBadgeText, activeTab === tab && styles.countBadgeTextActive]}>
-                    {count}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      <SlideTabBar
+        tabs={['Active', 'Completed', 'Archived']}
+        active={activeTab}
+        onChange={(t) => setActiveTab(t as typeof activeTab)}
+        badge={{ Completed: completedGoals.length, Archived: archivedGoals.length }}
+        trackColor="rgba(255,255,255,0.15)"
+        activeColor="#3ECBA8"
+        inactiveTextColor="rgba(255,255,255,0.7)"
+        style={{ marginHorizontal: 20, marginBottom: 18 }}
+      />
 
       {/* Content */}
       <View style={[styles.content, { backgroundColor: theme.cardBg }]}>
@@ -768,24 +755,6 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center',
   },
-
-  // Tabs
-  tabRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, paddingBottom: 18 },
-  tabPill: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 18, paddingVertical: 8, borderRadius: 50,
-    backgroundColor: 'rgba(255,255,255,0.12)', gap: 6,
-  },
-  tabPillActive:          { backgroundColor: '#3ECBA8' },
-  tabPillText:            { fontFamily: Font.bodyMedium, fontSize: 13, color: 'rgba(255,255,255,0.7)' },
-  tabPillTextActive:      { fontFamily: Font.bodySemiBold, color: '#fff' },
-  countBadge: {
-    minWidth: 18, height: 18, borderRadius: 9,
-    backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
-  },
-  countBadgeActive:     { backgroundColor: 'rgba(255,255,255,0.3)' },
-  countBadgeText:       { fontFamily: Font.bodySemiBold, fontSize: 10, color: 'rgba(255,255,255,0.8)' },
-  countBadgeTextActive: { color: '#fff' },
 
   // Content
   content: { flex: 1, borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },

@@ -3,7 +3,6 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 
@@ -11,6 +10,7 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { HomeDashboardSkeleton, TransactionRowSkeleton } from '@/components/SkeletonLoader';
+import SlideTabBar from '@/components/SlideTabBar';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Period = 'Daily' | 'Weekly' | 'Monthly';
@@ -85,29 +85,6 @@ export default function HomeScreen() {
   const [loading, setLoading]                 = useState(true);
   const userIdRef = useRef<string | null>(null);
 
-  // Sliding period indicator
-  const [tabWidth, setTabWidth] = useState(0);
-  const tabWidthRef = useRef(0);
-  const indicatorX  = useSharedValue(0);
-
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: indicatorX.value }],
-  }));
-
-  const handlePeriodLayout = (width: number) => {
-    const w = (width - 8) / PERIODS.length;
-    tabWidthRef.current = w;
-    setTabWidth(w);
-    indicatorX.value = PERIODS.indexOf(activePeriod) * w;
-  };
-
-  const selectPeriod = (period: Period) => {
-    indicatorX.value = withSpring(PERIODS.indexOf(period) * tabWidthRef.current, {
-      damping: 18,
-      stiffness: 200,
-    });
-    setActivePeriod(period);
-  };
 
   // ── Data loading ───────────────────────────────────────────────────────────
   const loadDashboard = useCallback(async (userId: string) => {
@@ -451,30 +428,15 @@ export default function HomeScreen() {
           )}
 
           {/* Period Tabs */}
-          <View
-            style={[styles.periodTabs, { backgroundColor: theme.surface }]}
-            onLayout={(e) => handlePeriodLayout(e.nativeEvent.layout.width)}
-          >
-            <Animated.View
-              style={[styles.periodIndicator, { width: tabWidth }, indicatorStyle]}
-            />
-            {PERIODS.map((p) => (
-              <TouchableOpacity
-                key={p}
-                style={styles.periodTab}
-                onPress={() => selectPeriod(p)}
-                activeOpacity={0.8}
-              >
-                <Text style={[
-                  styles.periodTabText,
-                  activePeriod === p && styles.periodTabTextActive,
-                  { color: activePeriod === p ? '#fff' : theme.textSecondary },
-                ]}>
-                  {p}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <SlideTabBar
+            tabs={PERIODS}
+            active={activePeriod}
+            onChange={(p) => setActivePeriod(p as Period)}
+            trackColor={theme.surface as string}
+            activeColor="#1B7A4A"
+            inactiveTextColor={theme.textSecondary as string}
+            style={{ marginBottom: 20 }}
+          />
 
           {/* Transaction List */}
           <View>
@@ -776,38 +738,6 @@ const styles = StyleSheet.create({
   periodSummaryDivider: {
     width: 1,
     marginVertical: 2,
-  },
-
-  // ── Period Tabs ───────────────────────────────────────────────────────────────
-  periodTabs: {
-    flexDirection: 'row',
-    backgroundColor: '#F0F0F0',
-    borderRadius: 50,
-    padding: 4,
-    marginBottom: 20,
-  },
-  periodIndicator: {
-    position: 'absolute',
-    left: 4,
-    top: 4,
-    bottom: 4,
-    borderRadius: 50,
-    backgroundColor: '#1B7A4A',
-  },
-  periodTab: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 50,
-    alignItems: 'center',
-  },
-  periodTabText: {
-    fontFamily: Font.bodyMedium,
-    fontSize: 13,
-    color: '#888',
-  },
-  periodTabTextActive: {
-    fontFamily: Font.bodySemiBold,
-    color: '#fff',
   },
 
   // ── Transactions ──────────────────────────────────────────────────────────────
