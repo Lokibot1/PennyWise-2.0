@@ -5,7 +5,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
 import { StatusBar } from 'expo-status-bar';
 
 import { supabase } from '@/lib/supabase';
@@ -81,6 +82,16 @@ function IconPicker({
 export default function SavingsGoalsScreen() {
   const { theme } = useAppTheme();
   const [activeTab, setActiveTab] = useState<'Active' | 'Completed' | 'Archived'>('Active');
+
+  useFocusEffect(
+    useCallback(() => {
+      const target = getNavTarget();
+      if (!target || target.tab !== 'savings') return;
+      clearNavTarget();
+      if (target.goalTab) setActiveTab(target.goalTab);
+    }, []),
+  );
+
   const [goals, setGoals]         = useState<Goal[]>([]);
   const [loading, setLoading]     = useState(true);
   const [userId, setUserId]       = useState<string | null>(null);

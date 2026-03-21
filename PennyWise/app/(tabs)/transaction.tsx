@@ -23,6 +23,7 @@ import Animated, {
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
+import { setNavTarget } from '@/lib/activityNavTarget';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type FilterType = 'All' | 'Income' | 'Expenses' | 'Savings';
@@ -35,6 +36,7 @@ type ActivityItem = {
   description: string;
   icon: string;
   created_at: string;   // ISO string, used for sorting + display
+  category_id?: string; // only present for source-table items (income_sources, expenses)
 };
 
 type Section = {
@@ -164,14 +166,14 @@ async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
     // All income sources (including archived)
     supabase
       .from('income_sources')
-      .select('id, title, amount, created_at, is_archived, income_categories(label, icon)')
+      .select('id, title, amount, created_at, is_archived, income_categories(id, label, icon)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false }),
 
     // All expenses (including archived)
     supabase
       .from('expenses')
-      .select('id, title, amount, created_at, is_archived, expense_categories(label, icon)')
+      .select('id, title, amount, created_at, is_archived, expense_categories(id, label, icon)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false }),
 
@@ -205,6 +207,7 @@ async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
       description: `${fmtAmount(amt)} · ${cat?.label ?? 'Income'}${(r as any).is_archived ? ' · Archived' : ''}`,
       icon:        cat?.icon ?? 'cash-outline',
       created_at:  (r as any).created_at,
+      category_id: (cat as any)?.id,
     });
   }
 
@@ -220,6 +223,7 @@ async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
       description: `${fmtAmount(amt)} · ${cat?.label ?? 'Expense'}${(r as any).is_archived ? ' · Archived' : ''}`,
       icon:        cat?.icon ?? 'receipt-outline',
       created_at:  (r as any).created_at,
+      category_id: (cat as any)?.id,
     });
   }
 
@@ -297,6 +301,50 @@ function FilterChip({
   );
 }
 
+// ── Navigation helper ─────────────────────────────────────────────────────────
+function navigateToActivity(item: ActivityItem) {
+  const a = item.action_type;
+  const categoryId = item.category_id;
+
+  // ── Income ────────────────────────────────────────────────────────────────
+  if (item.entity_type === 'income_source' || item.entity_type === 'income_category') {
+    if (a === 'INCOME_SOURCE_ADDED' && categoryId) {
+      setNavTarget({ tab: 'income', categoryId, detailTab: 'Active' });
+    } else if (a === 'INCOME_CATEGORY_ARCHIVED') {
+      setNavTarget({ tab: 'income', catTab: 'Archived' });
+    } else {
+      setNavTarget({ tab: 'income', catTab: 'Active' });
+    }
+    router.push('/(tabs)/analytics' as any);
+    return;
+  }
+
+  // ── Expenses ──────────────────────────────────────────────────────────────
+  if (item.entity_type === 'expense' || item.entity_type === 'expense_category') {
+    if (a === 'EXPENSE_ADDED' && categoryId) {
+      setNavTarget({ tab: 'expense', categoryId, detailTab: 'Active' });
+    } else if (a === 'EXPENSE_CATEGORY_ARCHIVED') {
+      setNavTarget({ tab: 'expense', catTab: 'Archived' });
+    } else {
+      setNavTarget({ tab: 'expense', catTab: 'Active' });
+    }
+    router.push('/(tabs)/budget' as any);
+    return;
+  }
+
+  // ── Savings goals ─────────────────────────────────────────────────────────
+  if (item.entity_type === 'savings_goal') {
+    if (a === 'SAVINGS_GOAL_COMPLETED') {
+      setNavTarget({ tab: 'savings', goalTab: 'Completed' });
+    } else if (a === 'SAVINGS_GOAL_ARCHIVED') {
+      setNavTarget({ tab: 'savings', goalTab: 'Archived' });
+    } else {
+      setNavTarget({ tab: 'savings', goalTab: 'Active' });
+    }
+    router.push('/savings-goals' as any);
+  }
+}
+
 // ── Activity row ──────────────────────────────────────────────────────────────
 function ActivityRow({
   item, theme,
@@ -305,7 +353,11 @@ function ActivityRow({
 }) {
   const color = entityColor(item.entity_type, item.action_type);
   return (
-    <View style={[styles.activityItem, { borderBottomColor: theme.divider }]}>
+    <TouchableOpacity
+      style={[styles.activityItem, { borderBottomColor: theme.divider }]}
+      onPress={() => navigateToActivity(item)}
+      activeOpacity={0.75}
+    >
       <View style={[styles.iconCircle, { backgroundColor: color }]}>
         <Ionicons name={item.icon as any} size={18} color="#fff" />
       </View>
@@ -327,7 +379,8 @@ function ActivityRow({
           <Text style={[styles.actionBadgeText, { color }]}>{actionLabel(item.action_type)}</Text>
         </View>
       </View>
-    </View>
+      <Ionicons name="chevron-forward" size={16} color={theme.textMuted as string} style={{ marginLeft: 4 }} />
+    </TouchableOpacity>
   );
 }
 
@@ -608,7 +661,7 @@ const styles = StyleSheet.create({
 
   activityItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -621,7 +674,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    marginTop: 2,
   },
   activityInfo: { flex: 1, gap: 3 },
   activityTitleRow: {

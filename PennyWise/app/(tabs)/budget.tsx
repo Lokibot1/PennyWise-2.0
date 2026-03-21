@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { router } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
 import DatePickerModal from '@/components/DatePickerModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import SlideTabBar from '@/components/SlideTabBar';
@@ -447,18 +448,20 @@ function EditCategoryModal({
 // ── CategoriesScreen ──────────────────────────────────────────────────────────
 function CategoriesScreen({
   categories, expenses, totalExpenses,
+  initialTab,
   onSelectCategory, onAddCategory,
   onEditCategory, onArchiveCategory, onRestoreCategory, onDeleteCategory,
   theme,
 }: {
   categories: Category[]; expenses: ExpenseEntry[];
   totalExpenses: number;
+  initialTab?: 'Active' | 'Archived';
   onSelectCategory: (id: string) => void; onAddCategory: () => void;
   onEditCategory: (id: string) => void; onArchiveCategory: (id: string) => void;
   onRestoreCategory: (id: string) => void; onDeleteCategory: (id: string) => void;
   theme: Theme;
 }) {
-  const [tab, setTab]           = useState<'Active' | 'Archived'>('Active');
+  const [tab, setTab]           = useState<'Active' | 'Archived'>(initialTab ?? 'Active');
   const [kebabCatId, setKebabId] = useState<string | null>(null);
   const active                  = categories.filter(c => !c.isArchived);
   const archived                = categories.filter(c => c.isArchived);
@@ -587,15 +590,17 @@ function CategoriesScreen({
 // ── CategoryDetailScreen ──────────────────────────────────────────────────────
 function CategoryDetailScreen({
   category, expenses, totalExpenses,
+  initialTab,
   onBack, onAdd, onEditExpense, onArchiveExpense, onRestoreExpense, onDeleteExpense, theme,
 }: {
   category: Category; expenses: ExpenseEntry[];
   totalExpenses: number;
+  initialTab?: 'Active' | 'Archived';
   onBack: () => void; onAdd: () => void; onEditExpense: (id: string) => void;
   onArchiveExpense: (id: string) => void; onRestoreExpense: (id: string) => void;
   onDeleteExpense: (id: string) => void; theme: Theme;
 }) {
-  const [tab, setTab]           = useState<'Active' | 'Archived'>('Active');
+  const [tab, setTab]           = useState<'Active' | 'Archived'>(initialTab ?? 'Active');
   const [kebabExpId, setKebabId] = useState<string | null>(null);
 
   const catExpenses    = expenses.filter(e => e.categoryId === category.id);
@@ -952,6 +957,26 @@ export default function ManageExpenseScreen() {
   const [showNewCat,  setShowNewCat]  = useState(false);
   const [editCat,     setEditCat]     = useState<Category | null>(null);
   const [toast,       setToast]       = useState('');
+  const [catNavKey,    setCatNavKey]    = useState(0);
+  const [catNavTab,    setCatNavTab]    = useState<'Active' | 'Archived'>('Active');
+  const [detailNavTab, setDetailNavTab] = useState<'Active' | 'Archived'>('Active');
+
+  useFocusEffect(
+    useCallback(() => {
+      const target = getNavTarget();
+      if (!target || target.tab !== 'expense') return;
+      clearNavTarget();
+
+      if (target.categoryId) {
+        setDetailNavTab(target.detailTab ?? 'Active');
+        setScreen({ name: 'detail', categoryId: target.categoryId! });
+      } else {
+        setCatNavTab(target.catTab ?? 'Active');
+        setCatNavKey(k => k + 1);
+        setScreen({ name: 'categories' });
+      }
+    }, []),
+  );
 
   // ── Load from Supabase ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -1383,9 +1408,11 @@ export default function ManageExpenseScreen() {
       case 'categories':
         return (
           <CategoriesScreen
+            key={catNavKey}
             categories={categories}
             expenses={expenses}
             totalExpenses={totalExpenses}
+            initialTab={catNavTab}
             onSelectCategory={id => setScreen({ name: 'detail', categoryId: id })}
             onAddCategory={() => setShowNewCat(true)}
             onEditCategory={id => setEditCat(categories.find(c => c.id === id) ?? null)}
@@ -1404,6 +1431,7 @@ export default function ManageExpenseScreen() {
             category={cat}
             expenses={expenses}
             totalExpenses={totalExpenses}
+            initialTab={detailNavTab}
             onBack={() => setScreen({ name: 'categories' })}
             onAdd={() => setScreen({ name: 'add', prefillCategoryId: cat.id })}
             onEditExpense={id => setScreen({ name: 'edit', expenseId: id })}
