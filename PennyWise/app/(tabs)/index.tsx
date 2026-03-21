@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
+import { router } from 'expo-router';
 
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
@@ -132,6 +133,9 @@ export default function HomeScreen() {
           .from('savings_goals')
           .select('icon, title, target_amount, current_amount')
           .eq('user_id', userId)
+          .eq('is_completed', false)
+          .eq('is_archived', false)
+          .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
       ]);
@@ -264,14 +268,21 @@ export default function HomeScreen() {
               </View>
 
               {/* Savings Card */}
-              <View style={styles.savingsCard}>
+              <TouchableOpacity
+                style={styles.savingsCard}
+                onPress={() => router.push('/savings-goals')}
+                activeOpacity={0.85}
+              >
                 <View style={styles.savingsLeft}>
                   <View style={styles.donutRing}>
-                    <Ionicons name={(savingsGoal?.icon ?? 'car-outline') as any} size={26} color="#fff" />
+                    <Ionicons name={(savingsGoal?.icon ?? 'flag-outline') as any} size={26} color="#fff" />
                   </View>
                   <Text style={styles.savingsLabel}>
                     {savingsGoal?.title ?? 'Savings\nOn Goals'}
                   </Text>
+                  {!savingsGoal && (
+                    <Text style={styles.savingsTapHint}>Tap to set a goal</Text>
+                  )}
                 </View>
 
                 <View style={styles.savingsDivider} />
@@ -294,7 +305,7 @@ export default function HomeScreen() {
                     </View>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
             </>
           )}
         </View>
@@ -517,6 +528,12 @@ const styles = StyleSheet.create({
   savingsLeft: {
     alignItems: 'center',
     flex: 1,
+  },
+  savingsTapHint: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 4,
   },
   donutRing: {
     width: 72,

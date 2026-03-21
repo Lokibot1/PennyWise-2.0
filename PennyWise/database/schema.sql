@@ -146,6 +146,9 @@ create table public.savings_goals (
   icon           text        not null default 'car-outline',
   target_amount  numeric     not null default 0,
   current_amount numeric     not null default 0,
+  is_completed   boolean     not null default false,
+  is_archived    boolean     not null default false,
+  completed_at   timestamptz,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
 );
