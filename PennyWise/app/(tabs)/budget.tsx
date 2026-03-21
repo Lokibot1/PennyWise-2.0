@@ -59,10 +59,9 @@ type ExpenseEntry = {
 };
 
 type Screen =
-  | { name: 'main' }
-  | { name: 'categories'; mode: 'new' | 'update' }
+  | { name: 'categories' }
   | { name: 'detail';   categoryId: string }
-  | { name: 'add';      prefillCategoryId: string }
+  | { name: 'add';      prefillCategoryId?: string }
   | { name: 'edit';     expenseId: string };
 
 type ExpenseFormValues = {
@@ -167,24 +166,14 @@ function AnimCard({
 function BalanceHeader({
   title,
   totalExpenses,
-  budgetLimit,
   onBack,
   theme,
 }: {
   title: string;
   totalExpenses: number;
-  budgetLimit: number;
   onBack?: () => void;
   theme: Theme;
 }) {
-  const remaining = budgetLimit - totalExpenses;
-  const pct       = budgetLimit > 0 ? Math.min(100, (totalExpenses / budgetLimit) * 100) : 0;
-  const pctStr    = pct.toFixed(0);
-  const pctMsg    =
-    pct <= 30 ? `${pctStr}% Of Income Spent, Looks Good.`
-    : pct <= 70 ? `${pctStr}% Of Income Spent, Be Careful.`
-    : `${pctStr}% Of Income Spent, Over Budget!`;
-
   return (
     <View style={[bh.wrap, { backgroundColor: theme.headerBg }]}>
       <View style={bh.nav}>
@@ -203,41 +192,22 @@ function BalanceHeader({
         </TouchableOpacity>
       </View>
 
-      <View style={[bh.card, {
-        backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)',
-        borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)',
-      }]}>
-        <View style={[bh.balRow, { borderBottomColor: theme.divider }]}>
+      <View style={[bh.card, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
+        <View style={bh.balRow}>
           <View style={{ flex: 1 }}>
             <View style={bh.lblRow}>
-              <Ionicons name="trending-up-outline" size={11} color={theme.isDark ? theme.textMuted : '#666'} />
-              <Text style={[bh.lbl, { color: theme.isDark ? theme.textMuted : '#666' }]}> Total Income</Text>
+              <Ionicons name="trending-down-outline" size={11} color={theme.textSecondary} />
+              <Text style={[bh.lbl, { color: theme.textSecondary }]}> Total Expenses</Text>
             </View>
-            <Text style={[bh.amt, { color: theme.textPrimary }]}>{fmtAmt(budgetLimit)}</Text>
+            <Text style={[bh.amt, { color: '#E05858' }]}>{fmtAmt(totalExpenses)}</Text>
           </View>
           <View style={[bh.divider, { backgroundColor: theme.divider }]} />
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <View style={bh.lblRow}>
-              <Ionicons name="wallet-outline" size={11} color={theme.isDark ? theme.textMuted : '#666'} />
-              <Text style={[bh.lbl, { color: theme.isDark ? theme.textMuted : '#666' }]}> Remaining</Text>
+              <Ionicons name="wallet-outline" size={11} color={theme.textSecondary} />
+              <Text style={[bh.lbl, { color: theme.textSecondary }]}> Expense Categories</Text>
             </View>
-            <Text style={[bh.amt, { color: remaining >= 0 ? theme.textPrimary : '#E05858' }]}>
-              {fmtAmt(remaining)}
-            </Text>
-          </View>
-        </View>
-
-        <View style={{ paddingTop: 12 }}>
-          <View style={bh.progRow}>
-            <View style={bh.pctBadge}><Text style={bh.pctTxt}>{pctStr}%</Text></View>
-            <Text style={[bh.budgetLbl, { color: theme.isDark ? theme.textMuted : '#666' }]}>Spent of {fmtAmt(budgetLimit)}</Text>
-          </View>
-          <View style={[bh.track, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.1)' : '#E0E0E0' }]}>
-            <View style={[bh.fill, { width: `${pct}%` as any }]} />
-          </View>
-          <View style={bh.lblRow}>
-            <Ionicons name="checkbox-outline" size={14} color={theme.textSecondary} />
-            <Text style={[bh.checkTxt, { color: theme.textSecondary }]}> {pctMsg}</Text>
+            <Text style={[bh.amt, { color: theme.textPrimary }]}>Active</Text>
           </View>
         </View>
       </View>
@@ -246,23 +216,16 @@ function BalanceHeader({
 }
 
 const bh = StyleSheet.create({
-  wrap:      { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
-  nav:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  iconBtn:   { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
-  title:     { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A' },
-  card:      { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
-  balRow:    { flexDirection: 'row', alignItems: 'center', paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.07)' },
-  lblRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
-  lbl:       { fontFamily: Font.bodyRegular, fontSize: 11, color: '#666' },
-  amt:       { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A', letterSpacing: -0.3 },
-  divider:   { width: 1, height: 40, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 12 },
-  progRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  pctBadge:  { backgroundColor: '#E05858', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  pctTxt:    { fontFamily: Font.bodySemiBold, fontSize: 11, color: '#fff' },
-  budgetLbl: { fontFamily: Font.bodyRegular, fontSize: 12, color: '#666' },
-  track:     { height: 10, backgroundColor: '#E0E0E0', borderRadius: 5, overflow: 'hidden', marginBottom: 8 },
-  fill:      { height: 10, backgroundColor: '#E05858', borderRadius: 5 },
-  checkTxt:  { fontFamily: Font.bodyRegular, fontSize: 12, color: '#4A7A5A' },
+  wrap:    { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
+  nav:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
+  title:   { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A' },
+  card:    { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
+  balRow:  { flexDirection: 'row', alignItems: 'center' },
+  lblRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
+  lbl:     { fontFamily: Font.bodyRegular, fontSize: 11, color: '#666' },
+  amt:     { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A', letterSpacing: -0.3 },
+  divider: { width: 1, height: 40, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 12 },
 });
 
 // ── FormHeader ────────────────────────────────────────────────────────────────
@@ -481,89 +444,16 @@ function EditCategoryModal({
   );
 }
 
-// ── MainScreen ────────────────────────────────────────────────────────────────
-function MainScreen({
-  totalExpenses,
-  budgetLimit,
-  onNew,
-  onUpdate,
-  onViewArchived,
-  theme,
-}: {
-  totalExpenses: number;
-  budgetLimit: number;
-  onNew: () => void;
-  onUpdate: () => void;
-  onViewArchived: () => void;
-  theme: Theme;
-}) {
-  const bodyAnim = useEntranceAnim();
-  return (
-    <>
-      <BalanceHeader title="Expenses" totalExpenses={totalExpenses} budgetLimit={budgetLimit} theme={theme} />
-      <Animated.View style={[{ flex: 1 }, bodyAnim]}>
-        <ScrollView
-          style={[s.white, { backgroundColor: theme.cardBg }]}
-          contentContainerStyle={[s.whiteContent, { paddingBottom: 48 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={[s.sectionTitle, { color: theme.textPrimary }]}>What would you like to do?</Text>
-
-          <AnimCard delay={0} style={[main.optionCard, { backgroundColor: theme.surface, borderColor: theme.divider }]} onPress={onNew}>
-            <View style={[main.optionIcon, { backgroundColor: '#E05858' }]}>
-              <Ionicons name="add-circle-outline" size={30} color="#fff" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>New Expense</Text>
-              <Text style={[main.optionDesc, { color: theme.textSecondary }]}>Add a new expense entry to a category</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#aaa" />
-          </AnimCard>
-
-          <AnimCard delay={80} style={[main.optionCard, { backgroundColor: theme.surface, borderColor: theme.divider }]} onPress={onUpdate}>
-            <View style={[main.optionIcon, { backgroundColor: '#4B78E0' }]}>
-              <Ionicons name="pencil-outline" size={28} color="#fff" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>Update Expense</Text>
-              <Text style={[main.optionDesc, { color: theme.textSecondary }]}>Edit or archive an existing expense entry</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#aaa" />
-          </AnimCard>
-
-          <AnimCard delay={160} style={[main.optionCard, { backgroundColor: theme.surface, borderColor: theme.divider }]} onPress={onViewArchived}>
-            <View style={[main.optionIcon, { backgroundColor: '#9AA5B4' }]}>
-              <Ionicons name="archive-outline" size={28} color="#fff" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[main.optionTitle, { color: theme.textPrimary }]}>Archived Expenses</Text>
-              <Text style={[main.optionDesc, { color: theme.textSecondary }]}>View and restore archived categories</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#aaa" />
-          </AnimCard>
-        </ScrollView>
-      </Animated.View>
-    </>
-  );
-}
-
-const main = StyleSheet.create({
-  optionCard:  { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, gap: 14, borderWidth: 1, borderColor: '#F5EAEA', elevation: 1, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
-  optionIcon:  { width: 58, height: 58, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  optionTitle: { fontFamily: Font.bodySemiBold, fontSize: 15, color: '#1A1A1A', marginBottom: 4 },
-  optionDesc:  { fontFamily: Font.bodyRegular, fontSize: 12, color: '#888' },
-});
-
 // ── CategoriesScreen ──────────────────────────────────────────────────────────
 function CategoriesScreen({
-  categories, expenses, mode, totalExpenses, budgetLimit,
-  onBack, onSelectCategory, onAddCategory,
+  categories, expenses, totalExpenses,
+  onSelectCategory, onAddCategory,
   onEditCategory, onArchiveCategory, onRestoreCategory, onDeleteCategory,
   theme,
 }: {
   categories: Category[]; expenses: ExpenseEntry[];
-  mode: 'new' | 'update'; totalExpenses: number; budgetLimit: number;
-  onBack: () => void; onSelectCategory: (id: string) => void; onAddCategory: () => void;
+  totalExpenses: number;
+  onSelectCategory: (id: string) => void; onAddCategory: () => void;
   onEditCategory: (id: string) => void; onArchiveCategory: (id: string) => void;
   onRestoreCategory: (id: string) => void; onDeleteCategory: (id: string) => void;
   theme: Theme;
@@ -574,11 +464,10 @@ function CategoriesScreen({
   const archived                = categories.filter(c => c.isArchived);
   const bodyAnim                = useEntranceAnim();
   const kebabCat                = kebabCatId ? categories.find(c => c.id === kebabCatId) : null;
-  const headerTitle             = mode === 'new' ? 'Select Category' : 'Expense Categories';
 
   return (
     <>
-      <BalanceHeader title={headerTitle} totalExpenses={totalExpenses} budgetLimit={budgetLimit} onBack={onBack} theme={theme} />
+      <BalanceHeader title="Expense Categories" totalExpenses={totalExpenses} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
         <SlideTabBar
           tabs={['Active', 'Archived']}
@@ -592,11 +481,6 @@ function CategoriesScreen({
         <ScrollView style={[s.white, { backgroundColor: theme.cardBg }]} contentContainerStyle={s.whiteContent} showsVerticalScrollIndicator={false}>
           {tab === 'Active' ? (
             <>
-              {mode === 'new' && (
-                <Text style={[s.hint, { color: theme.textMuted }]}>
-                  Select an existing category or tap <Text style={{ color: '#E05858', fontFamily: Font.bodySemiBold }}>More</Text> to create a new one.
-                </Text>
-              )}
               <View style={s.grid}>
                 {active.map(cat => {
                   const count = expenses.filter(e => e.categoryId === cat.id && !e.isArchived).length;
@@ -702,11 +586,11 @@ function CategoriesScreen({
 
 // ── CategoryDetailScreen ──────────────────────────────────────────────────────
 function CategoryDetailScreen({
-  category, expenses, totalExpenses, budgetLimit,
+  category, expenses, totalExpenses,
   onBack, onAdd, onEditExpense, onArchiveExpense, onRestoreExpense, onDeleteExpense, theme,
 }: {
   category: Category; expenses: ExpenseEntry[];
-  totalExpenses: number; budgetLimit: number;
+  totalExpenses: number;
   onBack: () => void; onAdd: () => void; onEditExpense: (id: string) => void;
   onArchiveExpense: (id: string) => void; onRestoreExpense: (id: string) => void;
   onDeleteExpense: (id: string) => void; theme: Theme;
@@ -753,7 +637,7 @@ function CategoryDetailScreen({
 
   return (
     <>
-      <BalanceHeader title={category.label} totalExpenses={totalExpenses} budgetLimit={budgetLimit} onBack={onBack} theme={theme} />
+      <BalanceHeader title={category.label} totalExpenses={totalExpenses} onBack={onBack} theme={theme} />
       <Animated.View style={[s.white, { flex: 1, backgroundColor: theme.cardBg }, bodyAnim]}>
         <SlideTabBar
           tabs={['Active', 'Archived']}
@@ -1058,7 +942,7 @@ export default function ManageExpenseScreen() {
   const { theme } = useAppTheme();
   const userIdRef = useRef('');
 
-  const [screen,      setScreen]      = useState<Screen>({ name: 'main' });
+  const [screen,      setScreen]      = useState<Screen>({ name: 'categories' });
   const [categories,  setCategories]  = useState<Category[]>([]);
   const [expenses,    setExpenses]    = useState<ExpenseEntry[]>([]);
   const [budgetLimit, setBudgetLimit] = useState(20000);
@@ -1256,7 +1140,7 @@ export default function ManageExpenseScreen() {
             description: changes.length > 0 ? changes.join(' · ') : `${fmtAmt(newAmount)} · ${catU?.label ?? 'Expense'}`,
             icon:        catU?.icon ?? 'receipt-outline',
           });
-          setScreen({ name: 'detail', categoryId: vals.categoryId });
+          setScreen({ name: 'categories' });
         }
       }
 
@@ -1459,7 +1343,7 @@ export default function ManageExpenseScreen() {
 
   const addInitial = (): ExpenseFormValues => ({
     date:        today,
-    categoryId:  screen.name === 'add' ? screen.prefillCategoryId : '',
+    categoryId:  screen.name === 'add' ? (screen.prefillCategoryId ?? '') : '',
     amount:      '',
     title:       '',
     description: '',
@@ -1496,34 +1380,13 @@ export default function ManageExpenseScreen() {
   const renderScreen = () => {
     switch (screen.name) {
 
-      case 'main':
-        return (
-          <MainScreen
-            totalExpenses={totalExpenses}
-            budgetLimit={budgetLimit}
-            onNew={() => setScreen({ name: 'categories', mode: 'new' })}
-            onUpdate={() => setScreen({ name: 'categories', mode: 'update' })}
-            onViewArchived={() => setScreen({ name: 'categories', mode: 'update' })}
-            theme={theme}
-          />
-        );
-
       case 'categories':
         return (
           <CategoriesScreen
             categories={categories}
             expenses={expenses}
-            mode={screen.mode}
             totalExpenses={totalExpenses}
-            budgetLimit={budgetLimit}
-            onBack={() => setScreen({ name: 'main' })}
-            onSelectCategory={id => {
-              if (screen.mode === 'new') {
-                setScreen({ name: 'add', prefillCategoryId: id });
-              } else {
-                setScreen({ name: 'detail', categoryId: id });
-              }
-            }}
+            onSelectCategory={id => setScreen({ name: 'detail', categoryId: id })}
             onAddCategory={() => setShowNewCat(true)}
             onEditCategory={id => setEditCat(categories.find(c => c.id === id) ?? null)}
             onArchiveCategory={handleArchiveCategory}
@@ -1541,8 +1404,7 @@ export default function ManageExpenseScreen() {
             category={cat}
             expenses={expenses}
             totalExpenses={totalExpenses}
-            budgetLimit={budgetLimit}
-            onBack={() => setScreen({ name: 'categories', mode: 'update' })}
+            onBack={() => setScreen({ name: 'categories' })}
             onAdd={() => setScreen({ name: 'add', prefillCategoryId: cat.id })}
             onEditExpense={id => setScreen({ name: 'edit', expenseId: id })}
             onArchiveExpense={handleArchiveExpense}
@@ -1556,12 +1418,12 @@ export default function ManageExpenseScreen() {
       case 'add':
         return (
           <ExpenseFormScreen
-            key={`add-${screen.prefillCategoryId}`}
+            key={`add-${screen.prefillCategoryId ?? 'none'}`}
             initial={addInitial()}
             categories={categories}
             screenTitle="New Expense"
             saving={saving}
-            onBack={() => setScreen({ name: 'detail', categoryId: screen.prefillCategoryId })}
+            onBack={() => screen.prefillCategoryId ? setScreen({ name: 'detail', categoryId: screen.prefillCategoryId }) : setScreen({ name: 'categories' })}
             onSave={handleSave}
             theme={theme}
           />
@@ -1581,13 +1443,14 @@ export default function ManageExpenseScreen() {
               const catId = exp?.categoryId;
               catId
                 ? setScreen({ name: 'detail', categoryId: catId })
-                : setScreen({ name: 'categories', mode: 'update' });
+                : setScreen({ name: 'categories' });
             }}
             onSave={handleSave}
             theme={theme}
           />
         );
       }
+
     }
   };
 
