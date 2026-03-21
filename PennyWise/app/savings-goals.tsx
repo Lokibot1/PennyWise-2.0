@@ -106,8 +106,9 @@ export default function SavingsGoalsScreen() {
   const [addingFunds, setAddingFunds]       = useState(false);
 
   // ── Kebab menu state ───────────────────────────────────────────────────────
-  const [menuGoalId, setMenuGoalId]           = useState<string | null>(null);
+  const [menuGoalId, setMenuGoalId]                 = useState<string | null>(null);
   const [pendingArchiveGoal, setPendingArchiveGoal] = useState<Goal | null>(null);
+  const [pendingDeleteGoal,  setPendingDeleteGoal]  = useState<Goal | null>(null);
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const fetchGoals = useCallback(async (uid: string) => {
@@ -301,6 +302,23 @@ export default function SavingsGoalsScreen() {
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_ARCHIVED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `Goal Archived: ${goal.title}`,
       description: `${formatCurrency(goal.current_amount)} of ${formatCurrency(goal.target_amount)} saved`,
+      icon: goal.icon,
+    });
+  };
+
+  /* Delete permanently */
+  const handleDeleteGoal = (goal: Goal) => setPendingDeleteGoal(goal);
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteGoal || !userId) return;
+    const goal = pendingDeleteGoal;
+    setPendingDeleteGoal(null);
+    await supabase.from('savings_goals').delete().eq('id', goal.id);
+    fetchGoals(userId);
+    logActivity({
+      user_id: userId, action_type: ACTION.SAVINGS_GOAL_DELETED, entity_type: ENTITY.SAVINGS_GOAL,
+      title: `Goal Deleted: ${goal.title}`,
+      description: `Permanently removed · ${formatCurrency(goal.current_amount)} of ${formatCurrency(goal.target_amount)} saved`,
       icon: goal.icon,
     });
   };
@@ -520,16 +538,31 @@ export default function SavingsGoalsScreen() {
                       )}
 
                       {isArchived && (
-                        <TouchableOpacity
-                          style={styles.menuItem}
-                          onPress={() => { setMenuGoalId(null); handleRestoreGoal(goal); }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(62,203,168,0.12)' }]}>
-                            <Ionicons name="refresh-outline" size={14} color="#3ECBA8" />
-                          </View>
-                          <Text style={[styles.menuItemLabel, { color: theme.textPrimary }]}>Restore Goal</Text>
-                        </TouchableOpacity>
+                        <>
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => { setMenuGoalId(null); handleRestoreGoal(goal); }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(62,203,168,0.12)' }]}>
+                              <Ionicons name="refresh-outline" size={14} color="#3ECBA8" />
+                            </View>
+                            <Text style={[styles.menuItemLabel, { color: theme.textPrimary }]}>Restore Goal</Text>
+                          </TouchableOpacity>
+
+                          <View style={[styles.menuDivider, { backgroundColor: theme.divider }]} />
+
+                          <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => { setMenuGoalId(null); handleDeleteGoal(goal); }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.menuItemIcon, { backgroundColor: 'rgba(239,68,68,0.12)' }]}>
+                              <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                            </View>
+                            <Text style={[styles.menuItemLabel, { color: '#EF4444' }]}>Delete Permanently</Text>
+                          </TouchableOpacity>
+                        </>
                       )}
                     </View>
                   )}
@@ -642,6 +675,22 @@ export default function SavingsGoalsScreen() {
         confirmLabel="Archive"
         confirmColor="#F59E0B"
         icon="archive-outline"
+      />
+
+      {/* ── Delete Confirm Modal ────────────────────────────────────────────── */}
+      <ConfirmModal
+        visible={pendingDeleteGoal !== null}
+        onClose={() => setPendingDeleteGoal(null)}
+        onConfirm={confirmDelete}
+        title="Delete Permanently?"
+        message={
+          pendingDeleteGoal
+            ? `"${pendingDeleteGoal.title}" will be deleted forever and cannot be recovered.`
+            : ''
+        }
+        confirmLabel="Delete"
+        confirmColor="#EF4444"
+        icon="trash-outline"
       />
 
       {/* ── Add Funds Modal ────────────────────────────────────────────────── */}
