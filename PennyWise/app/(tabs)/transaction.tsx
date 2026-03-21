@@ -52,7 +52,10 @@ const LOG_ONLY_ACTIONS = [
   'INCOME_SOURCE_UPDATED',
   'EXPENSE_UPDATED',
   'INCOME_CATEGORY_CREATED',
+  'INCOME_CATEGORY_UPDATED',
   'INCOME_CATEGORY_ARCHIVED',
+  'INCOME_CATEGORY_RESTORED',
+  'INCOME_CATEGORY_DELETED',
   'EXPENSE_CATEGORY_CREATED',
   'EXPENSE_CATEGORY_ARCHIVED',
   'SAVINGS_GOAL_UPDATED',
@@ -72,6 +75,8 @@ function entityColor(entityType: string, actionType: string): string {
     if (actionType === 'SAVINGS_GOAL_FUNDED')    return '#F59E0B';
     return '#F59E0B';
   }
+  if (actionType.includes('DELETED'))  return '#EF4444';
+  if (actionType.includes('RESTORED')) return '#3ECBA8';
   if (actionType.includes('ARCHIVED')) return '#9AA5B4';
   if (entityType.startsWith('income'))  return '#22C55E';
   if (entityType.startsWith('expense')) return '#4895EF';
@@ -110,13 +115,16 @@ function groupByDate(items: ActivityItem[]): Section[] {
 function actionLabel(actionType: string): string {
   const labels: Record<string, string> = {
     INCOME_CATEGORY_CREATED:   'Category Created',
+    INCOME_CATEGORY_UPDATED:   'Category Updated',
+    INCOME_CATEGORY_ARCHIVED:  'Category Archived',
+    INCOME_CATEGORY_RESTORED:  'Category Restored',
+    INCOME_CATEGORY_DELETED:   'Category Deleted',
     INCOME_SOURCE_ADDED:       'Income Added',
     INCOME_SOURCE_UPDATED:     'Income Updated',
-    INCOME_CATEGORY_ARCHIVED:  'Category Archived',
     EXPENSE_CATEGORY_CREATED:  'Category Created',
+    EXPENSE_CATEGORY_ARCHIVED: 'Category Archived',
     EXPENSE_ADDED:             'Expense Added',
     EXPENSE_UPDATED:           'Expense Updated',
-    EXPENSE_CATEGORY_ARCHIVED: 'Category Archived',
     SAVINGS_GOAL_CREATED:      'Goal Created',
     SAVINGS_GOAL_UPDATED:      'Goal Updated',
     SAVINGS_GOAL_FUNDED:       'Goal Funded',

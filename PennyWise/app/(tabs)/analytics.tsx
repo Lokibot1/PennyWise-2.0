@@ -412,12 +412,12 @@ function EditCategoryModal({
 
 // ── CategoriesScreen ──────────────────────────────────────────────────────────
 function CategoriesScreen({
-  categories, income, totalIncome, onSelectCategory, onAddCategory, onEditCategory, onArchiveCategory, onRestore, theme,
+  categories, income, totalIncome, onSelectCategory, onAddCategory, onEditCategory, onArchiveCategory, onRestore, onDeleteCategory, theme,
 }: {
   categories: Category[]; income: IncomeSource[]; totalIncome: number;
   onSelectCategory: (id: string) => void; onAddCategory: () => void;
   onEditCategory: (id: string) => void; onArchiveCategory: (id: string) => void;
-  onRestore: (id: string) => void; theme: Theme;
+  onRestore: (id: string) => void; onDeleteCategory: (id: string) => void; theme: Theme;
 }) {
   const [tab, setTab]           = useState<'Active' | 'Archived'>('Active');
   const [kebabCatId, setKebabId] = useState<string | null>(null);
@@ -522,14 +522,24 @@ function CategoriesScreen({
                   <Text style={[s.kebabItemTxt, { color: theme.textPrimary }]}>Edit</Text>
                 </TouchableOpacity>
                 {kebabCat.isArchived ? (
-                  <TouchableOpacity
-                    style={s.kebabItem}
-                    onPress={() => { setKebabId(null); onRestore(kebabCatId!); }}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="refresh-outline" size={20} color="#3ECBA8" />
-                    <Text style={[s.kebabItemTxt, { color: '#3ECBA8' }]}>Restore</Text>
-                  </TouchableOpacity>
+                  <>
+                    <TouchableOpacity
+                      style={s.kebabItem}
+                      onPress={() => { setKebabId(null); onRestore(kebabCatId!); }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="refresh-outline" size={20} color="#3ECBA8" />
+                      <Text style={[s.kebabItemTxt, { color: '#3ECBA8' }]}>Restore</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={s.kebabItem}
+                      onPress={() => { setKebabId(null); onDeleteCategory(kebabCatId!); }}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#E05858" />
+                      <Text style={[s.kebabItemTxt, { color: '#E05858' }]}>Delete Permanently</Text>
+                    </TouchableOpacity>
+                  </>
                 ) : (
                   <TouchableOpacity
                     style={s.kebabItem}
@@ -931,6 +941,7 @@ export default function IncomeSourcesScreen() {
   };
 
   const handleRestore = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
     showConfirm({
       title:        'Restore Category?',
       message:      'Are you sure you want to restore this Income Category?',
@@ -943,6 +954,42 @@ export default function IncomeSourcesScreen() {
         if (!error) {
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
           showToast('Income category restored successfully.');
+          logActivity({
+            user_id:     userIdRef.current!,
+            action_type: ACTION.INCOME_CATEGORY_RESTORED,
+            entity_type: ENTITY.INCOME_CATEGORY,
+            title:       `Category Restored: ${cat?.label ?? 'Income Category'}`,
+            description: 'Income source category restored from archive.',
+            icon:        cat?.icon ?? 'refresh-outline',
+          });
+        }
+      },
+    });
+  };
+
+  const handleDeleteCategory = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
+    showConfirm({
+      title:        'Delete Permanently?',
+      message:      `This will permanently delete "${cat?.label ?? 'this category'}" and all its income sources. This cannot be undone.`,
+      icon:         'trash-outline',
+      confirmLabel: 'Delete',
+      confirmColor: '#E05858',
+      onYes: async () => {
+        hideConfirm();
+        const { error } = await supabase.from('income_categories').delete().eq('id', categoryId);
+        if (!error) {
+          setCategories(prev => prev.filter(c => c.id !== categoryId));
+          setIncome(prev => prev.filter(i => i.categoryId !== categoryId));
+          showToast('Category permanently deleted.');
+          logActivity({
+            user_id:     userIdRef.current!,
+            action_type: ACTION.INCOME_CATEGORY_DELETED,
+            entity_type: ENTITY.INCOME_CATEGORY,
+            title:       `Category Deleted: ${cat?.label ?? 'Income Category'}`,
+            description: 'Income category and all its sources permanently deleted.',
+            icon:        cat?.icon ?? 'trash-outline',
+          });
         }
       },
     });
@@ -1032,6 +1079,7 @@ export default function IncomeSourcesScreen() {
             onEditCategory={id => { const cat = categories.find(c => c.id === id); if (cat) setEditCat(cat); }}
             onArchiveCategory={handleArchiveCategory}
             onRestore={handleRestore}
+            onDeleteCategory={handleDeleteCategory}
             theme={theme}
           />
         );
