@@ -17,6 +17,7 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import ConfirmModal from '@/components/ConfirmModal';
 import SlideTabBar from '@/components/SlideTabBar';
+import CircularRing from '@/components/CircularRing';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Goal = {
@@ -460,14 +461,16 @@ export default function SavingsGoalsScreen() {
                 >
                   {/* ── Main row ── */}
                   <View style={styles.goalCardRow}>
-                    {/* Icon */}
-                    <View style={[
-                      styles.goalIcon,
-                      isCompleted && styles.goalIconCompleted,
-                      isArchived  && styles.goalIconArchived,
-                    ]}>
-                      <Ionicons name={goal.icon as any} size={26} color="#fff" />
-                    </View>
+                    {/* Circular progress ring */}
+                    <CircularRing
+                      size={72}
+                      stroke={5}
+                      pct={pct}
+                      color={isCompleted ? '#3ECBA8' : isArchived ? '#9AA5B4' : '#4895EF'}
+                      track={isCompleted ? 'rgba(62,203,168,0.18)' : isArchived ? 'rgba(154,165,180,0.18)' : 'rgba(72,149,239,0.18)'}
+                      icon={goal.icon}
+                      iconSize={24}
+                    />
 
                     {/* Info */}
                     <View style={styles.goalInfo}>
@@ -493,16 +496,6 @@ export default function SavingsGoalsScreen() {
                         {formatCurrency(goal.current_amount)}
                         <Text style={{ color: theme.textMuted }}> / {formatCurrency(goal.target_amount)}</Text>
                       </Text>
-
-                      <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
-                        <View style={[
-                          styles.progressFill,
-                          {
-                            width: `${pct}%` as any,
-                            backgroundColor: isCompleted ? '#3ECBA8' : isArchived ? '#9AA5B4' : '#4895EF',
-                          },
-                        ]} />
-                      </View>
 
                       <Text style={[styles.pctText, { color: theme.textMuted }]}>
                         {isCompleted
@@ -764,9 +757,15 @@ export default function SavingsGoalsScreen() {
             {selectedGoal && (
               <>
                 <View style={[styles.goalSummary, { backgroundColor: theme.surface }]}>
-                  <View style={styles.goalIcon}>
-                    <Ionicons name={selectedGoal.icon as any} size={20} color="#fff" />
-                  </View>
+                  <CircularRing
+                    size={52}
+                    stroke={4}
+                    pct={Math.min(100, (selectedGoal.current_amount / selectedGoal.target_amount) * 100)}
+                    color="#4895EF"
+                    track="rgba(72,149,239,0.18)"
+                    icon={selectedGoal.icon}
+                    iconSize={18}
+                  />
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.goalTitle, { color: theme.textPrimary }]}>{selectedGoal.title}</Text>
                     <Text style={[styles.goalAmounts, { color: theme.textSecondary }]}>
@@ -776,12 +775,6 @@ export default function SavingsGoalsScreen() {
                   <Text style={styles.pctBadge}>
                     {Math.min(100, (selectedGoal.current_amount / selectedGoal.target_amount) * 100).toFixed(0)}%
                   </Text>
-                </View>
-                <View style={[styles.progressTrack, { backgroundColor: theme.divider, marginBottom: 4 }]}>
-                  <View style={[
-                    styles.progressFill,
-                    { width: `${Math.min(100, (selectedGoal.current_amount / selectedGoal.target_amount) * 100)}%` as any, backgroundColor: '#4895EF' },
-                  ]} />
                 </View>
                 {selectedGoal.current_amount < selectedGoal.target_amount && (
                   <Text style={[styles.remainingHint, { color: theme.textMuted }]}>
@@ -841,16 +834,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   goalCardRow: {
-    padding: 20,
+    padding: 16,
     paddingRight: 36,
     flexDirection: 'row', alignItems: 'center', gap: 14,
   },
-  goalIcon: {
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: '#4895EF', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  goalIconCompleted: { backgroundColor: '#3ECBA8' },
-  goalIconArchived:  { backgroundColor: '#9AA5B4' },
   goalInfo:          { flex: 1, gap: 6 },
   goalTitleRow:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
   goalTitle:         { fontFamily: Font.headerBold, fontSize: 16, flex: 1 },

@@ -13,6 +13,7 @@ import { HomeDashboardSkeleton, TransactionRowSkeleton } from '@/components/Skel
 import NotificationBell from '@/components/NotificationBell';
 import SlideTabBar from '@/components/SlideTabBar';
 import BudgetLimitModal from '@/components/BudgetLimitModal';
+import CircularRing from '@/components/CircularRing';
 import ErrorModal from '@/components/ErrorModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -349,25 +350,18 @@ export default function HomeScreen() {
               >
                 {/* Left: goal summary */}
                 <View style={styles.savingsLeft}>
-                  {/* Progress ring */}
-                  <View style={[
-                    styles.donutRing,
-                    goalsCount > 0 && {
-                      borderColor: goalsPct >= 100
-                        ? '#3ECBA8'
-                        : `rgba(255,255,255,${0.3 + (goalsPct / 100) * 0.6})`,
-                    },
-                  ]}>
-                    <Ionicons
-                      name={(goalsCount === 0 ? 'flag-outline' : firstGoal!.icon) as any}
-                      size={26}
-                      color="#fff"
+                  {/* Circular progress ring */}
+                  <View style={{ marginBottom: 8 }}>
+                    <CircularRing
+                      size={72}
+                      stroke={5}
+                      pct={goalsCount > 0 ? goalsPct : 0}
+                      color={goalsPct >= 100 ? '#3ECBA8' : '#fff'}
+                      track="rgba(255,255,255,0.18)"
+                      icon={goalsCount === 0 ? 'flag-outline' : firstGoal!.icon}
+                      iconSize={24}
+                      innerBg={goalsPct >= 100 ? '#3ECBA8' : 'rgba(255,255,255,0.15)'}
                     />
-                    {goalsCount > 0 && (
-                      <View style={styles.pctOverlay}>
-                        <Text style={styles.pctOverlayText}>{goalsPct.toFixed(0)}%</Text>
-                      </View>
-                    )}
                   </View>
 
                   {goalsCount === 0 ? (
@@ -665,30 +659,6 @@ const styles = StyleSheet.create({
   savingsLeft: {
     alignItems: 'center',
     flex: 1,
-  },
-  donutRing: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 6,
-    borderColor: 'rgba(255,255,255,0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  pctOverlay: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#3ECBA8',
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  pctOverlayText: {
-    fontFamily: Font.bodySemiBold,
-    fontSize: 8,
-    color: '#fff',
   },
   savingsLabel: {
     fontFamily: Font.bodyMedium,

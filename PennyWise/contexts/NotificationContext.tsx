@@ -20,6 +20,7 @@ type NotificationCtx = {
   notifications: AppNotification[];
   readIds: Set<string>;
   unreadCount: number;
+  loading: boolean;
   panelVisible: boolean;
   bellLayout: BellLayout | null;
   prefs: NotifPrefs;
@@ -35,6 +36,7 @@ const NotificationContext = createContext<NotificationCtx>({
   notifications:  [],
   readIds:        new Set(),
   unreadCount:    0,
+  loading:        false,
   panelVisible:   false,
   bellLayout:     null,
   prefs:          DEFAULT_PREFS,
@@ -49,6 +51,7 @@ const NotificationContext = createContext<NotificationCtx>({
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [readIds, setReadIds]             = useState<Set<string>>(new Set());
+  const [loading, setLoading]             = useState(false);
   const [panelVisible, setPanelVisible]   = useState(false);
   const [bellLayout, setBellLayout]       = useState<BellLayout | null>(null);
   const [prefs, setPrefs]                 = useState<NotifPrefs>(DEFAULT_PREFS);
@@ -69,8 +72,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // ── Fetch notifications + prefs from Supabase ─────────────────────────────
   const refresh = useCallback(async () => {
+    setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) { setLoading(false); return; }
     userIdRef.current = user.id;
     try {
       const [notifs, currentPrefs] = await Promise.all([
@@ -80,6 +84,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setPrefs(currentPrefs);
       setNotifications(filterByPrefs(notifs, currentPrefs));
     } catch {}
+    finally { setLoading(false); }
   }, []);
 
   // ── Initial load + auth changes ────────────────────────────────────────────
@@ -121,7 +126,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const openPanel = useCallback((layout: BellLayout) => {
     setBellLayout(layout);
     setPanelVisible(true);
-  }, []);
+    refresh();   // always fetch fresh data — triggers skeleton loading in the panel
+  }, [refresh]);
 
   const closePanel = useCallback(() => setPanelVisible(false), []);
 
@@ -140,6 +146,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       notifications,
       readIds,
       unreadCount,
+      loading,
       panelVisible,
       bellLayout,
       prefs,

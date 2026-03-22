@@ -1,6 +1,7 @@
 /**
  * components/NotificationPanel.tsx
  * Floating dropdown anchored directly below the notification bell.
+ * Shows animated skeleton cards while notifications are loading.
  */
 import { useEffect } from 'react';
 import { Dimensions, Modal, Pressable, ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -9,6 +10,7 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
+  withRepeat,
   useAnimatedStyle,
   interpolate,
 } from 'react-native-reanimated';
@@ -19,9 +21,10 @@ import { useNotifications } from '@/contexts/NotificationContext';
 import type { AppNotification } from '@/lib/notifications';
 
 const SCREEN_W = Dimensions.get('window').width;
-const PANEL_MX = 12;  // side margin
-const CARET_W  = 9;   // half-width of caret triangle
-const CARET_H  = 7;   // height of caret triangle
+const PANEL_MX = 12;
+const CARET_W  = 9;
+const CARET_H  = 7;
+const DEFAULT_SKELETON_COUNT = 3;
 
 const TYPE_COLOR: Record<AppNotification['type'], string> = {
   warning:  '#F59E0B',
@@ -51,7 +54,70 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// ── Card ──────────────────────────────────────────────────────────────────────
+// ── Skeleton card ─────────────────────────────────────────────────────────────
+function SkeletonCard({ sweep }: { sweep: Animated.SharedValue<number> }) {
+  const { theme } = useAppTheme();
+
+  const shimBg  = theme.isDark ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.75)';
+  const blockBg = theme.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+
+  const sweepStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(sweep.value, [0, 1], [-180, 260]) }],
+  }));
+
+  const Bone = ({
+    w, h = 10, r = 5, mt = 0,
+  }: { w: number | `${number}%`; h?: number; r?: number; mt?: number }) => (
+    <View style={{
+      width: w, height: h, borderRadius: r,
+      backgroundColor: blockBg,
+      marginTop: mt,
+      overflow: 'hidden',
+    }}>
+      <Animated.View style={[{
+        position: 'absolute', top: 0, bottom: 0, width: 90,
+        backgroundColor: shimBg,
+        transform: [{ skewX: '-20deg' }],
+      }, sweepStyle]} />
+    </View>
+  );
+
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'flex-start',
+      borderRadius: 12, marginBottom: 8,
+      paddingHorizontal: 10, paddingVertical: 10,
+      gap: 10,
+      backgroundColor: theme.surface,
+    }}>
+      {/* Icon circle bone */}
+      <View style={{
+        width: 36, height: 36, borderRadius: 18,
+        backgroundColor: blockBg,
+        overflow: 'hidden', flexShrink: 0,
+      }}>
+        <Animated.View style={[{
+          position: 'absolute', top: 0, bottom: 0, width: 90,
+          backgroundColor: shimBg,
+          transform: [{ skewX: '-20deg' }],
+        }, sweepStyle]} />
+      </View>
+
+      {/* Text bones */}
+      <View style={{ flex: 1, gap: 7 }}>
+        <Bone w="62%" h={11} />
+        <Bone w="90%" h={9} />
+        <Bone w="75%" h={9} />
+        <View style={{ flexDirection: 'row', gap: 6, marginTop: 1 }}>
+          <Bone w={38} h={15} r={4} />
+          <Bone w={52} h={15} r={4} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ── Notification card ─────────────────────────────────────────────────────────
 function NotifCard({ notif, isRead }: { notif: AppNotification; isRead: boolean }) {
   const { theme }    = useAppTheme();
   const { markRead } = useNotifications();
@@ -118,13 +184,24 @@ function NotifCard({ notif, isRead }: { notif: AppNotification; isRead: boolean 
 // ── Panel ─────────────────────────────────────────────────────────────────────
 export default function NotificationPanel() {
   const { theme } = useAppTheme();
-  const { notifications, readIds, panelVisible, bellLayout, closePanel, markAllRead, unreadCount } = useNotifications();
+  const {
+    notifications, readIds, panelVisible, bellLayout,
+    closePanel, markAllRead, unreadCount, loading,
+  } = useNotifications();
 
   const progress = useSharedValue(0);
+  const sweep    = useSharedValue(0);   // shared shimmer sweep for all skeletons
 
   useEffect(() => {
     if (panelVisible) {
       progress.value = withSpring(1, { damping: 24, stiffness: 300, mass: 0.75 });
+      // start / restart shimmer sweep loop
+      sweep.value = 0;
+      sweep.value = withRepeat(
+        withTiming(1, { duration: 1100 }),
+        -1,
+        false,
+      );
     } else {
       progress.value = withTiming(0, { duration: 150 });
     }
@@ -144,15 +221,11 @@ export default function NotificationPanel() {
 
   // ── Positioning ─────────────────────────────────────────────────────────────
   const bellBottom  = bellLayout ? bellLayout.pageY + bellLayout.height : 108;
-  // panelTop = bellBottom + CARET_H → caret tip sits exactly at bell's bottom edge
   const panelTop    = bellBottom + CARET_H;
-
   const panelWidth  = SCREEN_W - PANEL_MX * 2;
   const bellCenterX = bellLayout
     ? bellLayout.pageX + bellLayout.width / 2 - PANEL_MX
-    : panelWidth - 28;  // fallback: near right edge
-
-  // Clamp caret so it stays inside panel with a small margin
+    : panelWidth - 28;
   const caretLeft   = Math.max(CARET_W + 8, Math.min(panelWidth - CARET_W - 8, bellCenterX - CARET_W));
 
   const unread = notifications.filter(n => !readIds.has(n.id)).length;
@@ -195,7 +268,7 @@ export default function NotificationPanel() {
           elevation:       20,
         }, floatStyle]}
       >
-        {/* Caret shadow layer (slightly larger, darker, behind) */}
+        {/* Caret shadow */}
         <View style={{
           position:          'absolute',
           top:               -CARET_H - 1,
@@ -223,7 +296,7 @@ export default function NotificationPanel() {
           borderBottomColor: theme.cardBg,
         }} />
 
-        {/* ── Header ─────────────────────────────────────────────────────── */}
+        {/* ── Header ──────────────────────────────────────────────────────── */}
         <View style={{
           flexDirection:     'row',
           alignItems:        'center',
@@ -234,7 +307,6 @@ export default function NotificationPanel() {
           borderBottomWidth: 1,
           borderBottomColor: theme.divider,
         }}>
-          {/* Left */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
             <View style={{
               width: 32, height: 32, borderRadius: 16,
@@ -248,14 +320,13 @@ export default function NotificationPanel() {
                 Notifications
               </Text>
               <Text style={{ fontFamily: Font.bodyRegular, fontSize: 10.5, color: theme.textMuted }}>
-                {unread > 0 ? `${unread} unread` : 'All caught up'}
+                {loading ? 'Loading…' : unread > 0 ? `${unread} unread` : 'All caught up'}
               </Text>
             </View>
           </View>
 
-          {/* Right */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {unreadCount > 0 && (
+            {!loading && unreadCount > 0 && (
               <TouchableOpacity
                 onPress={() => { sfx.success(); markAllRead(); }}
                 activeOpacity={0.7}
@@ -285,12 +356,18 @@ export default function NotificationPanel() {
           </View>
         </View>
 
-        {/* ── List ───────────────────────────────────────────────────────── */}
+        {/* ── List ────────────────────────────────────────────────────────── */}
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 10, paddingTop: 10, paddingBottom: 14 }}
+          scrollEnabled={!loading}
         >
-          {notifications.length === 0 ? (
+          {loading ? (
+            // Show exactly as many skeletons as the previous notification count (or default if first load)
+            Array.from({ length: notifications.length || DEFAULT_SKELETON_COUNT }).map((_, i) => (
+              <SkeletonCard key={i} sweep={sweep} />
+            ))
+          ) : notifications.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 32, gap: 8 }}>
               <View style={{
                 width: 52, height: 52, borderRadius: 26,
