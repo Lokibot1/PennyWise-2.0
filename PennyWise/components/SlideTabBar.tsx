@@ -49,16 +49,16 @@ export default function SlideTabBar({
   useEffect(() => {
     if (tabWidthRef.current > 0) {
       indicatorX.value = withSpring(tabs.indexOf(active) * tabWidthRef.current, {
-        damping: 18,
-        stiffness: 200,
+        damping: 26,
+        stiffness: 340,
       });
     }
   }, [active]);
 
   const handlePress = (tab: string) => {
     indicatorX.value = withSpring(tabs.indexOf(tab) * tabWidthRef.current, {
-      damping: 18,
-      stiffness: 200,
+      damping: 26,
+      stiffness: 340,
     });
     onChange(tab);
   };

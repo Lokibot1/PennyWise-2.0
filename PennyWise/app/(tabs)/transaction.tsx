@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import {
-  ActivityIndicator,
   SectionList,
   StyleSheet,
   Text,
@@ -24,6 +23,7 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { setNavTarget } from '@/lib/activityNavTarget';
+import { ActivityHistorySkeleton } from '@/components/SkeletonLoader';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type FilterType = 'All' | 'Income' | 'Expenses' | 'Savings';
@@ -543,7 +543,7 @@ export default function TransactionHistoryScreen() {
           )}
 
           {loading ? (
-            <ActivityIndicator color="#3ECBA8" size="large" style={{ marginTop: 60 }} />
+            <ActivityHistorySkeleton />
           ) : sections.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="time-outline" size={52} color={theme.divider} />

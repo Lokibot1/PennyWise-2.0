@@ -23,15 +23,14 @@ const TABS: { name: string; icon: IoniconName }[] = [
 ];
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const TAB_WIDTH       = SCREEN_WIDTH / TABS.length;
-const INDICATOR_SIZE  = 46;
-const BAR_HEIGHT      = 70;
-const PAD_TOP         = 8;
-const PAD_BOTTOM      = 10;
-const INDICATOR_TOP   = PAD_TOP + (BAR_HEIGHT - PAD_TOP - PAD_BOTTOM - INDICATOR_SIZE) / 2;
+const TAB_WIDTH      = SCREEN_WIDTH / TABS.length;
+const INDICATOR_SIZE = 46;
+const BAR_HEIGHT     = 70;
+const PAD_TOP        = 8;
+const PAD_BOTTOM     = 10;
+const INDICATOR_TOP  = PAD_TOP + (BAR_HEIGHT - PAD_TOP - PAD_BOTTOM - INDICATOR_SIZE) / 2;
 
-const indicatorLeft = (index: number) =>
-  index * TAB_WIDTH + (TAB_WIDTH - INDICATOR_SIZE) / 2;
+const pillCenter = (index: number) => index * TAB_WIDTH + TAB_WIDTH / 2;
 
 // ── TabItem ────────────────────────────────────────────────────────────────────
 function TabItem({
@@ -48,13 +47,15 @@ function TabItem({
   onLongPress: () => void;
 }) {
   const scale = useSharedValue(isFocused ? 1 : 0.82);
+  const ty    = useSharedValue(isFocused ? -3 : 0);
 
   useEffect(() => {
-    scale.value = withSpring(isFocused ? 1 : 0.82, { damping: 14, stiffness: 260 });
+    scale.value = withSpring(isFocused ? 1 : 0.82, { damping: 18, stiffness: 300 });
+    ty.value    = withSpring(isFocused ? -3 : 0,   { damping: 16, stiffness: 280 });
   }, [isFocused]);
 
   const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    transform: [{ scale: scale.value }, { translateY: ty.value }],
   }));
 
   return (
@@ -78,13 +79,11 @@ const AUTH_SCREENS = new Set(['login']);
 
 // ── CustomTabBar ───────────────────────────────────────────────────────────────
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
-  // Hide on auth/launch screens
   if (AUTH_SCREENS.has(state.routes[state.index].name)) return null;
 
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
 
-  // Only render the 5 declared tabs (exclude href:null screens)
   const visibleRoutes = state.routes.filter(r => TABS.some(t => t.name === r.name));
 
   const activeIndex = Math.max(
@@ -92,22 +91,48 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
     visibleRoutes.findIndex(r => r.key === state.routes[state.index].key),
   );
 
-  const indicatorX = useSharedValue(indicatorLeft(activeIndex));
+  // ── Stretchy liquid pill ───────────────────────────────────────────────────
+  // Each edge animates independently with different spring tensions.
+  // The "leading" edge (the one facing the target) springs ahead fast;
+  // the "trailing" edge lags behind — creating an elastic stretch effect.
+  const initCenter = pillCenter(activeIndex);
+  const pillLeft  = useSharedValue(initCenter - INDICATOR_SIZE / 2);
+  const pillRight = useSharedValue(initCenter + INDICATOR_SIZE / 2);
 
   useEffect(() => {
-    indicatorX.value = withSpring(indicatorLeft(activeIndex), {
-      damping: 18,
-      stiffness: 200,
-    });
+    const targetCenter = pillCenter(activeIndex);
+    const targetLeft   = targetCenter - INDICATOR_SIZE / 2;
+    const targetRight  = targetCenter + INDICATOR_SIZE / 2;
+
+    // Determine which side is the leading edge
+    const movingRight = targetLeft > pillLeft.value;
+
+    const FAST = { damping: 22, stiffness: 400, mass: 0.85 } as const;
+    const SLOW = { damping: 28, stiffness: 220, mass: 0.85 } as const;
+
+    if (movingRight) {
+      pillRight.value = withSpring(targetRight, FAST);
+      pillLeft.value  = withSpring(targetLeft,  SLOW);
+    } else {
+      pillLeft.value  = withSpring(targetLeft,  FAST);
+      pillRight.value = withSpring(targetRight, SLOW);
+    }
   }, [activeIndex]);
 
   const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: indicatorX.value }],
+    left:  pillLeft.value,
+    width: pillRight.value - pillLeft.value,
   }));
 
   return (
-    <View style={[styles.tabBar, { paddingBottom: PAD_BOTTOM + insets.bottom, height: BAR_HEIGHT + insets.bottom, backgroundColor: theme.tabBarBg }]}>
-      {/* Sliding teal pill */}
+    <View style={[
+      styles.tabBar,
+      {
+        paddingBottom: PAD_BOTTOM + insets.bottom,
+        height: BAR_HEIGHT + insets.bottom,
+        backgroundColor: theme.tabBarBg,
+      },
+    ]}>
       <Animated.View style={[styles.indicator, indicatorStyle]} />
 
       {visibleRoutes.map((route, index) => {
@@ -147,7 +172,7 @@ export default function TabLayout() {
   return (
     <Tabs
       tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false, animation: 'shift' }}
+      screenOptions={{ headerShown: false, animation: 'none' }}
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="analytics" />
@@ -165,7 +190,6 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
     height: BAR_HEIGHT,
     paddingTop: PAD_TOP,
     paddingBottom: PAD_BOTTOM,
@@ -178,8 +202,6 @@ const styles = StyleSheet.create({
   indicator: {
     position: 'absolute',
     top: INDICATOR_TOP,
-    left: 0,
-    width: INDICATOR_SIZE,
     height: INDICATOR_SIZE,
     borderRadius: INDICATOR_SIZE / 2,
     backgroundColor: '#1B7A4A',

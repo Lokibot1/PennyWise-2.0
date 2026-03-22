@@ -289,6 +289,47 @@ export function ProfileAvatarSkeleton() {
   );
 }
 
+// ── Activity History skeleton ─────────────────────────────────────────────────
+export function ActivityHistorySkeleton() {
+  const { theme } = useAppTheme();
+  // Two sections: 3 rows then 2 rows
+  const sections = [3, 2];
+  return (
+    <View style={{ paddingBottom: 24 }}>
+      {sections.map((count, si) => (
+        <View key={si}>
+          {/* Section header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center',
+            paddingHorizontal: 20, paddingVertical: 10, gap: 10 }}>
+            <SkeletonBox width={si === 0 ? 44 : 90} height={10} borderRadius={4} />
+            <View style={{ flex: 1, height: 1, backgroundColor: theme.divider }} />
+          </View>
+          {/* Rows */}
+          {[...Array(count)].map((_, ri) => (
+            <View key={ri} style={{
+              flexDirection: 'row', alignItems: 'center',
+              paddingHorizontal: 20, paddingVertical: 12,
+              borderBottomWidth: 1, borderBottomColor: theme.divider,
+              gap: 12,
+            }}>
+              <SkeletonBox width={40} height={40} borderRadius={20} style={{ flexShrink: 0 }} />
+              <View style={{ flex: 1, gap: 5 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <SkeletonBox width={`${42 + (ri * 13) % 28}%`} height={13} borderRadius={5} />
+                  <SkeletonBox width={52} height={10} borderRadius={4} style={{ flexShrink: 0 }} />
+                </View>
+                <SkeletonBox width={`${28 + (ri * 11) % 22}%`} height={11} borderRadius={4} />
+                <SkeletonBox width={90 + (ri % 3) * 30} height={18} borderRadius={5} />
+              </View>
+              <SkeletonBox width={12} height={12} borderRadius={3} style={{ flexShrink: 0 }} />
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // ── Profile: menu row skeletons ────────────────────────────────────────────────
 export function ProfileMenuSkeleton() {
   const { theme } = useAppTheme();
