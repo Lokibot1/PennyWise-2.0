@@ -1,5 +1,8 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const THEME_KEY = 'pw_dark_mode_v1';
 
 // ── Theme definition ────────────────────────────────────────────────────────────
 export type Theme = {
@@ -79,8 +82,23 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   const [darkMode, setDarkMode] = useState(false);
   const theme = darkMode ? DARK : LIGHT;
 
+  // Load persisted preference on mount
+  useEffect(() => {
+    AsyncStorage.getItem(THEME_KEY).then(val => {
+      if (val !== null) setDarkMode(val === 'true');
+    });
+  }, []);
+
+  const toggleDark = useCallback(() => {
+    setDarkMode(prev => {
+      const next = !prev;
+      AsyncStorage.setItem(THEME_KEY, String(next));
+      return next;
+    });
+  }, []);
+
   return (
-    <AppThemeContext.Provider value={{ theme, darkMode, toggleDark: () => setDarkMode(v => !v) }}>
+    <AppThemeContext.Provider value={{ theme, darkMode, toggleDark }}>
       {children}
     </AppThemeContext.Provider>
   );
