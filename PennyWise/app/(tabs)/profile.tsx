@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -13,6 +14,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,7 +37,7 @@ import BudgetLimitModal from '@/components/BudgetLimitModal';
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = 'profile' | 'edit' | 'terms' | 'settings';
 type IoniconName = keyof typeof Ionicons.glyphMap;
-type ProfileData = { full_name: string; email: string; phone: string };
+type ProfileData = { full_name: string; email: string; phone: string; avatar_url?: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getInitials(name: string): string {
@@ -62,16 +66,26 @@ function NavHeader({ title, onBack }: { title: string; onBack?: () => void }) {
 }
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
-function Avatar({ name, size = 96, showEdit }: { name: string; size?: number; showEdit?: boolean }) {
+function Avatar({ name, uri, size = 96, showEdit, onEditPress }: {
+  name: string; uri?: string; size?: number; showEdit?: boolean; onEditPress?: () => void;
+}) {
   const initials = name ? getInitials(name) : '';
   const fontSize = Math.round(size * 0.35);
+  const inner = uri
+    ? <Image source={{ uri }} style={{ width: size, height: size, borderRadius: size / 2 }} />
+    : initials
+      ? <Text style={[styles.avatarInitials, { fontSize }]}>{initials}</Text>
+      : <Ionicons name="person" size={size * 0.46} color="#fff" />;
   return (
-    <View style={{ position: 'relative' }}>
+    <TouchableOpacity
+      style={{ position: 'relative' }}
+      onPress={onEditPress}
+      disabled={!onEditPress}
+      activeOpacity={onEditPress ? 0.8 : 1}
+    >
       <View style={[styles.avatarRing, { width: size + 8, height: size + 8, borderRadius: (size + 8) / 2 }]}>
         <View style={[styles.avatarCircle, { width: size, height: size, borderRadius: size / 2 }]}>
-          {initials
-            ? <Text style={[styles.avatarInitials, { fontSize }]}>{initials}</Text>
-            : <Ionicons name="person" size={size * 0.46} color="#fff" />}
+          {inner}
         </View>
       </View>
       {showEdit && (
@@ -79,7 +93,7 @@ function Avatar({ name, size = 96, showEdit }: { name: string; size?: number; sh
           <Ionicons name="camera" size={13} color="#fff" />
         </View>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -148,7 +162,7 @@ function ProfileView({
       <View style={[styles.greenSection, { backgroundColor: theme.headerBg }]}>
         <NavHeader title="Profile" />
         <View style={styles.avatarBlock}>
-          {loading ? <ProfileAvatarSkeleton /> : <Avatar name={profile.full_name} size={100} />}
+          {loading ? <ProfileAvatarSkeleton /> : <Avatar name={profile.full_name} uri={profile.avatar_url} size={100} />}
           {loading ? (
             <ProfileInfoSkeleton />
           ) : (
@@ -229,13 +243,61 @@ function EditProfileView({
   profile: ProfileData; onBack: () => void; onSaved: (u: ProfileData) => void;
 }) {
   const { theme } = useAppTheme();
-  const [username, setUsername] = useState(profile.full_name);
-  const [phone, setPhone]       = useState(profile.phone ?? '');
-  const [email, setEmail]       = useState(profile.email);
-  const [saving, setSaving]     = useState(false);
-  const [confirm, setConfirm]   = useState(false);
-  const [toast, setToast]       = useState(false);
-  const [errModal, setErrModal] = useState({ visible: false, title: '', message: '' });
+  const [username, setUsername]       = useState(profile.full_name);
+  const [phone, setPhone]             = useState(profile.phone ?? '');
+  const [email, setEmail]             = useState(profile.email);
+  const [saving, setSaving]           = useState(false);
+  const [confirm, setConfirm]         = useState(false);
+  const [errModal, setErrModal]       = useState({ visible: false, title: '', message: '' });
+  const [previewUri, setPreviewUri]   = useState<string | null>(null);
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
+  const [showPhotoMenu, setShowPhotoMenu] = useState(false);
+
+  const displayUri = avatarRemoved ? undefined : (previewUri ?? profile.avatar_url);
+  const hasPhoto   = !!displayUri;
+
+  async function pickFromLibrary() {
+    setShowPhotoMenu(false);
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      setErrModal({ visible: true, title: 'Permission Denied', message: 'Please allow access to your photo library in Settings.' });
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setPreviewUri(result.assets[0].uri);
+      setAvatarRemoved(false);
+    }
+  }
+
+  async function takePhoto() {
+    setShowPhotoMenu(false);
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      setErrModal({ visible: true, title: 'Permission Denied', message: 'Please allow camera access in Settings.' });
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setPreviewUri(result.assets[0].uri);
+      setAvatarRemoved(false);
+    }
+  }
+
+  function removePhoto() {
+    setShowPhotoMenu(false);
+    setPreviewUri(null);
+    setAvatarRemoved(true);
+  }
 
   async function handleSave() {
     setConfirm(false);
@@ -248,9 +310,35 @@ function EditProfileView({
       setErrModal({ visible: true, title: 'Authentication Error', message: userError?.message ?? 'Could not retrieve user. Please log in again.' });
       return;
     }
+
+    let newAvatarUrl: string | null = profile.avatar_url ?? null;
+
+    // Upload new photo if picked
+    if (previewUri) {
+      try {
+        const fileExt = previewUri.split('.').pop()?.toLowerCase() ?? 'jpg';
+        const filePath = `${user.id}/${Date.now()}.${fileExt}`;
+        const base64 = await FileSystem.readAsStringAsync(previewUri, { encoding: FileSystem.EncodingType.Base64 });
+        const arrayBuffer = decode(base64);
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, arrayBuffer, { upsert: true, contentType: `image/${fileExt}` });
+        if (uploadError) throw uploadError;
+        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+        newAvatarUrl = publicUrl;
+      } catch (err: any) {
+        loadingBar.finish();
+        setSaving(false);
+        setErrModal({ visible: true, title: 'Upload Failed', message: err?.message ?? 'Could not upload profile photo.' });
+        return;
+      }
+    } else if (avatarRemoved) {
+      newAvatarUrl = null;
+    }
+
     const { error } = await supabase
       .from('profiles')
-      .update({ full_name: username.trim(), phone: phone.trim(), email: email.trim() })
+      .update({ full_name: username.trim(), phone: phone.trim(), email: email.trim(), avatar_url: newAvatarUrl })
       .eq('id', user.id);
     loadingBar.finish();
     setSaving(false);
@@ -258,9 +346,8 @@ function EditProfileView({
       setErrModal({ visible: true, title: 'Failed to Update Profile', message: error.message });
     } else {
       sfx.success();
-      onSaved({ full_name: username.trim(), phone: phone.trim(), email: email.trim() });
-      setToast(true);
-      setTimeout(() => setToast(false), 2800);
+      onSaved({ full_name: username.trim(), phone: phone.trim(), email: email.trim(), avatar_url: newAvatarUrl ?? undefined });
+      onBack();
     }
   }
 
@@ -272,10 +359,51 @@ function EditProfileView({
       <View style={[styles.greenSection, { backgroundColor: theme.headerBg, paddingBottom: 24 }]}>
         <NavHeader title="Edit Profile" onBack={onBack} />
         <View style={styles.avatarBlock}>
-          <Avatar name={profile.full_name} size={88} showEdit />
-          <Text style={styles.headerName}>{profile.full_name || 'Your Name'}</Text>
+          <Avatar name={username} uri={displayUri} size={88} showEdit onEditPress={() => setShowPhotoMenu(true)} />
+          <Text style={styles.headerName}>{username || 'Your Name'}</Text>
+          <TouchableOpacity onPress={() => setShowPhotoMenu(true)} activeOpacity={0.7} style={{ marginTop: 6 }}>
+            <Text style={{ fontFamily: Font.bodyMedium, fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
+              {hasPhoto ? 'Change photo' : 'Add photo'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
+
+      {/* Photo picker action sheet */}
+      <Modal visible={showPhotoMenu} transparent animationType="slide" statusBarTranslucent onRequestClose={() => setShowPhotoMenu(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setShowPhotoMenu(false)} />
+        <View style={[styles.photoSheet, { backgroundColor: theme.modalBg }]}>
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.divider, alignSelf: 'center', marginBottom: 20 }} />
+          <Text style={[styles.photoSheetTitle, { color: theme.textPrimary }]}>Profile Photo</Text>
+
+          <TouchableOpacity style={[styles.photoSheetBtn, { borderBottomWidth: 1, borderBottomColor: theme.divider }]} onPress={pickFromLibrary} activeOpacity={0.7}>
+            <View style={[styles.photoSheetIcon, { backgroundColor: 'rgba(27,122,74,0.12)' }]}>
+              <Ionicons name="images-outline" size={20} color="#1B7A4A" />
+            </View>
+            <Text style={[styles.photoSheetLabel, { color: theme.textPrimary }]}>Choose from Library</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.photoSheetBtn, hasPhoto ? { borderBottomWidth: 1, borderBottomColor: theme.divider } : {}]} onPress={takePhoto} activeOpacity={0.7}>
+            <View style={[styles.photoSheetIcon, { backgroundColor: 'rgba(27,122,74,0.12)' }]}>
+              <Ionicons name="camera-outline" size={20} color="#1B7A4A" />
+            </View>
+            <Text style={[styles.photoSheetLabel, { color: theme.textPrimary }]}>Take Photo</Text>
+          </TouchableOpacity>
+
+          {hasPhoto && (
+            <TouchableOpacity style={styles.photoSheetBtn} onPress={removePhoto} activeOpacity={0.7}>
+              <View style={[styles.photoSheetIcon, { backgroundColor: 'rgba(224,85,85,0.12)' }]}>
+                <Ionicons name="trash-outline" size={20} color="#E05555" />
+              </View>
+              <Text style={[styles.photoSheetLabel, { color: '#E05555' }]}>Remove Photo</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={{ alignItems: 'center', paddingVertical: 14, marginTop: 4 }} onPress={() => setShowPhotoMenu(false)} activeOpacity={0.7}>
+            <Text style={{ fontFamily: Font.bodyMedium, fontSize: 15, color: theme.textSecondary }}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       {/* Scrollable form */}
       <ScrollView
@@ -369,13 +497,6 @@ function EditProfileView({
         confirmColor="#1B7A4A"
         icon="save-outline"
       />
-
-      {toast && (
-        <View style={styles.toast} pointerEvents="none">
-          <Ionicons name="checkmark-circle" size={18} color="#fff" />
-          <Text style={styles.toastText}>Profile updated successfully.</Text>
-        </View>
-      )}
 
       <ErrorModal
         visible={errModal.visible}
@@ -661,7 +782,7 @@ function SettingsView({ onBack }: { onBack: () => void }) {
 // ── Root ──────────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const [screen, setScreen]   = useState<Screen>('profile');
-  const [profile, setProfile] = useState<ProfileData>({ full_name: '', email: '', phone: '' });
+  const [profile, setProfile] = useState<ProfileData>({ full_name: '', email: '', phone: '', avatar_url: undefined });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -669,13 +790,14 @@ export default function ProfileScreen() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (cancelled || !user) { if (!cancelled) setLoading(false); return; }
       const meta = (user.user_metadata ?? {}) as Record<string, string>;
-      supabase.from('profiles').select('full_name, email, phone').eq('id', user.id).single()
+      supabase.from('profiles').select('full_name, email, phone, avatar_url').eq('id', user.id).single()
         .then(({ data }) => {
           if (cancelled) return;
           setProfile({
-            full_name: data?.full_name || meta.full_name || '',
-            email:     data?.email     || meta.email     || '',
-            phone:     data?.phone     || meta.phone     || '',
+            full_name:  data?.full_name  || meta.full_name || '',
+            email:      data?.email      || meta.email     || '',
+            phone:      data?.phone      || meta.phone     || '',
+            avatar_url: data?.avatar_url ?? undefined,
           });
           setLoading(false);
         });
@@ -756,6 +878,10 @@ const styles = StyleSheet.create({
   checkboxOn:    { backgroundColor: '#1B7A4A', borderColor: '#1B7A4A' },
   checkLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, flex: 1 },
 
-  toast:     { position: 'absolute', bottom: 28, left: 20, right: 20, backgroundColor: '#115533', borderRadius: 14, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingVertical: 14, elevation: 10 },
-  toastText: { fontFamily: Font.bodySemiBold, fontSize: 14, color: '#fff', flex: 1 },
+  // Photo action sheet
+  photoSheet:      { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 44 },
+  photoSheetTitle: { fontFamily: Font.headerBold, fontSize: 17, textAlign: 'center', marginBottom: 20 },
+  photoSheetBtn:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+  photoSheetIcon:  { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  photoSheetLabel: { fontFamily: Font.bodySemiBold, fontSize: 15 },
 });
