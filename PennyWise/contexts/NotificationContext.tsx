@@ -7,6 +7,10 @@ import type { ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { generateNotifications, type AppNotification } from '@/lib/notifications';
+import {
+  loadNotifPrefs, saveNotifPrefs, filterByPrefs,
+  DEFAULT_PREFS, type NotifPrefs,
+} from '@/lib/notificationPrefs';
 
 const READ_KEY = 'pw_notif_read_v1';
 
@@ -18,11 +22,13 @@ type NotificationCtx = {
   unreadCount: number;
   panelVisible: boolean;
   bellLayout: BellLayout | null;
+  prefs: NotifPrefs;
   openPanel: (layout: BellLayout) => void;
   closePanel: () => void;
   markRead: (id: string) => void;
   markAllRead: () => void;
   refresh: () => Promise<void>;
+  updatePrefs: (prefs: NotifPrefs) => Promise<void>;
 };
 
 const NotificationContext = createContext<NotificationCtx>({
@@ -31,11 +37,13 @@ const NotificationContext = createContext<NotificationCtx>({
   unreadCount:    0,
   panelVisible:   false,
   bellLayout:     null,
+  prefs:          DEFAULT_PREFS,
   openPanel:      () => {},
   closePanel:     () => {},
   markRead:       () => {},
   markAllRead:    () => {},
   refresh:        async () => {},
+  updatePrefs:    async () => {},
 });
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
@@ -43,15 +51,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [readIds, setReadIds]             = useState<Set<string>>(new Set());
   const [panelVisible, setPanelVisible]   = useState(false);
   const [bellLayout, setBellLayout]       = useState<BellLayout | null>(null);
+  const [prefs, setPrefs]                 = useState<NotifPrefs>(DEFAULT_PREFS);
   const userIdRef = useRef<string | null>(null);
 
-  // ── Restore persisted read set ─────────────────────────────────────────────
+  // ── Restore persisted read set + prefs ────────────────────────────────────
   useEffect(() => {
     AsyncStorage.getItem(READ_KEY).then(raw => {
       if (raw) {
         try { setReadIds(new Set(JSON.parse(raw) as string[])); } catch {}
       }
     });
+    loadNotifPrefs().then(setPrefs);
   }, []);
 
   const persistRead = useCallback((ids: Set<string>) => {
@@ -65,7 +75,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     userIdRef.current = user.id;
     try {
       const notifs = await generateNotifications(user.id);
-      setNotifications(notifs);
+      const currentPrefs = await loadNotifPrefs();
+      setPrefs(currentPrefs);
+      setNotifications(filterByPrefs(notifs, currentPrefs));
     } catch {}
   }, []);
 
@@ -111,6 +123,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const closePanel = useCallback(() => setPanelVisible(false), []);
 
+  const updatePrefs = useCallback(async (next: NotifPrefs) => {
+    await saveNotifPrefs(next);
+    setPrefs(next);
+    if (userIdRef.current) {
+      try {
+        const notifs = await generateNotifications(userIdRef.current);
+        setNotifications(filterByPrefs(notifs, next));
+      } catch {}
+    }
+  }, []);
+
   return (
     <NotificationContext.Provider value={{
       notifications,
@@ -118,11 +141,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       unreadCount,
       panelVisible,
       bellLayout,
+      prefs,
       openPanel,
       closePanel,
       markRead,
       markAllRead,
       refresh,
+      updatePrefs,
     }}>
       {children}
     </NotificationContext.Provider>

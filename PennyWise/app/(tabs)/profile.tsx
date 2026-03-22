@@ -33,9 +33,10 @@ import ErrorModal from '@/components/ErrorModal';
 import { ProfileInfoSkeleton, ProfileAvatarSkeleton, ProfileCardSkeleton } from '@/components/SkeletonLoader';
 import NotificationBell from '@/components/NotificationBell';
 import BudgetLimitModal from '@/components/BudgetLimitModal';
+import { useNotifications } from '@/contexts/NotificationContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Screen = 'profile' | 'edit' | 'terms' | 'settings';
+type Screen = 'profile' | 'edit' | 'terms' | 'settings' | 'notif-settings';
 type IoniconName = keyof typeof Ionicons.glyphMap;
 type ProfileData = { full_name: string; email: string; phone: string; avatar_url?: string };
 
@@ -658,7 +659,7 @@ function DeleteAccountModal({
 }
 
 // ── Settings view ─────────────────────────────────────────────────────────────
-function SettingsView({ onBack }: { onBack: () => void }) {
+function SettingsView({ onBack, navigate }: { onBack: () => void; navigate: (s: Screen) => void }) {
   const { theme, darkMode, toggleDark } = useAppTheme();
   const [deleteVisible, setDeleteVisible]   = useState(false);
   const [budgetVisible, setBudgetVisible]   = useState(false);
@@ -738,7 +739,7 @@ function SettingsView({ onBack }: { onBack: () => void }) {
         {/* Notifications */}
         <Text style={[styles.formSectionTitle, { color: theme.textMuted, marginTop: 24 }]}>NOTIFICATIONS</Text>
         <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
-          <MenuItem icon="notifications-outline" iconBg="#2A7E8F" label="Notification Settings" last />
+          <MenuItem icon="notifications-outline" iconBg="#2A7E8F" label="Notification Settings" last onPress={() => navigate('notif-settings')} />
         </View>
 
         {/* Security */}
@@ -779,6 +780,91 @@ function SettingsView({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ── Notification settings view ────────────────────────────────────────────────
+const NOTIF_CATEGORIES = [
+  { key: 'budget_70'       as const, icon: 'alert-outline'            as IoniconName, bg: '#F59E0B', label: 'Budget Getting Low',         desc: "You'll get a heads-up when your monthly spending hits 70% of your budget, so you can slow down before it's too late."         },
+  { key: 'budget_90'       as const, icon: 'alert-circle-outline'     as IoniconName, bg: '#E05555', label: 'Budget Almost Gone',         desc: "A stronger warning when 90% of your budget is used up — only a small amount is left for the rest of the month."             },
+  { key: 'budget_exceeded' as const, icon: 'warning-outline'          as IoniconName, bg: '#C0392B', label: 'Budget Exceeded',            desc: "Get notified immediately when your spending goes over your monthly budget limit."                                           },
+  { key: 'low_balance'     as const, icon: 'trending-down-outline'    as IoniconName, bg: '#E67E22', label: 'Low Total Balance',          desc: "Alerts you when your total available balance drops below 10% of your budget — a sign that funds are running low."            },
+  { key: 'goal_50'         as const, icon: 'golf-outline'             as IoniconName, bg: '#3B82F6', label: 'Savings Goal: Halfway',      desc: "Celebrate the milestone when any of your savings goals reaches 50% of its target amount."                                   },
+  { key: 'goal_75'         as const, icon: 'trending-up-outline'      as IoniconName, bg: '#1B7A4A', label: 'Savings Goal: Almost There', desc: "Stay motivated — get notified when a savings goal hits 75% and you're in the home stretch."                                 },
+  { key: 'goal_100'        as const, icon: 'checkmark-circle-outline' as IoniconName, bg: '#115533', label: 'Savings Goal: Completed',    desc: "A congratulations notification when you fully reach a savings goal target."                                                  },
+  { key: 'no_goals'        as const, icon: 'flag-outline'             as IoniconName, bg: '#6B7280', label: 'No Savings Goals Set',       desc: "A gentle reminder to create a savings goal if you don't have one yet — a great way to stay financially focused."             },
+  { key: 'new_month'       as const, icon: 'sparkles-outline'         as IoniconName, bg: '#8B5CF6', label: 'New Month Greeting',         desc: "A fresh-start message during the first 3 days of each month, encouraging you to review your budget and set new targets."     },
+  { key: 'recurring'       as const, icon: 'repeat-outline'           as IoniconName, bg: '#06B6D4', label: 'Recurring Expense Reminder', desc: "A prompt during the first 7 days of the month to log your regular bills and subscriptions before you forget."                },
+] as const;
+
+function NotificationSettingsView({ onBack }: { onBack: () => void }) {
+  const { theme } = useAppTheme();
+  const { prefs, updatePrefs } = useNotifications();
+  const [local, setLocal] = useState(prefs);
+  const [saving, setSaving] = useState(false);
+
+  async function toggle(key: keyof typeof local) {
+    const next = { ...local, [key]: !local[key] };
+    setLocal(next);
+    setSaving(true);
+    await updatePrefs(next);
+    setSaving(false);
+  }
+
+  return (
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
+      <StatusBar style={theme.statusBar} />
+      <View style={[styles.greenSection, { backgroundColor: theme.headerBg, paddingBottom: 20 }]}>
+        <NavHeader title="Notification Settings" onBack={onBack} />
+      </View>
+
+      <ScrollView
+        style={[styles.card, { backgroundColor: theme.cardBg }]}
+        contentContainerStyle={[styles.cardContent, { paddingTop: 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Info banner */}
+        <View style={[styles.notifInfoBanner, { backgroundColor: theme.surface }]}>
+          <Ionicons name="information-circle-outline" size={20} color="#2A7E8F" style={{ marginTop: 1 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.notifInfoTitle, { color: theme.textPrimary }]}>Manage your notifications</Text>
+            <Text style={[styles.notifInfoBody,  { color: theme.textSecondary }]}>
+              Toggle each type on or off to control which in-app alerts you receive. Changes take effect immediately.
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[styles.formSectionTitle, { color: theme.textMuted, marginTop: 24 }]}>NOTIFICATION TYPES</Text>
+        <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+          {NOTIF_CATEGORIES.map((cat, i) => (
+            <View
+              key={cat.key}
+              style={[
+                styles.notifRow,
+                i < NOTIF_CATEGORIES.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.divider },
+              ]}
+            >
+              <View style={[styles.menuIconCircle, { backgroundColor: cat.bg, marginRight: 14, alignSelf: 'flex-start', marginTop: 2 }]}>
+                <Ionicons name={cat.icon} size={18} color="#fff" />
+              </View>
+              <View style={{ flex: 1, marginRight: 12 }}>
+                <Text style={[styles.notifRowLabel, { color: theme.textPrimary }]}>{cat.label}</Text>
+                <Text style={[styles.notifRowDesc,  { color: theme.textMuted   }]}>{cat.desc}</Text>
+              </View>
+              <Switch
+                value={local[cat.key]}
+                onValueChange={() => toggle(cat.key)}
+                disabled={saving}
+                trackColor={{ false: theme.inputBorder, true: '#1B7A4A' }}
+                thumbColor="#fff"
+                style={{ alignSelf: 'flex-start', marginTop: 2 }}
+              />
+            </View>
+          ))}
+        </View>
+        <View style={{ height: 32 }} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 // ── Root ──────────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const [screen, setScreen]   = useState<Screen>('profile');
@@ -807,7 +893,8 @@ export default function ProfileScreen() {
 
   if (screen === 'edit')     return <EditProfileView profile={profile} onBack={() => setScreen('profile')} onSaved={u => setProfile(u)} />;
   if (screen === 'terms')    return <TermsView onBack={() => setScreen('profile')} />;
-  if (screen === 'settings') return <SettingsView onBack={() => setScreen('profile')} />;
+  if (screen === 'notif-settings') return <NotificationSettingsView onBack={() => setScreen('settings')} />;
+  if (screen === 'settings') return <SettingsView onBack={() => setScreen('profile')} navigate={setScreen} />;
   return <ProfileView profile={profile} loading={loading} navigate={setScreen} />;
 }
 
@@ -877,6 +964,14 @@ const styles = StyleSheet.create({
   checkbox:      { width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
   checkboxOn:    { backgroundColor: '#1B7A4A', borderColor: '#1B7A4A' },
   checkLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, flex: 1 },
+
+  // Notification settings
+  notifInfoBanner: { flexDirection: 'row', gap: 12, borderRadius: 16, padding: 16 },
+  notifInfoTitle:  { fontFamily: Font.bodySemiBold, fontSize: 14, marginBottom: 4 },
+  notifInfoBody:   { fontFamily: Font.bodyRegular, fontSize: 13, lineHeight: 19 },
+  notifRow:        { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 14, paddingHorizontal: 16 },
+  notifRowLabel:   { fontFamily: Font.bodySemiBold, fontSize: 15, marginBottom: 4 },
+  notifRowDesc:    { fontFamily: Font.bodyRegular, fontSize: 12, lineHeight: 18 },
 
   // Photo action sheet
   photoSheet:      { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 44 },
