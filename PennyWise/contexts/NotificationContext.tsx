@@ -1,6 +1,6 @@
 /**
  * contexts/NotificationContext.tsx
- * Global in-app notification state. Persists read-state across sessions via AsyncStorage.
+ * Global in-app notification state. Persists read-state via AsyncStorage; prefs via Supabase.
  */
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -54,28 +54,29 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs]                 = useState<NotifPrefs>(DEFAULT_PREFS);
   const userIdRef = useRef<string | null>(null);
 
-  // ── Restore persisted read set + prefs ────────────────────────────────────
+  // ── Restore persisted read set (local) ────────────────────────────────────
   useEffect(() => {
     AsyncStorage.getItem(READ_KEY).then(raw => {
       if (raw) {
         try { setReadIds(new Set(JSON.parse(raw) as string[])); } catch {}
       }
     });
-    loadNotifPrefs().then(setPrefs);
   }, []);
 
   const persistRead = useCallback((ids: Set<string>) => {
     AsyncStorage.setItem(READ_KEY, JSON.stringify([...ids]));
   }, []);
 
-  // ── Fetch notifications ────────────────────────────────────────────────────
+  // ── Fetch notifications + prefs from Supabase ─────────────────────────────
   const refresh = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     userIdRef.current = user.id;
     try {
-      const notifs = await generateNotifications(user.id);
-      const currentPrefs = await loadNotifPrefs();
+      const [notifs, currentPrefs] = await Promise.all([
+        generateNotifications(user.id),
+        loadNotifPrefs(user.id),
+      ]);
       setPrefs(currentPrefs);
       setNotifications(filterByPrefs(notifs, currentPrefs));
     } catch {}
@@ -88,6 +89,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       if (event === 'SIGNED_IN')  refresh();
       if (event === 'SIGNED_OUT') {
         setNotifications([]);
+        setPrefs(DEFAULT_PREFS);
         userIdRef.current = null;
       }
     });
@@ -124,14 +126,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const closePanel = useCallback(() => setPanelVisible(false), []);
 
   const updatePrefs = useCallback(async (next: NotifPrefs) => {
-    await saveNotifPrefs(next);
+    if (!userIdRef.current) return;
+    await saveNotifPrefs(userIdRef.current, next);
     setPrefs(next);
-    if (userIdRef.current) {
-      try {
-        const notifs = await generateNotifications(userIdRef.current);
-        setNotifications(filterByPrefs(notifs, next));
-      } catch {}
-    }
+    try {
+      const notifs = await generateNotifications(userIdRef.current);
+      setNotifications(filterByPrefs(notifs, next));
+    } catch {}
   }, []);
 
   return (

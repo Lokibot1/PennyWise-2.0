@@ -1,7 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from './supabase';
 import type { AppNotification } from './notifications';
-
-const PREFS_KEY = 'pw_notif_prefs_v1';
 
 export type NotifPrefs = {
   budget_70:        boolean;
@@ -29,18 +27,21 @@ export const DEFAULT_PREFS: NotifPrefs = {
   recurring:       true,
 };
 
-export async function loadNotifPrefs(): Promise<NotifPrefs> {
-  try {
-    const raw = await AsyncStorage.getItem(PREFS_KEY);
-    if (!raw) return { ...DEFAULT_PREFS };
-    return { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<NotifPrefs>) };
-  } catch {
-    return { ...DEFAULT_PREFS };
-  }
+export async function loadNotifPrefs(userId: string): Promise<NotifPrefs> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('notification_prefs')
+    .eq('id', userId)
+    .single();
+  if (error || !data?.notification_prefs) return { ...DEFAULT_PREFS };
+  return { ...DEFAULT_PREFS, ...(data.notification_prefs as Partial<NotifPrefs>) };
 }
 
-export async function saveNotifPrefs(prefs: NotifPrefs): Promise<void> {
-  await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+export async function saveNotifPrefs(userId: string, prefs: NotifPrefs): Promise<void> {
+  await supabase
+    .from('profiles')
+    .update({ notification_prefs: prefs })
+    .eq('id', userId);
 }
 
 export function filterByPrefs(notifs: AppNotification[], prefs: NotifPrefs): AppNotification[] {
