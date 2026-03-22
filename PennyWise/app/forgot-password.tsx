@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { FormInput } from '@/components/form-input';
 import { Font } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
+import { loadingBar } from '@/components/GlobalLoadingBar';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail]   = useState('');
@@ -28,11 +29,13 @@ export default function ForgotPasswordScreen() {
     if (!email.trim()) return;
     setLoading(true);
     setError('');
+    loadingBar.start();
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       email.trim()
     );
 
+    loadingBar.finish();
     setLoading(false);
 
     if (resetError) {

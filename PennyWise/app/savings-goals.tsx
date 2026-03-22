@@ -12,6 +12,7 @@ import { StatusBar } from 'expo-status-bar';
 import { supabase } from '@/lib/supabase';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { sfx } from '@/lib/sfx';
+import { loadingBar } from '@/components/GlobalLoadingBar';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -164,12 +165,14 @@ export default function SavingsGoalsScreen() {
     if (!userId) return;
 
     setSaving(true);
+    loadingBar.start();
     const { error } = await supabase.from('savings_goals').insert({
       user_id: userId, title: newTitle.trim(), icon: newIcon,
       target_amount: target, current_amount: 0,
       is_completed: false, is_archived: false,
     });
     setSaving(false);
+    loadingBar.finish();
     if (error) { Alert.alert('Error', error.message); return; }
 
     sfx.coin();
@@ -205,6 +208,7 @@ export default function SavingsGoalsScreen() {
     }
 
     setEditSaving(true);
+    loadingBar.start();
 
     // Check if this edit makes the goal complete
     const isNowComplete = editingGoal.current_amount >= target;
@@ -221,6 +225,7 @@ export default function SavingsGoalsScreen() {
       })
       .eq('id', editingGoal.id);
 
+    loadingBar.finish();
     setEditSaving(false);
     if (error) { Alert.alert('Error', error.message); return; }
 
@@ -258,6 +263,7 @@ export default function SavingsGoalsScreen() {
     if (!amount || amount <= 0) { Alert.alert('Missing info', 'Please enter a valid amount.'); return; }
 
     setAddingFunds(true);
+    loadingBar.start();
     const newCurrent = selectedGoal.current_amount + amount;
     const isComplete = newCurrent >= selectedGoal.target_amount;
 
@@ -270,6 +276,7 @@ export default function SavingsGoalsScreen() {
         completed_at:   isComplete ? new Date().toISOString() : null,
       })
       .eq('id', selectedGoal.id);
+    loadingBar.finish();
     setAddingFunds(false);
     if (error) { Alert.alert('Error', error.message); return; }
 
@@ -321,7 +328,9 @@ export default function SavingsGoalsScreen() {
     const goal = pendingArchiveGoal;
     setPendingArchiveGoal(null);
     sfx.warning();
+    loadingBar.start();
     await supabase.from('savings_goals').update({ is_archived: true }).eq('id', goal.id);
+    loadingBar.finish();
     fetchGoals(userId);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_ARCHIVED, entity_type: ENTITY.SAVINGS_GOAL,
@@ -339,7 +348,9 @@ export default function SavingsGoalsScreen() {
     const goal = pendingDeleteGoal;
     setPendingDeleteGoal(null);
     sfx.error();
+    loadingBar.start();
     await supabase.from('savings_goals').delete().eq('id', goal.id);
+    loadingBar.finish();
     fetchGoals(userId);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_DELETED, entity_type: ENTITY.SAVINGS_GOAL,
@@ -352,7 +363,9 @@ export default function SavingsGoalsScreen() {
   /* Restore */
   const handleRestoreGoal = async (goal: Goal) => {
     if (!userId) return;
+    loadingBar.start();
     await supabase.from('savings_goals').update({ is_archived: false }).eq('id', goal.id);
+    loadingBar.finish();
     fetchGoals(userId);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_RESTORED, entity_type: ENTITY.SAVINGS_GOAL,

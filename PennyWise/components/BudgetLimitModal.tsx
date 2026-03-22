@@ -18,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Font } from '@/constants/fonts';
 import { sfx } from '@/lib/sfx';
+import { loadingBar } from '@/components/GlobalLoadingBar';
 import { useAppTheme } from '@/contexts/AppTheme';
 
 type Props = {
@@ -57,11 +58,14 @@ export default function BudgetLimitModal({ visible, current, onClose, onSave }: 
   async function handleSave() {
     if (!isValid || saving) return;
     setSaving(true);
+    loadingBar.start();
     try {
       await onSave(parsed);
+      loadingBar.finish();
       sfx.coin();
       onClose();
     } catch (err: any) {
+      loadingBar.finish();
       setErrMsg(err?.message ?? 'Failed to save budget limit. Please try again.');
     } finally {
       setSaving(false);

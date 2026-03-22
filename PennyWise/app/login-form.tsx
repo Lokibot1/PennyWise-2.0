@@ -18,6 +18,7 @@ import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-na
 import { FormInput } from '@/components/form-input';
 import { Font } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
+import { loadingBar } from '@/components/GlobalLoadingBar';
 
 export default function LoginFormScreen() {
   const [email, setEmail]       = useState('');
@@ -32,12 +33,14 @@ export default function LoginFormScreen() {
     if (!email.trim() || !password) return;
     setLoading(true);
     setError('');
+    loadingBar.start();
 
     const { error: authError } = await supabase.auth.signInWithPassword({
       email:    email.trim(),
       password,
     });
 
+    loadingBar.finish();
     setLoading(false);
 
     if (authError) {

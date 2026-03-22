@@ -22,6 +22,7 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { sfx } from '@/lib/sfx';
+import { loadingBar } from '@/components/GlobalLoadingBar';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import ConfirmModal from '@/components/ConfirmModal';
 import ErrorModal from '@/components/ErrorModal';
@@ -133,7 +134,9 @@ function ProfileView({
   const [errModal, setErrModal] = useState({ visible: false, title: '', message: '' });
 
   async function confirmLogout() {
+    loadingBar.start();
     const { error } = await supabase.auth.signOut();
+    loadingBar.finish();
     if (error) setErrModal({ visible: true, title: 'Sign Out Failed', message: error.message });
   }
 
@@ -237,8 +240,10 @@ function EditProfileView({
   async function handleSave() {
     setConfirm(false);
     setSaving(true);
+    loadingBar.start();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
+      loadingBar.finish();
       setSaving(false);
       setErrModal({ visible: true, title: 'Authentication Error', message: userError?.message ?? 'Could not retrieve user. Please log in again.' });
       return;
@@ -247,6 +252,7 @@ function EditProfileView({
       .from('profiles')
       .update({ full_name: username.trim(), phone: phone.trim(), email: email.trim() })
       .eq('id', user.id);
+    loadingBar.finish();
     setSaving(false);
     if (error) {
       setErrModal({ visible: true, title: 'Failed to Update Profile', message: error.message });
@@ -557,7 +563,9 @@ function SettingsView({ onBack }: { onBack: () => void }) {
   }
 
   async function confirmDelete() {
+    loadingBar.start();
     const { error } = await supabase.auth.signOut();
+    loadingBar.finish();
     if (error) setErrModal({ visible: true, title: 'Sign Out Failed', message: error.message });
   }
 
@@ -585,7 +593,7 @@ function SettingsView({ onBack }: { onBack: () => void }) {
               <Text style={[styles.formToggleLabel, { color: theme.textPrimary, flex: 1 }]}>Dark Mode</Text>
               <Switch
                 value={darkMode}
-                onValueChange={() => { sfx.toggle(); toggleDark(); }}
+                onValueChange={() => { sfx.toggle(); loadingBar.start(); toggleDark(); setTimeout(() => loadingBar.finish(), 400); }}
                 trackColor={{ false: theme.inputBorder, true: '#1B7A4A' }}
                 thumbColor="#fff"
               />

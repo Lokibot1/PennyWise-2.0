@@ -7,6 +7,7 @@ import ErrorModal from '@/components/ErrorModal';
 import SlideTabBar from '@/components/SlideTabBar';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { sfx } from '@/lib/sfx';
+import { loadingBar } from '@/components/GlobalLoadingBar';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import NotificationBell from '@/components/NotificationBell';
 import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
@@ -1087,6 +1088,7 @@ export default function ManageExpenseScreen() {
       onYes: async () => {
         hideConfirm();
         setSaving(true);
+        loadingBar.start();
 
       if (screen.name === 'add') {
         const { data, error } = await supabase
@@ -1204,6 +1206,7 @@ export default function ManageExpenseScreen() {
         }
       }
 
+      loadingBar.finish();
       setSaving(false);
       },
     });
@@ -1211,7 +1214,9 @@ export default function ManageExpenseScreen() {
 
   const handleSaveCategory = async (id: string, label: string, icon: IoniconName) => {
     const oldCat = categories.find(c => c.id === id);
+    loadingBar.start();
     const { error } = await supabase.from('expense_categories').update({ label, icon }).eq('id', id);
+    loadingBar.finish();
     if (error) {
       showError('Failed to Update Category', error.message);
     } else {
@@ -1239,7 +1244,9 @@ export default function ManageExpenseScreen() {
       icon: 'archive-outline', confirmLabel: 'Archive', confirmColor: '#F59E0B',
       onYes: async () => {
         hideConfirm();
+        loadingBar.start();
         const { error } = await supabase.from('expense_categories').update({ is_archived: true }).eq('id', categoryId);
+        loadingBar.finish();
         if (error) {
           showError('Failed to Archive Category', error.message);
         } else {
@@ -1265,7 +1272,9 @@ export default function ManageExpenseScreen() {
       icon: 'refresh-outline', confirmLabel: 'Restore', confirmColor: '#3ECBA8',
       onYes: async () => {
         hideConfirm();
+        loadingBar.start();
         const { error } = await supabase.from('expense_categories').update({ is_archived: false }).eq('id', categoryId);
+        loadingBar.finish();
         if (error) {
           showError('Failed to Restore Category', error.message);
         } else {
@@ -1292,7 +1301,9 @@ export default function ManageExpenseScreen() {
       icon: 'trash-outline', confirmLabel: 'Delete', confirmColor: '#E05858',
       onYes: async () => {
         hideConfirm();
+        loadingBar.start();
         const { error } = await supabase.from('expense_categories').delete().eq('id', categoryId);
+        loadingBar.finish();
         if (error) {
           showError('Failed to Delete Category', error.message);
         } else {
@@ -1319,7 +1330,9 @@ export default function ManageExpenseScreen() {
       icon: 'archive-outline', confirmLabel: 'Archive', confirmColor: '#F59E0B',
       onYes: async () => {
         hideConfirm();
+        loadingBar.start();
         const { error } = await supabase.from('expenses').update({ is_archived: true }).eq('id', expenseId);
+        loadingBar.finish();
         if (error) {
           showError('Failed to Archive Expense', error.message);
         } else {
@@ -1346,7 +1359,9 @@ export default function ManageExpenseScreen() {
       icon: 'refresh-outline', confirmLabel: 'Restore', confirmColor: '#3ECBA8',
       onYes: async () => {
         hideConfirm();
+        loadingBar.start();
         const { error } = await supabase.from('expenses').update({ is_archived: false }).eq('id', expenseId);
+        loadingBar.finish();
         if (error) {
           showError('Failed to Restore Expense', error.message);
         } else {
@@ -1374,7 +1389,9 @@ export default function ManageExpenseScreen() {
       icon: 'trash-outline', confirmLabel: 'Delete', confirmColor: '#E05858',
       onYes: async () => {
         hideConfirm();
+        loadingBar.start();
         const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
+        loadingBar.finish();
         if (error) {
           showError('Failed to Delete Expense', error.message);
         } else {
@@ -1395,11 +1412,13 @@ export default function ManageExpenseScreen() {
   };
 
   const handleNewCategory = async (label: string, icon: IoniconName) => {
+    loadingBar.start();
     const { data, error } = await supabase
       .from('expense_categories')
       .insert({ user_id: userIdRef.current, label, icon })
       .select()
       .single();
+    loadingBar.finish();
 
     if (error) {
       showError('Failed to Create Category', error.message);

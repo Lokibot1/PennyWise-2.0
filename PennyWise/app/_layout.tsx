@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase";
 import { AppThemeProvider } from "@/contexts/AppTheme";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import NotificationPanel from "@/components/NotificationPanel";
+import GlobalLoadingBar from "@/components/GlobalLoadingBar";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -85,6 +86,7 @@ export default function RootLayout() {
         </Stack>
         <StatusBar style="auto" />
         <NotificationPanel />
+        <GlobalLoadingBar />
       </ThemeProvider>
       </NotificationProvider>
     </AppThemeProvider>

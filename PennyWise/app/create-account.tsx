@@ -19,6 +19,7 @@ import { PasswordStrength } from '@/components/password-strength';
 import DatePickerModal from '@/components/DatePickerModal';
 import { Font } from '@/constants/fonts';
 import { supabase } from '@/lib/supabase';
+import { loadingBar } from '@/components/GlobalLoadingBar';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const MAX_DOB = (() => {
@@ -67,6 +68,7 @@ export default function CreateAccountScreen() {
     if (password !== confirmPassword) return setError('Passwords do not match.');
 
     setLoading(true);
+    loadingBar.start();
 
     const { error: authError } = await supabase.auth.signUp({
       email:    email.trim(),
@@ -80,6 +82,7 @@ export default function CreateAccountScreen() {
       },
     });
 
+    loadingBar.finish();
     setLoading(false);
 
     if (authError) {
