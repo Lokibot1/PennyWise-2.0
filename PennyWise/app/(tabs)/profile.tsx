@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -19,10 +23,13 @@ import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import ConfirmModal from '@/components/ConfirmModal';
+import ErrorModal from '@/components/ErrorModal';
 import { ProfileInfoSkeleton, ProfileAvatarSkeleton, ProfileCardSkeleton } from '@/components/SkeletonLoader';
+import NotificationBell from '@/components/NotificationBell';
+import BudgetLimitModal from '@/components/BudgetLimitModal';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Screen = 'profile' | 'edit' | 'terms';
+type Screen = 'profile' | 'edit' | 'terms' | 'settings';
 type IoniconName = keyof typeof Ionicons.glyphMap;
 type ProfileData = { full_name: string; email: string; phone: string };
 
@@ -47,12 +54,7 @@ function NavHeader({ title, onBack }: { title: string; onBack?: () => void }) {
           : <PennyWiseLogo size="xs" />}
       </TouchableOpacity>
       <Text style={[styles.navTitle, { color: theme.iconBtnColor }]}>{title}</Text>
-      <TouchableOpacity
-        style={[styles.iconBtn, { backgroundColor: theme.iconBtnBg }]}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
-      </TouchableOpacity>
+      <NotificationBell style={[styles.iconBtn, { backgroundColor: theme.iconBtnBg }]} iconColor={theme.iconBtnColor} />
     </View>
   );
 }
@@ -127,9 +129,11 @@ function ProfileView({
 }) {
   const { theme } = useAppTheme();
   const [logoutVisible, setLogoutVisible] = useState(false);
+  const [errModal, setErrModal] = useState({ visible: false, title: '', message: '' });
 
   async function confirmLogout() {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) setErrModal({ visible: true, title: 'Sign Out Failed', message: error.message });
   }
 
   return (
@@ -179,7 +183,7 @@ function ProfileView({
 
             {/* General section */}
             <MenuGroup label="GENERAL">
-              <MenuItem icon="settings-outline" iconBg="#115533" label="Settings" />
+              <MenuItem icon="settings-outline" iconBg="#115533" label="Settings"       onPress={() => navigate('settings')} />
               <MenuItem icon="headset-outline"  iconBg="#43A872" label="Help & Support" last />
             </MenuGroup>
 
@@ -203,6 +207,13 @@ function ProfileView({
         confirmColor="#E05555"
         icon="log-out-outline"
       />
+
+      <ErrorModal
+        visible={errModal.visible}
+        title={errModal.title}
+        message={errModal.message}
+        onClose={() => setErrModal(p => ({ ...p, visible: false }))}
+      />
     </SafeAreaView>
   );
 }
@@ -213,24 +224,32 @@ function EditProfileView({
 }: {
   profile: ProfileData; onBack: () => void; onSaved: (u: ProfileData) => void;
 }) {
-  const { theme, darkMode, toggleDark } = useAppTheme();
+  const { theme } = useAppTheme();
   const [username, setUsername] = useState(profile.full_name);
   const [phone, setPhone]       = useState(profile.phone ?? '');
   const [email, setEmail]       = useState(profile.email);
   const [saving, setSaving]     = useState(false);
   const [confirm, setConfirm]   = useState(false);
   const [toast, setToast]       = useState(false);
+  const [errModal, setErrModal] = useState({ visible: false, title: '', message: '' });
 
   async function handleSave() {
     setConfirm(false);
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      setSaving(false);
+      setErrModal({ visible: true, title: 'Authentication Error', message: userError?.message ?? 'Could not retrieve user. Please log in again.' });
+      return;
+    }
     const { error } = await supabase
       .from('profiles')
       .update({ full_name: username.trim(), phone: phone.trim(), email: email.trim() })
-      .eq('id', user?.id);
+      .eq('id', user.id);
     setSaving(false);
-    if (!error) {
+    if (error) {
+      setErrModal({ visible: true, title: 'Failed to Update Profile', message: error.message });
+    } else {
       onSaved({ full_name: username.trim(), phone: phone.trim(), email: email.trim() });
       setToast(true);
       setTimeout(() => setToast(false), 2800);
@@ -281,7 +300,7 @@ function EditProfileView({
               <Ionicons name="call-outline" size={16} color="#1B7A4A" />
             </View>
             <View style={styles.formFieldBody}>
-              <Text style={[styles.formFieldLabel, { color: theme.textMuted }]}>Phone</Text>
+              <Text style={[styles.formFieldLabel, { color: theme.textMuted }]}>Phone (optional)</Text>
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={phone}
@@ -298,7 +317,7 @@ function EditProfileView({
               <Ionicons name="mail-outline" size={16} color="#1B7A4A" />
             </View>
             <View style={styles.formFieldBody}>
-              <Text style={[styles.formFieldLabel, { color: theme.textMuted }]}>Email</Text>
+              <Text style={[styles.formFieldLabel, { color: theme.textMuted }]}>Email (optional)</Text>
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={email}
@@ -307,25 +326,6 @@ function EditProfileView({
                 autoCapitalize="none"
                 placeholderTextColor={theme.textMuted}
                 placeholder="Enter your email"
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Preferences section */}
-        <Text style={[styles.formSectionTitle, { color: theme.textMuted, marginTop: 24 }]}>PREFERENCES</Text>
-        <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
-          <View style={styles.formField}>
-            <View style={styles.formFieldIcon}>
-              <Ionicons name="moon-outline" size={16} color="#1B7A4A" />
-            </View>
-            <View style={[styles.formFieldBody, { flexDirection: 'row', alignItems: 'center' }]}>
-              <Text style={[styles.formToggleLabel, { color: theme.textPrimary, flex: 1 }]}>Dark Theme</Text>
-              <Switch
-                value={darkMode}
-                onValueChange={toggleDark}
-                trackColor={{ false: theme.inputBorder, true: '#1B7A4A' }}
-                thumbColor="#fff"
               />
             </View>
           </View>
@@ -368,6 +368,13 @@ function EditProfileView({
           <Text style={styles.toastText}>Profile updated successfully.</Text>
         </View>
       )}
+
+      <ErrorModal
+        visible={errModal.visible}
+        title={errModal.title}
+        message={errModal.message}
+        onClose={() => setErrModal(p => ({ ...p, visible: false }))}
+      />
     </SafeAreaView>
   );
 }
@@ -415,6 +422,231 @@ function TermsView({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ── Delete account modal ───────────────────────────────────────────────────────
+function DeleteAccountModal({
+  visible,
+  onClose,
+  onConfirm,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const [input, setInput] = useState('');
+  const confirmed = input.trim() === 'DELETE';
+
+  function handleClose() {
+    setInput('');
+    onClose();
+  }
+
+  function handleConfirm() {
+    if (!confirmed) return;
+    setInput('');
+    onConfirm();
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent onRequestClose={handleClose}>
+      <KeyboardAvoidingView
+        style={{ flex: 1, justifyContent: 'flex-end' }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={handleClose} />
+        <Pressable style={[{
+          borderTopLeftRadius: 28, borderTopRightRadius: 28,
+          padding: 24, paddingBottom: 44, alignItems: 'center',
+          backgroundColor: theme.modalBg,
+        }]} onPress={() => {}}>
+
+          {/* Handle */}
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.divider, marginBottom: 24 }} />
+
+          {/* Icon */}
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(224,85,85,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+            <Ionicons name="trash-outline" size={30} color="#E05555" />
+          </View>
+
+          <Text style={{ fontFamily: Font.headerBold, fontSize: 20, color: theme.textPrimary, textAlign: 'center', marginBottom: 10 }}>
+            Delete Account?
+          </Text>
+          <Text style={{ fontFamily: Font.bodyRegular, fontSize: 13, color: theme.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 24, paddingHorizontal: 8 }}>
+            This will permanently delete your account and all your financial data. {'\n\n'}
+            To confirm, type{' '}
+            <Text style={{ fontFamily: Font.bodySemiBold, color: '#E05555' }}>DELETE</Text>
+            {' '}below.
+          </Text>
+
+          {/* Confirmation input */}
+          <TextInput
+            style={{
+              width: '100%',
+              borderWidth: 1.5,
+              borderColor: confirmed ? '#E05555' : theme.inputBorder,
+              borderRadius: 12,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              fontFamily: Font.bodySemiBold,
+              fontSize: 15,
+              color: '#E05555',
+              backgroundColor: theme.surface,
+              textAlign: 'center',
+              letterSpacing: 2,
+              marginBottom: 20,
+            }}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Type DELETE to confirm"
+            placeholderTextColor={theme.textMuted}
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
+
+          {/* Delete button */}
+          <TouchableOpacity
+            style={{
+              width: '100%', borderRadius: 14, paddingVertical: 14,
+              alignItems: 'center', marginBottom: 10,
+              backgroundColor: confirmed ? '#E05555' : theme.surface,
+            }}
+            onPress={handleConfirm}
+            activeOpacity={confirmed ? 0.85 : 1}
+          >
+            <Text style={{ fontFamily: Font.bodySemiBold, fontSize: 16, color: confirmed ? '#fff' : theme.textMuted }}>
+              Delete My Account
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={{ width: '100%', alignItems: 'center', paddingVertical: 10 }} onPress={handleClose} activeOpacity={0.7}>
+            <Text style={{ fontFamily: Font.bodyMedium, fontSize: 14, color: theme.textSecondary }}>Cancel</Text>
+          </TouchableOpacity>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ── Settings view ─────────────────────────────────────────────────────────────
+function SettingsView({ onBack }: { onBack: () => void }) {
+  const { theme, darkMode, toggleDark } = useAppTheme();
+  const [deleteVisible, setDeleteVisible]   = useState(false);
+  const [budgetVisible, setBudgetVisible]   = useState(false);
+  const [budgetLimit,   setBudgetLimit]     = useState(20000);
+  const [errModal,      setErrModal]        = useState({ visible: false, title: '', message: '' });
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user }, error: uErr }) => {
+      if (uErr || !user) return;
+      supabase.from('profiles').select('budget_limit').eq('id', user.id).single()
+        .then(({ data, error }) => {
+          if (!error && data?.budget_limit) setBudgetLimit(data.budget_limit);
+        });
+    });
+  }, []);
+
+  async function saveBudgetLimit(newLimit: number) {
+    const { data: { user }, error: uErr } = await supabase.auth.getUser();
+    if (uErr || !user) throw new Error(uErr?.message ?? 'Could not retrieve user.');
+    const { error } = await supabase.from('profiles').update({ budget_limit: newLimit }).eq('id', user.id);
+    if (error) throw error;
+    setBudgetLimit(newLimit);
+  }
+
+  async function confirmDelete() {
+    const { error } = await supabase.auth.signOut();
+    if (error) setErrModal({ visible: true, title: 'Sign Out Failed', message: error.message });
+  }
+
+  return (
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
+      <StatusBar style={theme.statusBar} />
+
+      <View style={[styles.greenSection, { backgroundColor: theme.headerBg, paddingBottom: 20 }]}>
+        <NavHeader title="Settings" onBack={onBack} />
+      </View>
+
+      <ScrollView
+        style={[styles.card, { backgroundColor: theme.cardBg }]}
+        contentContainerStyle={[styles.cardContent, { paddingTop: 28 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Appearance */}
+        <Text style={[styles.formSectionTitle, { color: theme.textMuted }]}>APPEARANCE</Text>
+        <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+          <View style={styles.formField}>
+            <View style={styles.formFieldIcon}>
+              <Ionicons name="moon-outline" size={16} color="#1B7A4A" />
+            </View>
+            <View style={[styles.formFieldBody, { flexDirection: 'row', alignItems: 'center' }]}>
+              <Text style={[styles.formToggleLabel, { color: theme.textPrimary, flex: 1 }]}>Dark Mode</Text>
+              <Switch
+                value={darkMode}
+                onValueChange={toggleDark}
+                trackColor={{ false: theme.inputBorder, true: '#1B7A4A' }}
+                thumbColor="#fff"
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* Budget */}
+        <Text style={[styles.formSectionTitle, { color: theme.textMuted, marginTop: 24 }]}>BUDGET</Text>
+        <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
+          <MenuItem
+            icon="wallet-outline"
+            iconBg="#1B7A4A"
+            label="Monthly Budget Limit"
+            value={`₱${budgetLimit.toLocaleString('en-PH')}`}
+            last
+            onPress={() => setBudgetVisible(true)}
+          />
+        </View>
+
+        {/* Notifications */}
+        <Text style={[styles.formSectionTitle, { color: theme.textMuted, marginTop: 24 }]}>NOTIFICATIONS</Text>
+        <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
+          <MenuItem icon="notifications-outline" iconBg="#2A7E8F" label="Notification Settings" last />
+        </View>
+
+        {/* Security */}
+        <Text style={[styles.formSectionTitle, { color: theme.textMuted, marginTop: 24 }]}>SECURITY</Text>
+        <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
+          <MenuItem icon="lock-closed-outline" iconBg="#115533" label="Password Settings" last />
+        </View>
+
+        {/* Danger zone */}
+        <Text style={[styles.formSectionTitle, { color: theme.textMuted, marginTop: 24 }]}>DANGER ZONE</Text>
+        <View style={[styles.dangerCard, { backgroundColor: 'rgba(224,85,85,0.08)' }]}>
+          <MenuItem icon="trash-outline" iconBg="#E05555" label="Delete Account" danger last onPress={() => setDeleteVisible(true)} />
+        </View>
+
+        <View style={{ height: 32 }} />
+      </ScrollView>
+
+      <BudgetLimitModal
+        visible={budgetVisible}
+        current={budgetLimit}
+        onClose={() => setBudgetVisible(false)}
+        onSave={saveBudgetLimit}
+      />
+
+      <DeleteAccountModal
+        visible={deleteVisible}
+        onClose={() => setDeleteVisible(false)}
+        onConfirm={confirmDelete}
+      />
+
+      <ErrorModal
+        visible={errModal.visible}
+        title={errModal.title}
+        message={errModal.message}
+        onClose={() => setErrModal(p => ({ ...p, visible: false }))}
+      />
+    </SafeAreaView>
+  );
+}
+
 // ── Root ──────────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const [screen, setScreen]   = useState<Screen>('profile');
@@ -440,8 +672,9 @@ export default function ProfileScreen() {
     return () => { cancelled = true; };
   }, []);
 
-  if (screen === 'edit')  return <EditProfileView profile={profile} onBack={() => setScreen('profile')} onSaved={u => setProfile(u)} />;
-  if (screen === 'terms') return <TermsView onBack={() => setScreen('profile')} />;
+  if (screen === 'edit')     return <EditProfileView profile={profile} onBack={() => setScreen('profile')} onSaved={u => setProfile(u)} />;
+  if (screen === 'terms')    return <TermsView onBack={() => setScreen('profile')} />;
+  if (screen === 'settings') return <SettingsView onBack={() => setScreen('profile')} />;
   return <ProfileView profile={profile} loading={loading} navigate={setScreen} />;
 }
 

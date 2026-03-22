@@ -3,9 +3,11 @@ import { router, useFocusEffect } from 'expo-router';
 import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
 import DatePickerModal from '@/components/DatePickerModal';
 import ConfirmModal from '@/components/ConfirmModal';
+import ErrorModal from '@/components/ErrorModal';
 import SlideTabBar from '@/components/SlideTabBar';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
+import NotificationBell from '@/components/NotificationBell';
 import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
 import {
   ActivityIndicator,
@@ -88,6 +90,13 @@ type ConfirmState = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmtAmt = (n: number) =>
   `₱${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+
+function fmtMoney(raw: string): string {
+  const clean = raw.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  const [whole, decimal] = clean.split('.');
+  const formatted = (whole || '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return decimal !== undefined ? `${formatted}.${decimal}` : formatted;
+}
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -188,9 +197,7 @@ function BalanceHeader({
             : <PennyWiseLogo size="xs" />}
         </TouchableOpacity>
         <Text style={[bh.title, { color: theme.iconBtnColor }]}>{title}</Text>
-        <TouchableOpacity style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
-          <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
-        </TouchableOpacity>
+        <NotificationBell style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} iconColor={theme.iconBtnColor} />
       </View>
 
       <View style={[bh.card, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
@@ -238,9 +245,7 @@ function FormHeader({ title, onBack, theme }: { title: string; onBack: () => voi
           <Ionicons name="chevron-back" size={22} color={theme.iconBtnColor} />
         </TouchableOpacity>
         <Text style={[fh.title, { color: theme.iconBtnColor }]}>{title}</Text>
-        <TouchableOpacity style={[fh.iconBtn, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
-          <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
-        </TouchableOpacity>
+        <NotificationBell style={[fh.iconBtn, { backgroundColor: theme.iconBtnBg }]} iconColor={theme.iconBtnColor} />
       </View>
     </View>
   );
@@ -307,8 +312,10 @@ const pk = StyleSheet.create({
 
 // ── NewCategoryModal ──────────────────────────────────────────────────────────
 const NEW_CAT_ICONS: IoniconName[] = [
-  'star-outline', 'gift-outline', 'ribbon-outline', 'trophy-outline',
-  'diamond-outline', 'heart-outline', 'planet-outline', 'sparkles-outline',
+  'home-outline',          'cart-outline',         'car-outline',          'restaurant-outline',
+  'flash-outline',         'medkit-outline',        'school-outline',       'phone-portrait-outline',
+  'shirt-outline',         'game-controller-outline','airplane-outline',    'cafe-outline',
+  'wifi-outline',          'tv-outline',            'fitness-outline',      'build-outline',
 ];
 
 const ncm = StyleSheet.create({
@@ -327,14 +334,16 @@ function NewCategoryModal({
   onCreate: (label: string, icon: IoniconName) => void;
   theme: Theme;
 }) {
-  const [label, setLabel] = useState('');
-  const [icon, setIcon]   = useState<IoniconName>('star-outline');
+  const [label, setLabel]       = useState('');
+  const [icon, setIcon]         = useState<IoniconName>('home-outline');
+  const [nameError, setNameError] = useState(false);
 
   const handleCreate = () => {
-    if (!label.trim()) return;
+    if (!label.trim()) { setNameError(true); return; }
     onCreate(label.trim(), icon);
     setLabel('');
-    setIcon('star-outline');
+    setIcon('home-outline');
+    setNameError(false);
     onClose();
   };
 
@@ -348,15 +357,18 @@ function NewCategoryModal({
           <Pressable style={[ncm.card, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
             <Text style={[pk.heading, { color: theme.textPrimary }]}>New Expense Category</Text>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <Text style={s.label}>Category Name</Text>
+              <Text style={[s.label, { color: nameError ? '#E05555' : theme.textPrimary }]}>
+                Category Name
+              </Text>
               <Text style={s.hint}>e.g. Rent, Groceries, Transport, Utilities…</Text>
-              <View style={[s.fieldRow, { marginBottom: 4 }]}>
+              <View style={[s.fieldRow, { marginBottom: 4 }, nameError && { borderWidth: 1.5, borderColor: '#E05555', backgroundColor: 'rgba(224,85,85,0.06)' }]}>
+                <Ionicons name="tag-outline" size={16} color={nameError ? '#E0908A' : '#aaa'} style={{ marginRight: 8 }} />
                 <TextInput
                   style={[s.fieldTxt, { flex: 1 }]}
                   value={label}
-                  onChangeText={setLabel}
-                  placeholder="Category name"
-                  placeholderTextColor="#aaa"
+                  onChangeText={t => { setLabel(t); if (nameError) setNameError(false); }}
+                  placeholder="e.g. Rent, Groceries, Transport"
+                  placeholderTextColor={nameError ? '#E0908A' : '#aaa'}
                 />
               </View>
 
@@ -369,7 +381,7 @@ function NewCategoryModal({
                     onPress={() => setIcon(ic)}
                     activeOpacity={0.8}
                   >
-                    <Ionicons name={ic} size={22} color={icon === ic ? '#fff' : '#E05858'} />
+                    <Ionicons name={ic} size={22} color={icon === ic ? '#fff' : '#2A7E8F'} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -418,11 +430,12 @@ function EditCategoryModal({
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={[s.label, { color: theme.textPrimary }]}>Category Name</Text>
               <View style={[s.fieldRow, { marginBottom: 4, backgroundColor: theme.inputBg }]}>
+                <Ionicons name="tag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
                 <TextInput
                   style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
                   value={label}
                   onChangeText={setLabel}
-                  placeholder="Category name"
+                  placeholder="e.g. Rent, Groceries, Transport"
                   placeholderTextColor="#aaa"
                 />
               </View>
@@ -430,7 +443,7 @@ function EditCategoryModal({
               <View style={s.iconGrid}>
                 {NEW_CAT_ICONS.map(ic => (
                   <TouchableOpacity key={ic} style={[s.iconOpt, icon === ic && s.iconOptActive]} onPress={() => setIcon(ic)} activeOpacity={0.8}>
-                    <Ionicons name={ic} size={22} color={icon === ic ? '#fff' : '#E05858'} />
+                    <Ionicons name={ic} size={22} color={icon === ic ? '#fff' : '#2A7E8F'} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -509,7 +522,7 @@ function CategoriesScreen({
                 })}
                 <TouchableOpacity style={s.catCard} onPress={onAddCategory} activeOpacity={0.85}>
                   <View style={[s.catIcon, s.catIconMore]}>
-                    <Ionicons name="add" size={32} color="#E05858" />
+                    <Ionicons name="add" size={32} color="#2A7E8F" />
                   </View>
                   <Text style={[s.catLabel, { color: theme.textPrimary }]}>More</Text>
                 </TouchableOpacity>
@@ -619,7 +632,7 @@ function CategoryDetailScreen({
       key={exp.id}
       style={[s.expRow, idx < items.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.divider }]}
     >
-      <View style={[s.expIcon, { backgroundColor: '#E05858' }]}>
+      <View style={[s.expIcon, { backgroundColor: '#2A7E8F' }]}>
         <Ionicons name={category.icon} size={20} color="#fff" />
       </View>
       <TouchableOpacity style={{ flex: 1 }} onPress={() => onEditExpense(exp.id)} activeOpacity={0.85}>
@@ -820,12 +833,13 @@ function ExpenseFormScreen({
             {/* Amount */}
             <Text style={[s.label, { color: theme.textPrimary }]}>Amount</Text>
             <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
+              <Ionicons name="cash-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
               <TextInput
                 style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
                 value={vals.amount}
-                onChangeText={v => set('amount', v)}
+                onChangeText={v => set('amount', fmtMoney(v))}
                 keyboardType="decimal-pad"
-                placeholder="₱0.00"
+                placeholder="e.g. 1,500.00"
                 placeholderTextColor="#aaa"
               />
             </View>
@@ -833,6 +847,7 @@ function ExpenseFormScreen({
             {/* Title */}
             <Text style={[s.label, { color: theme.textPrimary }]}>Expense Title</Text>
             <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
+              <Ionicons name="pencil-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
               <TextInput
                 style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
                 value={vals.title}
@@ -843,13 +858,14 @@ function ExpenseFormScreen({
             </View>
 
             {/* Description */}
-            <Text style={[s.label, { color: theme.textPrimary }]}>Description</Text>
+            <Text style={[s.label, { color: theme.textPrimary }]}>Description (optional)</Text>
             <View style={[s.fieldRow, { alignItems: 'flex-start', minHeight: 100, backgroundColor: theme.inputBg }]}>
+              <Ionicons name="document-text-outline" size={16} color="#aaa" style={{ marginRight: 8, marginTop: 2 }} />
               <TextInput
                 style={[s.fieldTxt, { flex: 1, textAlignVertical: 'top', paddingTop: 2, minHeight: 80, color: theme.textPrimary }]}
                 value={vals.description}
                 onChangeText={v => set('description', v)}
-                placeholder="Enter description"
+                placeholder="e.g. Paid at SM Mall"
                 placeholderTextColor="#aaa"
                 multiline
               />
@@ -957,6 +973,7 @@ export default function ManageExpenseScreen() {
   const [showNewCat,  setShowNewCat]  = useState(false);
   const [editCat,     setEditCat]     = useState<Category | null>(null);
   const [toast,       setToast]       = useState('');
+  const [errModal,    setErrModal]    = useState({ visible: false, title: '', message: '' });
   const [catNavKey,    setCatNavKey]    = useState(0);
   const [catNavTab,    setCatNavTab]    = useState<'Active' | 'Archived'>('Active');
   const [detailNavTab, setDetailNavTab] = useState<'Active' | 'Archived'>('Active');
@@ -981,43 +998,51 @@ export default function ManageExpenseScreen() {
   // ── Load from Supabase ──────────────────────────────────────────────────────
   useEffect(() => {
     async function loadData(userId: string) {
-      const [incomeRes, catRes, expRes] = await Promise.all([
-        // Budget limit = total of all active income sources
-        supabase.from('income_sources').select('amount').eq('user_id', userId).eq('is_archived', false),
-        supabase.from('expense_categories').select('id, label, icon, is_archived').eq('user_id', userId),
-        supabase.from('expenses').select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived').eq('user_id', userId),
-      ]);
+      try {
+        const [incomeRes, catRes, expRes] = await Promise.all([
+          // Budget limit = total of all active income sources
+          supabase.from('income_sources').select('amount').eq('user_id', userId).eq('is_archived', false),
+          supabase.from('expense_categories').select('id, label, icon, is_archived').eq('user_id', userId),
+          supabase.from('expenses').select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived').eq('user_id', userId),
+        ]);
 
-      if (incomeRes.data) {
-        const totalIncome = incomeRes.data.reduce((sum, r) => sum + Number(r.amount), 0);
-        setBudgetLimit(totalIncome);
+        if (incomeRes.error) throw incomeRes.error;
+        if (catRes.error)    throw catRes.error;
+        if (expRes.error)    throw expRes.error;
+
+        if (incomeRes.data) {
+          const totalIncome = incomeRes.data.reduce((sum, r) => sum + Number(r.amount), 0);
+          setBudgetLimit(totalIncome);
+        }
+
+        if (catRes.data) {
+          setCategories(catRes.data.map(c => ({
+            id:         c.id,
+            label:      c.label,
+            icon:       c.icon as IoniconName,
+            isArchived: c.is_archived,
+          })));
+        }
+
+        if (expRes.data) {
+          setExpenses(expRes.data.map(e => ({
+            id:          e.id,
+            categoryId:  e.category_id,
+            title:       e.title,
+            amount:      Number(e.amount),
+            date:        e.date,
+            time:        e.time,
+            description: e.description,
+            isRecurring: e.is_recurring,
+            frequency:   e.frequency as Frequency | null,
+            isArchived:  e.is_archived,
+          })));
+        }
+      } catch (err: any) {
+        showError('Failed to Load', err?.message ?? 'Could not load expenses. Please try again.');
+      } finally {
+        setLoading(false);
       }
-
-      if (catRes.data) {
-        setCategories(catRes.data.map(c => ({
-          id:         c.id,
-          label:      c.label,
-          icon:       c.icon as IoniconName,
-          isArchived: c.is_archived,
-        })));
-      }
-
-      if (expRes.data) {
-        setExpenses(expRes.data.map(e => ({
-          id:          e.id,
-          categoryId:  e.category_id,
-          title:       e.title,
-          amount:      Number(e.amount),
-          date:        e.date,
-          time:        e.time,
-          description: e.description,
-          isRecurring: e.is_recurring,
-          frequency:   e.frequency as Frequency | null,
-          isArchived:  e.is_archived,
-        })));
-      }
-
-      setLoading(false);
     }
 
     // Use onAuthStateChange to avoid the AsyncStorage race condition.
@@ -1046,6 +1071,7 @@ export default function ManageExpenseScreen() {
 
   const showConfirm = (opts: Omit<ConfirmState, 'visible'>) => setConfirm({ visible: true, ...opts });
   const hideConfirm = () => setConfirm(prev => ({ ...prev, visible: false }));
+  const showError   = (title: string, msg: string) => setErrModal({ visible: true, title, message: msg });
 
   // ── Action Handlers ───────────────────────────────────────────────────────────
   const handleSave = (vals: ExpenseFormValues) => {
@@ -1068,7 +1094,7 @@ export default function ManageExpenseScreen() {
             user_id:     userIdRef.current,
             category_id: vals.categoryId,
             title:       vals.title.trim(),
-            amount:      parseFloat(vals.amount) || 0,
+            amount:      parseFloat(vals.amount.replace(/,/g, '')) || 0,
             date:        vals.date,
             time:        new Date().toTimeString().slice(0, 5),
             description: vals.description.trim(),
@@ -1078,7 +1104,10 @@ export default function ManageExpenseScreen() {
           .select()
           .single();
 
-        if (!error && data) {
+        if (error) {
+          showError('Failed to Save Expense', error.message);
+          setSaving(false);
+        } else if (data) {
           setExpenses(prev => [...prev, {
             id:          data.id,
             categoryId:  data.category_id,
@@ -1098,7 +1127,7 @@ export default function ManageExpenseScreen() {
             action_type: ACTION.EXPENSE_ADDED,
             entity_type: ENTITY.EXPENSE,
             title:       `Expense Added: ${vals.title.trim()}`,
-            description: `₱${(parseFloat(vals.amount) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Expense'}`,
+            description: `₱${(parseFloat(vals.amount.replace(/,/g, '')) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Expense'}`,
             icon:        cat?.icon ?? 'receipt-outline',
           });
           setScreen({ name: 'detail', categoryId: screen.prefillCategoryId });
@@ -1107,7 +1136,7 @@ export default function ManageExpenseScreen() {
       } else if (screen.name === 'edit') {
         const oldExp    = expenses.find(e => e.id === screen.expenseId);
         const newTitle  = vals.title.trim();
-        const newAmount = parseFloat(vals.amount) || 0;
+        const newAmount = parseFloat(vals.amount.replace(/,/g, '')) || 0;
         const catU      = categories.find(c => c.id === vals.categoryId);
         const oldCatLbl = categories.find(c => c.id === oldExp?.categoryId)?.label;
 
@@ -1124,7 +1153,10 @@ export default function ManageExpenseScreen() {
           })
           .eq('id', screen.expenseId);
 
-        if (!error) {
+        if (error) {
+          showError('Failed to Update Expense', error.message);
+          setSaving(false);
+        } else {
           setExpenses(prev => prev.map(e =>
             e.id === screen.expenseId
               ? {
@@ -1177,7 +1209,9 @@ export default function ManageExpenseScreen() {
   const handleSaveCategory = async (id: string, label: string, icon: IoniconName) => {
     const oldCat = categories.find(c => c.id === id);
     const { error } = await supabase.from('expense_categories').update({ label, icon }).eq('id', id);
-    if (!error) {
+    if (error) {
+      showError('Failed to Update Category', error.message);
+    } else {
       setCategories(prev => prev.map(c => c.id === id ? { ...c, label, icon } : c));
       showToast('Category updated successfully.');
       const changes: string[] = [];
@@ -1202,7 +1236,9 @@ export default function ManageExpenseScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('expense_categories').update({ is_archived: true }).eq('id', categoryId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Archive Category', error.message);
+        } else {
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
           showToast('Expense category archived.');
           logActivity({
@@ -1225,7 +1261,9 @@ export default function ManageExpenseScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('expense_categories').update({ is_archived: false }).eq('id', categoryId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Restore Category', error.message);
+        } else {
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
           showToast('Expense category restored.');
           logActivity({
@@ -1249,7 +1287,9 @@ export default function ManageExpenseScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('expense_categories').delete().eq('id', categoryId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Delete Category', error.message);
+        } else {
           setCategories(prev => prev.filter(c => c.id !== categoryId));
           setExpenses(prev => prev.filter(e => e.categoryId !== categoryId));
           showToast('Category permanently deleted.');
@@ -1273,7 +1313,9 @@ export default function ManageExpenseScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('expenses').update({ is_archived: true }).eq('id', expenseId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Archive Expense', error.message);
+        } else {
           setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: true } : e));
           showToast('Expense archived.');
           const cat = categories.find(c => c.id === exp?.categoryId);
@@ -1297,7 +1339,9 @@ export default function ManageExpenseScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('expenses').update({ is_archived: false }).eq('id', expenseId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Restore Expense', error.message);
+        } else {
           setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: false } : e));
           showToast('Expense restored.');
           const cat = categories.find(c => c.id === exp?.categoryId);
@@ -1322,7 +1366,9 @@ export default function ManageExpenseScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Delete Expense', error.message);
+        } else {
           setExpenses(prev => prev.filter(e => e.id !== expenseId));
           showToast('Expense permanently deleted.');
           const cat = categories.find(c => c.id === exp?.categoryId);
@@ -1345,7 +1391,9 @@ export default function ManageExpenseScreen() {
       .select()
       .single();
 
-    if (!error && data) {
+    if (error) {
+      showError('Failed to Create Category', error.message);
+    } else if (data) {
       const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
       setCategories(prev => [...prev, newCat]);
       showToast(`Category "${label}" created.`);
@@ -1357,9 +1405,7 @@ export default function ManageExpenseScreen() {
         description: 'Expense category created.',
         icon:        icon,
       });
-      if (screen.name === 'categories') {
-        setScreen({ name: 'add', prefillCategoryId: newCat.id });
-      }
+      setScreen({ name: 'categories' });
     }
   };
 
@@ -1498,6 +1544,13 @@ export default function ManageExpenseScreen() {
         confirmColor={confirm.confirmColor}
       />
 
+      <ErrorModal
+        visible={errModal.visible}
+        title={errModal.title}
+        message={errModal.message}
+        onClose={() => setErrModal(p => ({ ...p, visible: false }))}
+      />
+
       <NewCategoryModal
         visible={showNewCat}
         onClose={() => setShowNewCat(false)}
@@ -1536,8 +1589,8 @@ const s = StyleSheet.create({
 
   grid:        { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 14, marginBottom: 24 },
   catCard:     { width: '30%', alignItems: 'center', marginBottom: 4 },
-  catIcon:     { width: 76, height: 76, borderRadius: 20, backgroundColor: '#E05858', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  catIconMore: { backgroundColor: 'rgba(224,88,88,0.12)' },
+  catIcon:     { width: 76, height: 76, borderRadius: 20, backgroundColor: '#2A7E8F', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  catIconMore: { backgroundColor: 'rgba(42,126,143,0.12)' },
   catLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, color: '#1A1A1A', textAlign: 'center' },
   catCount:    { fontFamily: Font.bodyRegular, fontSize: 11, color: '#888', marginTop: 2 },
 
@@ -1546,7 +1599,7 @@ const s = StyleSheet.create({
 
   expRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   expRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F2' },
-  expIcon:      { width: 46, height: 46, borderRadius: 23, backgroundColor: '#E05858', alignItems: 'center', justifyContent: 'center' },
+  expIcon:      { width: 46, height: 46, borderRadius: 23, backgroundColor: '#2A7E8F', alignItems: 'center', justifyContent: 'center' },
   expTitle:     { fontFamily: Font.bodySemiBold, fontSize: 15, color: '#1A1A1A', marginBottom: 3 },
   expMeta:      { fontFamily: Font.bodyRegular, fontSize: 11, color: '#999' },
   expAmt:       { fontFamily: Font.bodySemiBold, fontSize: 13, color: '#E05858' },
@@ -1576,7 +1629,7 @@ const s = StyleSheet.create({
   saveBtn:    { backgroundColor: '#1B7A4A', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 28 },
   saveBtnTxt: { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
 
-  pickerIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#E05858', alignItems: 'center', justifyContent: 'center' },
+  pickerIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#2A7E8F', alignItems: 'center', justifyContent: 'center' },
 
   archiveRow:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   archiveRowBorder: { borderBottomWidth: 1, borderBottomColor: '#F2F2F2' },
@@ -1584,8 +1637,8 @@ const s = StyleSheet.create({
   restoreTxt:       { fontFamily: Font.bodyMedium, fontSize: 13, color: '#1B7A4A' },
 
   iconGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 8 },
-  iconOpt:       { width: 50, height: 50, borderRadius: 14, borderWidth: 2, borderColor: '#E05858', alignItems: 'center', justifyContent: 'center' },
-  iconOptActive: { backgroundColor: '#E05858', borderColor: '#E05858' },
+  iconOpt:       { width: 50, height: 50, borderRadius: 14, borderWidth: 2, borderColor: '#2A7E8F', alignItems: 'center', justifyContent: 'center' },
+  iconOptActive: { backgroundColor: '#2A7E8F', borderColor: '#2A7E8F' },
 
   toast:    { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#115533', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', elevation: 8 },
   toastTxt: { fontFamily: Font.bodyMedium, fontSize: 14, color: '#fff' },
@@ -1595,7 +1648,7 @@ const s = StyleSheet.create({
   kebabOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   kebabSheet:   { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
   kebabHeader:  { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 12 },
-  kebabCatIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#E05858', alignItems: 'center', justifyContent: 'center' },
+  kebabCatIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#2A7E8F', alignItems: 'center', justifyContent: 'center' },
   kebabCatName: { fontFamily: Font.headerBold, fontSize: 16, flex: 1 },
   kebabDivider: { height: 1, marginBottom: 8 },
   kebabItem:    { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 14 },

@@ -24,6 +24,7 @@ import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { setNavTarget } from '@/lib/activityNavTarget';
 import { ActivityHistorySkeleton } from '@/components/SkeletonLoader';
+import ErrorModal from '@/components/ErrorModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type FilterType = 'All' | 'Income' | 'Expenses' | 'Savings';
@@ -192,6 +193,11 @@ async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
       .in('action_type', LOG_ONLY_ACTIONS)
       .order('created_at', { ascending: false }),
   ]);
+
+  if (incomeRes.error)  throw incomeRes.error;
+  if (expenseRes.error) throw expenseRes.error;
+  if (goalsRes.error)   throw goalsRes.error;
+  if (logsRes.error)    throw logsRes.error;
 
   const items: ActivityItem[] = [];
 
@@ -391,6 +397,7 @@ export default function TransactionHistoryScreen() {
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
+  const [errModal, setErrModal]         = useState({ visible: false, title: '', message: '' });
   const userIdRef = useRef<string | null>(null);
 
   // Entrance animation
@@ -409,9 +416,14 @@ export default function TransactionHistoryScreen() {
   // Load data
   const load = useCallback(async (uid: string) => {
     setLoading(true);
-    const items = await fetchAllActivity(uid);
-    setAll(items);
-    setLoading(false);
+    try {
+      const items = await fetchAllActivity(uid);
+      setAll(items);
+    } catch (err: any) {
+      setErrModal({ visible: true, title: 'Failed to Load Activity', message: err?.message ?? 'Could not load activity history. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   // Auth listener (initial load)
@@ -576,6 +588,13 @@ export default function TransactionHistoryScreen() {
           )}
         </View>
       </Animated.View>
+
+      <ErrorModal
+        visible={errModal.visible}
+        title={errModal.title}
+        message={errModal.message}
+        onClose={() => setErrModal(p => ({ ...p, visible: false }))}
+      />
     </SafeAreaView>
   );
 }

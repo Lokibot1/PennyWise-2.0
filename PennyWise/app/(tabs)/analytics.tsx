@@ -3,10 +3,12 @@ import { router, useFocusEffect } from 'expo-router';
 import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
 import DatePickerModal from '@/components/DatePickerModal';
 import ConfirmModal from '@/components/ConfirmModal';
+import ErrorModal from '@/components/ErrorModal';
 import SlideTabBar from '@/components/SlideTabBar';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
+import NotificationBell from '@/components/NotificationBell';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -88,6 +90,13 @@ type ConfirmState = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const fmtAmt = (n: number) =>
   `₱${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+
+function fmtMoney(raw: string): string {
+  const clean = raw.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  const [whole, decimal] = clean.split('.');
+  const formatted = (whole || '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return decimal !== undefined ? `${formatted}.${decimal}` : formatted;
+}
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -188,9 +197,7 @@ function BalanceHeader({
             : <PennyWiseLogo size="xs" />}
         </TouchableOpacity>
         <Text style={[bh.title, { color: theme.iconBtnColor }]}>{title}</Text>
-        <TouchableOpacity style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
-          <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
-        </TouchableOpacity>
+        <NotificationBell style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} iconColor={theme.iconBtnColor} />
       </View>
 
       <View style={[bh.card, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
@@ -238,9 +245,7 @@ function FormHeader({ title, onBack, theme }: { title: string; onBack: () => voi
           <Ionicons name="chevron-back" size={22} color={theme.iconBtnColor} />
         </TouchableOpacity>
         <Text style={[fh.title, { color: theme.iconBtnColor }]}>{title}</Text>
-        <TouchableOpacity style={[fh.iconBtn, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
-          <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
-        </TouchableOpacity>
+        <NotificationBell style={[fh.iconBtn, { backgroundColor: theme.iconBtnBg }]} iconColor={theme.iconBtnColor} />
       </View>
     </View>
   );
@@ -325,11 +330,12 @@ function NewCategoryModal({
               <Text style={s.label}>Category Name</Text>
               <Text style={[s.hint, { color: theme.textMuted }]}>e.g. Freelance, Remittance, Allowance…</Text>
               <View style={[s.fieldRow, { marginBottom: 4 }]}>
+                <Ionicons name="tag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
                 <TextInput
                   style={[s.fieldTxt, { flex: 1 }]}
                   value={label}
                   onChangeText={setLabel}
-                  placeholder="Category name"
+                  placeholder="e.g. Freelance, Salary, Allowance"
                   placeholderTextColor="#aaa"
                 />
               </View>
@@ -384,11 +390,12 @@ function EditCategoryModal({
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={[s.label, { color: theme.textPrimary }]}>Category Name</Text>
               <View style={[s.fieldRow, { marginBottom: 4, backgroundColor: theme.inputBg }]}>
+                <Ionicons name="tag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
                 <TextInput
                   style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
                   value={label}
                   onChangeText={setLabel}
-                  placeholder="Category name"
+                  placeholder="e.g. Freelance, Salary, Allowance"
                   placeholderTextColor="#aaa"
                 />
               </View>
@@ -793,17 +800,20 @@ function IncomeFormScreen({
 
             <Text style={[s.label, { color: theme.textPrimary }]}>Amount</Text>
             <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
-              <TextInput style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]} value={vals.amount} onChangeText={v => set('amount', v)} keyboardType="decimal-pad" placeholder="₱0.00" placeholderTextColor="#aaa" />
+              <Ionicons name="cash-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+              <TextInput style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]} value={vals.amount} onChangeText={v => set('amount', fmtMoney(v))} keyboardType="decimal-pad" placeholder="e.g. 5,000.00" placeholderTextColor="#aaa" />
             </View>
 
             <Text style={[s.label, { color: theme.textPrimary }]}>Income Title</Text>
             <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
+              <Ionicons name="pencil-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
               <TextInput style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]} value={vals.title} onChangeText={v => set('title', v)} placeholder="e.g. Monthly Salary" placeholderTextColor="#aaa" />
             </View>
 
-            <Text style={[s.label, { color: theme.textPrimary }]}>Description</Text>
+            <Text style={[s.label, { color: theme.textPrimary }]}>Description (optional)</Text>
             <View style={[s.fieldRow, { alignItems: 'flex-start', minHeight: 100, backgroundColor: theme.inputBg }]}>
-              <TextInput style={[s.fieldTxt, { flex: 1, textAlignVertical: 'top', paddingTop: 2, minHeight: 80, color: theme.textPrimary }]} value={vals.description} onChangeText={v => set('description', v)} placeholder="Enter description" placeholderTextColor="#aaa" multiline />
+              <Ionicons name="document-text-outline" size={16} color="#aaa" style={{ marginRight: 8, marginTop: 2 }} />
+              <TextInput style={[s.fieldTxt, { flex: 1, textAlignVertical: 'top', paddingTop: 2, minHeight: 80, color: theme.textPrimary }]} value={vals.description} onChangeText={v => set('description', v)} placeholder="e.g. Payment for project work" placeholderTextColor="#aaa" multiline />
             </View>
 
             <TouchableOpacity style={s.recurRow} onPress={() => set('isRecurring', !vals.isRecurring)} activeOpacity={0.8}>
@@ -879,6 +889,7 @@ export default function IncomeSourcesScreen() {
   const [showNewCat,  setShowNewCat]  = useState(false);
   const [editCat,     setEditCat]     = useState<Category | null>(null);
   const [toast,       setToast]       = useState('');
+  const [errModal,    setErrModal]    = useState({ visible: false, title: '', message: '' });
   const [catNavKey,    setCatNavKey]    = useState(0);
   const [catNavTab,    setCatNavTab]    = useState<'Active' | 'Archived'>('Active');
   const [detailNavTab, setDetailNavTab] = useState<'Active' | 'Archived'>('Active');
@@ -903,27 +914,34 @@ export default function IncomeSourcesScreen() {
   // ── Load from Supabase ──────────────────────────────────────────────────────
   useEffect(() => {
     async function loadData(userId: string) {
-      const [catRes, incRes] = await Promise.all([
-        supabase.from('income_categories').select('id, label, icon, is_archived').eq('user_id', userId),
-        supabase.from('income_sources').select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived').eq('user_id', userId),
-      ]);
+      try {
+        const [catRes, incRes] = await Promise.all([
+          supabase.from('income_categories').select('id, label, icon, is_archived').eq('user_id', userId),
+          supabase.from('income_sources').select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived').eq('user_id', userId),
+        ]);
 
-      if (catRes.data) {
-        setCategories(catRes.data.map(c => ({
-          id: c.id, label: c.label, icon: c.icon as IoniconName, isArchived: c.is_archived,
-        })));
+        if (catRes.error) throw catRes.error;
+        if (incRes.error) throw incRes.error;
+
+        if (catRes.data) {
+          setCategories(catRes.data.map(c => ({
+            id: c.id, label: c.label, icon: c.icon as IoniconName, isArchived: c.is_archived,
+          })));
+        }
+
+        if (incRes.data) {
+          setIncome(incRes.data.map(i => ({
+            id: i.id, categoryId: i.category_id, title: i.title,
+            amount: Number(i.amount), date: i.date, time: i.time,
+            description: i.description, isRecurring: i.is_recurring,
+            frequency: i.frequency as Frequency | null, isArchived: i.is_archived,
+          })));
+        }
+      } catch (err: any) {
+        showError('Failed to Load', err?.message ?? 'Could not load income data. Please try again.');
+      } finally {
+        setLoading(false);
       }
-
-      if (incRes.data) {
-        setIncome(incRes.data.map(i => ({
-          id: i.id, categoryId: i.category_id, title: i.title,
-          amount: Number(i.amount), date: i.date, time: i.time,
-          description: i.description, isRecurring: i.is_recurring,
-          frequency: i.frequency as Frequency | null, isArchived: i.is_archived,
-        })));
-      }
-
-      setLoading(false);
     }
 
     // Use onAuthStateChange to avoid the AsyncStorage race condition.
@@ -946,6 +964,7 @@ export default function IncomeSourcesScreen() {
   const showToast   = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2800); };
   const showConfirm = (opts: Omit<ConfirmState, 'visible'>) => setConfirm({ visible: true, ...opts });
   const hideConfirm = () => setConfirm(prev => ({ ...prev, visible: false }));
+  const showError   = (title: string, msg: string) => setErrModal({ visible: true, title, message: msg });
 
   // ── Action Handlers ───────────────────────────────────────────────────────────
   const handleSave = (vals: IncomeFormValues) => {
@@ -968,7 +987,7 @@ export default function IncomeSourcesScreen() {
             user_id:      userIdRef.current,
             category_id:  vals.categoryId,
             title:        vals.title.trim(),
-            amount:       parseFloat(vals.amount) || 0,
+            amount:       parseFloat(vals.amount.replace(/,/g, '')) || 0,
             date:         vals.date,
             time:         new Date().toTimeString().slice(0, 5),
             description:  vals.description.trim(),
@@ -978,7 +997,10 @@ export default function IncomeSourcesScreen() {
           .select()
           .single();
 
-        if (!error && data) {
+        if (error) {
+          showError('Failed to Save Income', error.message);
+          setSaving(false);
+        } else if (data) {
           setIncome(prev => [...prev, {
             id: data.id, categoryId: data.category_id, title: data.title,
             amount: Number(data.amount), date: data.date, time: data.time,
@@ -992,7 +1014,7 @@ export default function IncomeSourcesScreen() {
             action_type: ACTION.INCOME_SOURCE_ADDED,
             entity_type: ENTITY.INCOME_SOURCE,
             title:       `Income Added: ${vals.title.trim()}`,
-            description: `₱${(parseFloat(vals.amount) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Income'}`,
+            description: `₱${(parseFloat(vals.amount.replace(/,/g, '')) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Income'}`,
             icon:        cat?.icon ?? 'cash-outline',
           });
           // Return to the category detail if we came from one, otherwise go to categories grid
@@ -1006,7 +1028,7 @@ export default function IncomeSourcesScreen() {
       } else if (screen.name === 'edit') {
         const oldInc     = income.find(i => i.id === screen.incomeId);
         const newTitle   = vals.title.trim();
-        const newAmount  = parseFloat(vals.amount) || 0;
+        const newAmount  = parseFloat(vals.amount.replace(/,/g, '')) || 0;
         const catU       = categories.find(c => c.id === vals.categoryId);
         const oldCatLbl  = categories.find(c => c.id === oldInc?.categoryId)?.label;
 
@@ -1023,7 +1045,10 @@ export default function IncomeSourcesScreen() {
           })
           .eq('id', screen.incomeId);
 
-        if (!error) {
+        if (error) {
+          showError('Failed to Update Income', error.message);
+          setSaving(false);
+        } else {
           setIncome(prev => prev.map(i =>
             i.id === screen.incomeId
               ? { ...i, categoryId: vals.categoryId, title: newTitle, amount: newAmount, date: vals.date, description: vals.description.trim(), isRecurring: vals.isRecurring, frequency: vals.isRecurring ? vals.frequency : null }
@@ -1074,7 +1099,9 @@ export default function IncomeSourcesScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('income_categories').update({ is_archived: true }).eq('id', categoryId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Archive Category', error.message);
+        } else {
           const archivedCat = categories.find(c => c.id === categoryId);
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
           showToast('Income category archived successfully.');
@@ -1103,7 +1130,9 @@ export default function IncomeSourcesScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('income_categories').update({ is_archived: false }).eq('id', categoryId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Restore Category', error.message);
+        } else {
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
           showToast('Income category restored successfully.');
           logActivity({
@@ -1130,7 +1159,9 @@ export default function IncomeSourcesScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('income_categories').delete().eq('id', categoryId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Delete Category', error.message);
+        } else {
           setCategories(prev => prev.filter(c => c.id !== categoryId));
           setIncome(prev => prev.filter(i => i.categoryId !== categoryId));
           showToast('Category permanently deleted.');
@@ -1158,7 +1189,9 @@ export default function IncomeSourcesScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('income_sources').update({ is_archived: true }).eq('id', incomeId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Archive Income', error.message);
+        } else {
           setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: true } : i));
           showToast('Income source archived.');
           const cat = categories.find(c => c.id === inc?.categoryId);
@@ -1186,7 +1219,9 @@ export default function IncomeSourcesScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('income_sources').update({ is_archived: false }).eq('id', incomeId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Restore Income', error.message);
+        } else {
           setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: false } : i));
           showToast('Income source restored.');
           const cat = categories.find(c => c.id === inc?.categoryId);
@@ -1214,7 +1249,9 @@ export default function IncomeSourcesScreen() {
       onYes: async () => {
         hideConfirm();
         const { error } = await supabase.from('income_sources').delete().eq('id', incomeId);
-        if (!error) {
+        if (error) {
+          showError('Failed to Delete Income', error.message);
+        } else {
           setIncome(prev => prev.filter(i => i.id !== incomeId));
           showToast('Income source permanently deleted.');
           const cat = categories.find(c => c.id === inc?.categoryId);
@@ -1239,7 +1276,9 @@ export default function IncomeSourcesScreen() {
       .update({ label, icon })
       .eq('id', id);
 
-    if (!error) {
+    if (error) {
+      showError('Failed to Update Category', error.message);
+    } else {
       setCategories(prev => prev.map(c => c.id === id ? { ...c, label, icon } : c));
       showToast('Category updated successfully.');
 
@@ -1265,7 +1304,9 @@ export default function IncomeSourcesScreen() {
       .select()
       .single();
 
-    if (!error && data) {
+    if (error) {
+      showError('Failed to Create Category', error.message);
+    } else if (data) {
       const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
       setCategories(prev => [...prev, newCat]);
       showToast(`Category "${label}" created.`);
@@ -1386,6 +1427,12 @@ export default function IncomeSourcesScreen() {
         icon={confirm.icon}
         confirmLabel={confirm.confirmLabel}
         confirmColor={confirm.confirmColor}
+      />
+      <ErrorModal
+        visible={errModal.visible}
+        title={errModal.title}
+        message={errModal.message}
+        onClose={() => setErrModal(p => ({ ...p, visible: false }))}
       />
       <NewCategoryModal visible={showNewCat} onClose={() => setShowNewCat(false)} onCreate={handleNewCategory} theme={theme} />
       <EditCategoryModal visible={editCat !== null} category={editCat} onClose={() => setEditCat(null)} onSave={handleSaveCategory} theme={theme} />

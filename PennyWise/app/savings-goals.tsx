@@ -40,6 +40,13 @@ const ICON_OPTIONS = [
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
+function fmtMoney(raw: string): string {
+  const clean = raw.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+  const [whole, decimal] = clean.split('.');
+  const formatted = (whole || '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return decimal !== undefined ? `${formatted}.${decimal}` : formatted;
+}
+
 function formatCurrency(value: number): string {
   return '₱' + value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -151,7 +158,7 @@ export default function SavingsGoalsScreen() {
   /* Create */
   const handleSaveGoal = async () => {
     if (!newTitle.trim()) { Alert.alert('Missing info', 'Please enter a goal name.'); return; }
-    const target = parseFloat(newTarget);
+    const target = parseFloat(newTarget.replace(/,/g, ''));
     if (!target || target <= 0) { Alert.alert('Missing info', 'Please enter a valid target amount.'); return; }
     if (!userId) return;
 
@@ -188,7 +195,7 @@ export default function SavingsGoalsScreen() {
   const handleEditGoal = async () => {
     if (!editingGoal || !userId) return;
     if (!editTitle.trim()) { Alert.alert('Missing info', 'Please enter a goal name.'); return; }
-    const target = parseFloat(editTarget);
+    const target = parseFloat(editTarget.replace(/,/g, ''));
     if (!target || target <= 0) { Alert.alert('Missing info', 'Please enter a valid target amount.'); return; }
     if (target < editingGoal.current_amount) {
       Alert.alert('Invalid target', `Target can't be less than the amount already saved (${formatCurrency(editingGoal.current_amount)}).`);
@@ -244,7 +251,7 @@ export default function SavingsGoalsScreen() {
   /* Add funds */
   const handleAddFunds = async () => {
     if (!selectedGoal || !userId) return;
-    const amount = parseFloat(fundsAmount);
+    const amount = parseFloat(fundsAmount.replace(/,/g, ''));
     if (!amount || amount <= 0) { Alert.alert('Missing info', 'Please enter a valid amount.'); return; }
 
     setAddingFunds(true);
@@ -580,20 +587,26 @@ export default function SavingsGoalsScreen() {
             <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>New Savings Goal</Text>
 
             <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Goal Name</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.inputBg, color: theme.textPrimary, borderColor: theme.inputBorder }]}
-              placeholder="e.g. Buy a Car" placeholderTextColor={theme.textMuted}
-              value={newTitle} onChangeText={setNewTitle}
-            />
+            <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+              <Ionicons name="flag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.inputInner, { color: theme.textPrimary }]}
+                placeholder="e.g. Buy a Car, Emergency Fund" placeholderTextColor={theme.textMuted}
+                value={newTitle} onChangeText={setNewTitle}
+              />
+            </View>
 
             <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Target Amount (₱)</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.inputBg, color: theme.textPrimary, borderColor: theme.inputBorder }]}
-              placeholder="0.00" placeholderTextColor={theme.textMuted}
-              value={newTarget} onChangeText={setNewTarget} keyboardType="decimal-pad"
-            />
+            <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+              <Ionicons name="cash-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.inputInner, { color: theme.textPrimary }]}
+                placeholder="e.g. 50,000.00" placeholderTextColor={theme.textMuted}
+                value={newTarget} onChangeText={v => setNewTarget(fmtMoney(v))} keyboardType="decimal-pad"
+              />
+            </View>
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon</Text>
+            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon (optional)</Text>
             <IconPicker selected={newIcon} onSelect={setNewIcon} theme={theme} />
 
             <TouchableOpacity
@@ -630,20 +643,26 @@ export default function SavingsGoalsScreen() {
             </View>
 
             <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Goal Name</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.inputBg, color: theme.textPrimary, borderColor: theme.inputBorder }]}
-              placeholder="e.g. Buy a Car" placeholderTextColor={theme.textMuted}
-              value={editTitle} onChangeText={setEditTitle}
-            />
+            <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+              <Ionicons name="flag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.inputInner, { color: theme.textPrimary }]}
+                placeholder="e.g. Buy a Car, Emergency Fund" placeholderTextColor={theme.textMuted}
+                value={editTitle} onChangeText={setEditTitle}
+              />
+            </View>
 
             <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Target Amount (₱)</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.inputBg, color: theme.textPrimary, borderColor: theme.inputBorder }]}
-              placeholder="0.00" placeholderTextColor={theme.textMuted}
-              value={editTarget} onChangeText={setEditTarget} keyboardType="decimal-pad"
-            />
+            <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+              <Ionicons name="cash-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.inputInner, { color: theme.textPrimary }]}
+                placeholder="e.g. 50,000.00" placeholderTextColor={theme.textMuted}
+                value={editTarget} onChangeText={v => setEditTarget(fmtMoney(v))} keyboardType="decimal-pad"
+              />
+            </View>
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon</Text>
+            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon (optional)</Text>
             <IconPicker selected={editIcon} onSelect={setEditIcon} theme={theme} />
 
             <TouchableOpacity
@@ -730,11 +749,14 @@ export default function SavingsGoalsScreen() {
             )}
 
             <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: 16 }]}>Amount to Add (₱)</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: theme.inputBg, color: theme.textPrimary, borderColor: theme.inputBorder }]}
-              placeholder="0.00" placeholderTextColor={theme.textMuted}
-              value={fundsAmount} onChangeText={setFundsAmount} keyboardType="decimal-pad" autoFocus
-            />
+            <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+              <Ionicons name="trending-up-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+              <TextInput
+                style={[styles.inputInner, { color: theme.textPrimary }]}
+                placeholder="e.g. 1,000.00" placeholderTextColor={theme.textMuted}
+                value={fundsAmount} onChangeText={v => setFundsAmount(fmtMoney(v))} keyboardType="decimal-pad" autoFocus
+              />
+            </View>
 
             <TouchableOpacity
               style={[styles.primaryBtn, addingFunds && { opacity: 0.6 }]}
@@ -846,6 +868,15 @@ const styles = StyleSheet.create({
   modalHandle:   { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   modalTitle:    { fontFamily: Font.headerBold, fontSize: 20, marginBottom: 20 },
   inputLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, marginBottom: 6 },
+  inputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderRadius: 12,
+    paddingHorizontal: 14, marginBottom: 16,
+  },
+  inputInner: {
+    flex: 1, fontFamily: Font.bodyRegular, fontSize: 15,
+    paddingVertical: 12,
+  },
   input: {
     borderWidth: 1, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 12,

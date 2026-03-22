@@ -14,6 +14,8 @@ import { useFonts } from "expo-font";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { supabase } from "@/lib/supabase";
 import { AppThemeProvider } from "@/contexts/AppTheme";
+import { NotificationProvider } from "@/contexts/NotificationContext";
+import NotificationPanel from "@/components/NotificationPanel";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -58,6 +60,7 @@ export default function RootLayout() {
 
   return (
     <AppThemeProvider>
+      <NotificationProvider>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ animation: "slide_from_right" }}>
           <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -81,7 +84,9 @@ export default function RootLayout() {
           />
         </Stack>
         <StatusBar style="auto" />
+        <NotificationPanel />
       </ThemeProvider>
+      </NotificationProvider>
     </AppThemeProvider>
   );
 }

@@ -10,7 +10,10 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { HomeDashboardSkeleton, TransactionRowSkeleton } from '@/components/SkeletonLoader';
+import NotificationBell from '@/components/NotificationBell';
 import SlideTabBar from '@/components/SlideTabBar';
+import BudgetLimitModal from '@/components/BudgetLimitModal';
+import ErrorModal from '@/components/ErrorModal';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Period = 'Daily' | 'Weekly' | 'Monthly';
@@ -82,12 +85,23 @@ export default function HomeScreen() {
   const [revenueLastWeek, setRevenueLastWeek] = useState(0);
   const [expenseLastWeek, setExpenseLastWeek] = useState(0);
   const [allTransactions, setAllTransactions] = useState<TxRow[]>([]);
-  const [loading, setLoading]                 = useState(true);
+  const [loading, setLoading]                   = useState(true);
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
+  const [errModal, setErrModal]                 = useState({ visible: false, title: '', message: '' });
   const userIdRef = useRef<string | null>(null);
 
+  const showError = (title: string, msg: string) => setErrModal({ visible: true, title, message: msg });
+
+  const saveBudgetLimit = async (newLimit: number) => {
+    if (!userIdRef.current) return;
+    const { error } = await supabase.from('profiles').update({ budget_limit: newLimit }).eq('id', userIdRef.current);
+    if (error) throw error;
+    setBudgetLimit(newLimit);
+  };
 
   // ── Data loading ───────────────────────────────────────────────────────────
   const loadDashboard = useCallback(async (userId: string) => {
+    try {
     const now     = new Date();
     const weekAgo = new Date(now);
     weekAgo.setDate(now.getDate() - 7);
@@ -184,7 +198,11 @@ export default function HomeScreen() {
     setTotalExpense(totalExp);
     setRevenueLastWeek(revWeek);
     setExpenseLastWeek(expWeek);
-    setLoading(false);
+    } catch (err: any) {
+      showError('Failed to Load', err?.message ?? 'Could not load dashboard data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   // Initial load on auth
@@ -252,9 +270,7 @@ export default function HomeScreen() {
               </Text>
               <Text style={styles.greetingSubtitle}>{getGreeting()}</Text>
             </View>
-            <TouchableOpacity style={[styles.bellButton, { backgroundColor: theme.iconBtnBg }]} activeOpacity={0.8}>
-              <Ionicons name="notifications-outline" size={20} color={theme.iconBtnColor} />
-            </TouchableOpacity>
+            <NotificationBell style={[styles.bellButton, { backgroundColor: theme.iconBtnBg }]} iconColor={theme.iconBtnColor} />
           </View>
 
           {loading ? (
@@ -295,7 +311,14 @@ export default function HomeScreen() {
                     ]}>
                       <Text style={styles.percentText}>{budgetPercent.toFixed(0)}%</Text>
                     </View>
-                    <Text style={[styles.budgetLimit, { color: theme.textSecondary }]}>{formatCurrency(budgetLimit)}</Text>
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                      onPress={() => setBudgetModalVisible(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.budgetLimit, { color: theme.textSecondary }]}>{formatCurrency(budgetLimit)}</Text>
+                      <Ionicons name="pencil-outline" size={12} color={theme.textMuted} />
+                    </TouchableOpacity>
                   </View>
                   <View style={[styles.progressTrack, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.12)' : '#E0E0E0' }]}>
                     <View style={[
@@ -485,6 +508,20 @@ export default function HomeScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <BudgetLimitModal
+        visible={budgetModalVisible}
+        current={budgetLimit}
+        onClose={() => setBudgetModalVisible(false)}
+        onSave={saveBudgetLimit}
+      />
+
+      <ErrorModal
+        visible={errModal.visible}
+        title={errModal.title}
+        message={errModal.message}
+        onClose={() => setErrModal(p => ({ ...p, visible: false }))}
+      />
     </SafeAreaView>
   );
 }
