@@ -112,6 +112,7 @@ export default function BudgetLimitModal({ visible, current, onClose, onSave }: 
             st.inputRow,
             { backgroundColor: theme.surface, borderColor: isValid ? '#1B7A4A' : theme.inputBorder },
           ]}>
+            <Ionicons name="cash-outline" size={20} color={isValid ? '#1B7A4A' : '#9E9E9E'} style={{ marginRight: 8 }} />
             <Text style={st.currency}>₱</Text>
             <TextInput
               style={[st.input, { color: theme.textPrimary }]}

@@ -1,3 +1,9 @@
+import { Ionicons } from "@expo/vector-icons";
+import { decode } from "base64-arraybuffer";
+import * as FileSystem from "expo-file-system/legacy";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -14,30 +20,24 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system/legacy";
-import { decode } from "base64-arraybuffer";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
 
-import { Font } from "@/constants/fonts";
-import { useAppTheme } from "@/contexts/AppTheme";
-import { supabase } from "@/lib/supabase";
-import { sfx } from "@/lib/sfx";
-import { loadingBar } from "@/components/GlobalLoadingBar";
-import { PennyWiseLogo } from "@/components/penny-wise-logo";
+import BudgetLimitModal from "@/components/BudgetLimitModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import ErrorModal from "@/components/ErrorModal";
+import { loadingBar } from "@/components/GlobalLoadingBar";
+import NotificationBell from "@/components/NotificationBell";
+import { PennyWiseLogo } from "@/components/penny-wise-logo";
 import {
-  ProfileInfoSkeleton,
   ProfileAvatarSkeleton,
   ProfileCardSkeleton,
+  ProfileInfoSkeleton,
 } from "@/components/SkeletonLoader";
-import NotificationBell from "@/components/NotificationBell";
-import BudgetLimitModal from "@/components/BudgetLimitModal";
+import { Font } from "@/constants/fonts";
+import { useAppTheme } from "@/contexts/AppTheme";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { sfx } from "@/lib/sfx";
+import { supabase } from "@/lib/supabase";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = "profile" | "edit" | "terms" | "settings" | "notif-settings";
@@ -745,7 +745,7 @@ function EditProfileView({
                 value={username}
                 onChangeText={setUsername}
                 placeholderTextColor={theme.textMuted}
-                placeholder="Enter your name"
+                placeholder="e.g. John Smith"
               />
             </View>
           </View>
@@ -769,7 +769,7 @@ function EditProfileView({
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
                 placeholderTextColor={theme.textMuted}
-                placeholder="Enter your phone"
+                placeholder="e.g. +63 912 345 6789"
               />
             </View>
           </View>
@@ -789,7 +789,7 @@ function EditProfileView({
                 keyboardType="email-address"
                 autoCapitalize="none"
                 placeholderTextColor={theme.textMuted}
-                placeholder="Enter your email"
+                placeholder="e.g. john@example.com"
               />
             </View>
           </View>
@@ -1031,29 +1031,42 @@ function DeleteAccountModal({
           </Text>
 
           {/* Confirmation input */}
-          <TextInput
+          <View
             style={{
+              flexDirection: "row",
+              alignItems: "center",
               width: "100%",
               borderWidth: 1.5,
               borderColor: confirmed ? "#E05555" : theme.inputBorder,
               borderRadius: 12,
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              fontFamily: Font.bodySemiBold,
-              fontSize: 15,
-              color: "#E05555",
+              paddingHorizontal: 14,
               backgroundColor: theme.surface,
-              textAlign: "center",
-              letterSpacing: 2,
               marginBottom: 20,
             }}
-            value={input}
-            onChangeText={setInput}
-            placeholder="Type DELETE to confirm"
-            placeholderTextColor={theme.textMuted}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
+          >
+            <Ionicons
+              name="trash-outline"
+              size={18}
+              color={confirmed ? "#E05555" : theme.textMuted}
+              style={{ marginRight: 8 }}
+            />
+            <TextInput
+              style={{
+                flex: 1,
+                paddingVertical: 12,
+                fontFamily: Font.bodySemiBold,
+                fontSize: 15,
+                color: "#E05555",
+                letterSpacing: 2,
+              }}
+              value={input}
+              onChangeText={setInput}
+              placeholder="Type DELETE to confirm"
+              placeholderTextColor={theme.textMuted}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+          </View>
 
           {/* Delete button */}
           <TouchableOpacity
