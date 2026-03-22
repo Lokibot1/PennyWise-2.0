@@ -6,6 +6,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import ErrorModal from '@/components/ErrorModal';
 import SlideTabBar from '@/components/SlideTabBar';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
+import { sfx } from '@/lib/sfx';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import NotificationBell from '@/components/NotificationBell';
 import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
@@ -1120,6 +1121,7 @@ export default function ManageExpenseScreen() {
             frequency:   data.frequency as Frequency | null,
             isArchived:  data.is_archived,
           }]);
+          sfx.coin();
           showToast('Expense added successfully.');
           const cat = categories.find(c => c.id === vals.categoryId);
           logActivity({
@@ -1171,6 +1173,7 @@ export default function ManageExpenseScreen() {
                 }
               : e,
           ));
+          sfx.success();
           showToast('Expense updated successfully.');
 
           const changes: string[] = [];
@@ -1213,6 +1216,7 @@ export default function ManageExpenseScreen() {
       showError('Failed to Update Category', error.message);
     } else {
       setCategories(prev => prev.map(c => c.id === id ? { ...c, label, icon } : c));
+      sfx.success();
       showToast('Category updated successfully.');
       const changes: string[] = [];
       if (oldCat?.label !== label) changes.push(`Name: "${oldCat?.label}" → "${label}"`);
@@ -1240,6 +1244,7 @@ export default function ManageExpenseScreen() {
           showError('Failed to Archive Category', error.message);
         } else {
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
+          sfx.warning();
           showToast('Expense category archived.');
           logActivity({
             user_id: userIdRef.current!, action_type: ACTION.EXPENSE_CATEGORY_ARCHIVED,
@@ -1265,6 +1270,7 @@ export default function ManageExpenseScreen() {
           showError('Failed to Restore Category', error.message);
         } else {
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
+          sfx.success();
           showToast('Expense category restored.');
           logActivity({
             user_id: userIdRef.current!, action_type: ACTION.EXPENSE_CATEGORY_RESTORED,
@@ -1292,6 +1298,7 @@ export default function ManageExpenseScreen() {
         } else {
           setCategories(prev => prev.filter(c => c.id !== categoryId));
           setExpenses(prev => prev.filter(e => e.categoryId !== categoryId));
+          sfx.error();
           showToast('Category permanently deleted.');
           logActivity({
             user_id: userIdRef.current!, action_type: ACTION.EXPENSE_CATEGORY_DELETED,
@@ -1317,6 +1324,7 @@ export default function ManageExpenseScreen() {
           showError('Failed to Archive Expense', error.message);
         } else {
           setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: true } : e));
+          sfx.warning();
           showToast('Expense archived.');
           const cat = categories.find(c => c.id === exp?.categoryId);
           logActivity({
@@ -1343,6 +1351,7 @@ export default function ManageExpenseScreen() {
           showError('Failed to Restore Expense', error.message);
         } else {
           setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: false } : e));
+          sfx.success();
           showToast('Expense restored.');
           const cat = categories.find(c => c.id === exp?.categoryId);
           logActivity({
@@ -1370,6 +1379,7 @@ export default function ManageExpenseScreen() {
           showError('Failed to Delete Expense', error.message);
         } else {
           setExpenses(prev => prev.filter(e => e.id !== expenseId));
+          sfx.error();
           showToast('Expense permanently deleted.');
           const cat = categories.find(c => c.id === exp?.categoryId);
           logActivity({
@@ -1396,6 +1406,7 @@ export default function ManageExpenseScreen() {
     } else if (data) {
       const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
       setCategories(prev => [...prev, newCat]);
+      sfx.success();
       showToast(`Category "${label}" created.`);
       logActivity({
         user_id:     userIdRef.current!,

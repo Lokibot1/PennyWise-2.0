@@ -13,6 +13,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { Font } from '@/constants/fonts';
+import { sfx } from '@/lib/sfx';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { useNotifications } from '@/contexts/NotificationContext';
 import type { AppNotification } from '@/lib/notifications';
@@ -59,7 +60,7 @@ function NotifCard({ notif, isRead }: { notif: AppNotification; isRead: boolean 
 
   return (
     <TouchableOpacity
-      onPress={() => markRead(notif.id)}
+      onPress={() => { sfx.tap(); markRead(notif.id); }}
       activeOpacity={0.65}
       style={{
         flexDirection:   'row',
@@ -256,7 +257,7 @@ export default function NotificationPanel() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             {unreadCount > 0 && (
               <TouchableOpacity
-                onPress={markAllRead}
+                onPress={() => { sfx.success(); markAllRead(); }}
                 activeOpacity={0.7}
                 style={{
                   backgroundColor: 'rgba(27,122,74,0.08)',

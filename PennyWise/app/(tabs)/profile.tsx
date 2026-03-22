@@ -21,6 +21,7 @@ import { router } from 'expo-router';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
+import { sfx } from '@/lib/sfx';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import ConfirmModal from '@/components/ConfirmModal';
 import ErrorModal from '@/components/ErrorModal';
@@ -250,6 +251,7 @@ function EditProfileView({
     if (error) {
       setErrModal({ visible: true, title: 'Failed to Update Profile', message: error.message });
     } else {
+      sfx.success();
       onSaved({ full_name: username.trim(), phone: phone.trim(), email: email.trim() });
       setToast(true);
       setTimeout(() => setToast(false), 2800);
@@ -443,6 +445,7 @@ function DeleteAccountModal({
 
   function handleConfirm() {
     if (!confirmed) return;
+    sfx.error();
     setInput('');
     onConfirm();
   }
@@ -582,7 +585,7 @@ function SettingsView({ onBack }: { onBack: () => void }) {
               <Text style={[styles.formToggleLabel, { color: theme.textPrimary, flex: 1 }]}>Dark Mode</Text>
               <Switch
                 value={darkMode}
-                onValueChange={toggleDark}
+                onValueChange={() => { sfx.toggle(); toggleDark(); }}
                 trackColor={{ false: theme.inputBorder, true: '#1B7A4A' }}
                 thumbColor="#fff"
               />

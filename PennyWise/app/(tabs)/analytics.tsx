@@ -6,6 +6,7 @@ import ConfirmModal from '@/components/ConfirmModal';
 import ErrorModal from '@/components/ErrorModal';
 import SlideTabBar from '@/components/SlideTabBar';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
+import { sfx } from '@/lib/sfx';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
 import NotificationBell from '@/components/NotificationBell';
@@ -1007,6 +1008,7 @@ export default function IncomeSourcesScreen() {
             description: data.description, isRecurring: data.is_recurring,
             frequency: data.frequency as Frequency | null, isArchived: data.is_archived,
           }]);
+          sfx.coin();
           showToast('Income source added successfully.');
           const cat = categories.find(c => c.id === vals.categoryId);
           logActivity({
@@ -1054,6 +1056,7 @@ export default function IncomeSourcesScreen() {
               ? { ...i, categoryId: vals.categoryId, title: newTitle, amount: newAmount, date: vals.date, description: vals.description.trim(), isRecurring: vals.isRecurring, frequency: vals.isRecurring ? vals.frequency : null }
               : i,
           ));
+          sfx.success();
           showToast('Income source updated successfully.');
 
           const changes: string[] = [];
@@ -1104,6 +1107,7 @@ export default function IncomeSourcesScreen() {
         } else {
           const archivedCat = categories.find(c => c.id === categoryId);
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
+          sfx.warning();
           showToast('Income category archived successfully.');
           logActivity({
             user_id:     userIdRef.current!,
@@ -1134,6 +1138,7 @@ export default function IncomeSourcesScreen() {
           showError('Failed to Restore Category', error.message);
         } else {
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
+          sfx.success();
           showToast('Income category restored successfully.');
           logActivity({
             user_id:     userIdRef.current!,
@@ -1164,6 +1169,7 @@ export default function IncomeSourcesScreen() {
         } else {
           setCategories(prev => prev.filter(c => c.id !== categoryId));
           setIncome(prev => prev.filter(i => i.categoryId !== categoryId));
+          sfx.error();
           showToast('Category permanently deleted.');
           logActivity({
             user_id:     userIdRef.current!,
@@ -1193,6 +1199,7 @@ export default function IncomeSourcesScreen() {
           showError('Failed to Archive Income', error.message);
         } else {
           setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: true } : i));
+          sfx.warning();
           showToast('Income source archived.');
           const cat = categories.find(c => c.id === inc?.categoryId);
           logActivity({
@@ -1223,6 +1230,7 @@ export default function IncomeSourcesScreen() {
           showError('Failed to Restore Income', error.message);
         } else {
           setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: false } : i));
+          sfx.success();
           showToast('Income source restored.');
           const cat = categories.find(c => c.id === inc?.categoryId);
           logActivity({
@@ -1253,6 +1261,7 @@ export default function IncomeSourcesScreen() {
           showError('Failed to Delete Income', error.message);
         } else {
           setIncome(prev => prev.filter(i => i.id !== incomeId));
+          sfx.error();
           showToast('Income source permanently deleted.');
           const cat = categories.find(c => c.id === inc?.categoryId);
           logActivity({
@@ -1280,6 +1289,7 @@ export default function IncomeSourcesScreen() {
       showError('Failed to Update Category', error.message);
     } else {
       setCategories(prev => prev.map(c => c.id === id ? { ...c, label, icon } : c));
+      sfx.success();
       showToast('Category updated successfully.');
 
       const changes: string[] = [];
@@ -1309,6 +1319,7 @@ export default function IncomeSourcesScreen() {
     } else if (data) {
       const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
       setCategories(prev => [...prev, newCat]);
+      sfx.success();
       showToast(`Category "${label}" created.`);
       logActivity({
         user_id:     userIdRef.current!,

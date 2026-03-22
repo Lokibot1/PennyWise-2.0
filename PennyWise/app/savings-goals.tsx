@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { supabase } from '@/lib/supabase';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
+import { sfx } from '@/lib/sfx';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -171,6 +172,7 @@ export default function SavingsGoalsScreen() {
     setSaving(false);
     if (error) { Alert.alert('Error', error.message); return; }
 
+    sfx.coin();
     setShowAddModal(false);
     setNewTitle(''); setNewTarget(''); setNewIcon('wallet-outline');
     fetchGoals(userId);
@@ -222,6 +224,7 @@ export default function SavingsGoalsScreen() {
     setEditSaving(false);
     if (error) { Alert.alert('Error', error.message); return; }
 
+    sfx.success();
     // Build change description
     const changes: string[] = [];
     if (editTitle.trim() !== editingGoal.title)           changes.push(`Name → "${editTitle.trim()}"`);
@@ -277,6 +280,7 @@ export default function SavingsGoalsScreen() {
     fetchGoals(userId);
 
     if (isComplete) {
+      sfx.complete();
       logActivity({
         user_id: userId, action_type: ACTION.SAVINGS_GOAL_COMPLETED, entity_type: ENTITY.SAVINGS_GOAL,
         title: `Goal Achieved: ${goal.title}`,
@@ -287,6 +291,7 @@ export default function SavingsGoalsScreen() {
         Alert.alert('Goal Achieved!', `Congratulations! You have reached your "${goal.title}" savings goal!`);
       }, 400);
     } else {
+      sfx.coin();
       logActivity({
         user_id: userId, action_type: ACTION.SAVINGS_GOAL_FUNDED, entity_type: ENTITY.SAVINGS_GOAL,
         title: `Goal Funded: ${goal.title}`,
@@ -315,6 +320,7 @@ export default function SavingsGoalsScreen() {
     if (!pendingArchiveGoal || !userId) return;
     const goal = pendingArchiveGoal;
     setPendingArchiveGoal(null);
+    sfx.warning();
     await supabase.from('savings_goals').update({ is_archived: true }).eq('id', goal.id);
     fetchGoals(userId);
     logActivity({
@@ -332,6 +338,7 @@ export default function SavingsGoalsScreen() {
     if (!pendingDeleteGoal || !userId) return;
     const goal = pendingDeleteGoal;
     setPendingDeleteGoal(null);
+    sfx.error();
     await supabase.from('savings_goals').delete().eq('id', goal.id);
     fetchGoals(userId);
     logActivity({
@@ -431,7 +438,13 @@ export default function SavingsGoalsScreen() {
               const hasMenu     = !isCompleted;
 
               return (
-                <View key={goal.id} style={[styles.goalCard, { backgroundColor: theme.surface, zIndex: menuOpen ? 100 : 1 }]}>
+                <TouchableOpacity
+                  key={goal.id}
+                  style={[styles.goalCard, { backgroundColor: theme.surface, zIndex: menuOpen ? 100 : 1 }]}
+                  onPress={() => { if (!isCompleted && !isArchived) openFundsModal(goal); }}
+                  activeOpacity={!isCompleted && !isArchived ? 0.75 : 1}
+                  disabled={isCompleted || isArchived}
+                >
                   {/* ── Main row ── */}
                   <View style={styles.goalCardRow}>
                     {/* Icon */}
@@ -440,7 +453,7 @@ export default function SavingsGoalsScreen() {
                       isCompleted && styles.goalIconCompleted,
                       isArchived  && styles.goalIconArchived,
                     ]}>
-                      <Ionicons name={goal.icon as any} size={22} color="#fff" />
+                      <Ionicons name={goal.icon as any} size={26} color="#fff" />
                     </View>
 
                     {/* Info */}
@@ -571,7 +584,24 @@ export default function SavingsGoalsScreen() {
                       )}
                     </View>
                   )}
-                </View>
+
+                  {/* ── Tap-to-add hint (active goals only) ── */}
+                  {!isCompleted && !isArchived && (
+                    <View style={{
+                      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                      gap: 6, paddingVertical: 14,
+                      marginHorizontal: 20, marginBottom: 6,
+                      borderTopWidth: 1, borderTopColor: 'rgba(72,149,239,0.15)',
+                      backgroundColor: 'rgba(72,149,239,0.05)',
+                      borderBottomLeftRadius: 14, borderBottomRightRadius: 14,
+                    }}>
+                      <Ionicons name="add-circle-outline" size={16} color="#4895EF" />
+                      <Text style={{ fontFamily: Font.bodySemiBold, fontSize: 13, color: '#4895EF' }}>
+                        Tap to add funds
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
               );
             })}
           </ScrollView>
@@ -795,22 +825,22 @@ const styles = StyleSheet.create({
 
   // Goal card
   goalCard: {
-    borderRadius: 18,
+    borderRadius: 20,
   },
   goalCardRow: {
-    padding: 16,
+    padding: 20,
     paddingRight: 36,
     flexDirection: 'row', alignItems: 'center', gap: 14,
   },
   goalIcon: {
-    width: 48, height: 48, borderRadius: 24,
+    width: 56, height: 56, borderRadius: 28,
     backgroundColor: '#4895EF', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   goalIconCompleted: { backgroundColor: '#3ECBA8' },
   goalIconArchived:  { backgroundColor: '#9AA5B4' },
-  goalInfo:          { flex: 1, gap: 4 },
+  goalInfo:          { flex: 1, gap: 6 },
   goalTitleRow:      { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  goalTitle:         { fontFamily: Font.bodySemiBold, fontSize: 15, flex: 1 },
+  goalTitle:         { fontFamily: Font.headerBold, fontSize: 16, flex: 1 },
   doneBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: 'rgba(62,203,168,0.12)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
@@ -821,10 +851,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(154,165,180,0.12)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
   },
   archivedBadgeText: { fontFamily: Font.bodySemiBold, fontSize: 10, color: '#9AA5B4' },
-  goalAmounts:    { fontFamily: Font.bodyMedium, fontSize: 13 },
-  progressTrack:  { height: 6, borderRadius: 3, overflow: 'hidden', marginTop: 2 },
-  progressFill:   { height: 6, borderRadius: 3 },
-  pctText:        { fontFamily: Font.bodyRegular, fontSize: 11, marginTop: 2 },
+  goalAmounts:    { fontFamily: Font.bodyMedium, fontSize: 14 },
+  progressTrack:  { height: 8, borderRadius: 4, overflow: 'hidden', marginTop: 4 },
+  progressFill:   { height: 8, borderRadius: 4 },
+  pctText:        { fontFamily: Font.bodyRegular, fontSize: 12, marginTop: 2 },
 
   // Kebab button — absolute top-right of card
   kebabBtn: {

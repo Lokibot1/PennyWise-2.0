@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Font } from '@/constants/fonts';
+import { sfx } from '@/lib/sfx';
 import { useAppTheme } from '@/contexts/AppTheme';
 
 type Props = {
@@ -58,6 +59,7 @@ export default function BudgetLimitModal({ visible, current, onClose, onSave }: 
     setSaving(true);
     try {
       await onSave(parsed);
+      sfx.coin();
       onClose();
     } catch (err: any) {
       setErrMsg(err?.message ?? 'Failed to save budget limit. Please try again.');
