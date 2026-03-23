@@ -5,6 +5,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 import { router, useFocusEffect } from 'expo-router';
 import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
 import { StatusBar } from 'expo-status-bar';
@@ -88,6 +96,43 @@ function IconPicker({
   );
 }
 
+// ── Skeleton card — mirrors the real goal card layout exactly ──────────────────
+function GoalCardSkeleton({ sweep }: { sweep: Animated.SharedValue<number> }) {
+  const { theme } = useAppTheme();
+  const blockBg = theme.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+  const shimBg  = theme.isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.75)';
+
+  const sweepStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(sweep.value, [0, 1], [-220, 320]) }],
+  }));
+
+  const Bone = ({ w, h = 10, r = 5, mt = 0 }: { w: number | `${number}%`; h?: number; r?: number; mt?: number }) => (
+    <View style={{ width: w, height: h, borderRadius: r, backgroundColor: blockBg, marginTop: mt, overflow: 'hidden' }}>
+      <Animated.View style={[{ position: 'absolute', top: 0, bottom: 0, width: 100, backgroundColor: shimBg, transform: [{ skewX: '-20deg' }] }, sweepStyle]} />
+    </View>
+  );
+
+  return (
+    <View style={{ borderRadius: 20, backgroundColor: theme.surface, marginBottom: 14 }}>
+      <View style={{ padding: 16, paddingRight: 36, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        {/* Circle ring bone */}
+        <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: blockBg, overflow: 'hidden', flexShrink: 0 }}>
+          <Animated.View style={[{ position: 'absolute', top: 0, bottom: 0, width: 100, backgroundColor: shimBg, transform: [{ skewX: '-20deg' }] }, sweepStyle]} />
+        </View>
+        {/* Text + progress bones */}
+        <View style={{ flex: 1, gap: 8 }}>
+          <Bone w="60%" h={14} r={6} />
+          <Bone w="45%" h={11} r={5} />
+          <Bone w="100%" h={8}  r={4} mt={2} />
+          <Bone w="28%" h={10} r={5} />
+        </View>
+      </View>
+      {/* Tap-hint strip bone */}
+      <Bone w="100%" h={38} r={0} />
+    </View>
+  );
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function SavingsGoalsScreen() {
   const { theme } = useAppTheme();
@@ -105,6 +150,15 @@ export default function SavingsGoalsScreen() {
   const [goals, setGoals]         = useState<Goal[]>([]);
   const [loading, setLoading]     = useState(true);
   const [userId, setUserId]       = useState<string | null>(null);
+
+  // Skeleton shimmer sweep
+  const sweep = useSharedValue(0);
+  useEffect(() => {
+    if (loading) {
+      sweep.value = 0;
+      sweep.value = withRepeat(withTiming(1, { duration: 1100, easing: Easing.linear }), -1, false);
+    }
+  }, [loading]);
 
   // ── Add Goal modal state ───────────────────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false);
@@ -415,7 +469,11 @@ export default function SavingsGoalsScreen() {
       {/* Content */}
       <View style={[styles.content, { backgroundColor: theme.cardBg }]}>
         {loading ? (
-          <ActivityIndicator color="#3ECBA8" size="large" style={{ marginTop: 60 }} />
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.listContent} scrollEnabled={false}>
+            {Array.from({ length: goals.length || 3 }).map((_, i) => (
+              <GoalCardSkeleton key={i} sweep={sweep} />
+            ))}
+          </ScrollView>
         ) : displayedGoals.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons
@@ -619,41 +677,43 @@ export default function SavingsGoalsScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowAddModal(false)} />
           <View style={[styles.modalSheet, { backgroundColor: theme.modalBg }]}>
-            <View style={[styles.modalHandle, { backgroundColor: theme.divider }]} />
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>New Savings Goal</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
+              <View style={[styles.modalHandle, { backgroundColor: theme.divider }]} />
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>New Savings Goal</Text>
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Goal Name</Text>
-            <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
-              <Ionicons name="flag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
-              <TextInput
-                style={[styles.inputInner, { color: theme.textPrimary }]}
-                placeholder="e.g. Buy a Car, Emergency Fund" placeholderTextColor={theme.textMuted}
-                value={newTitle} onChangeText={setNewTitle}
-              />
-            </View>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Goal Name</Text>
+              <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+                <Ionicons name="flag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+                <TextInput
+                  style={[styles.inputInner, { color: theme.textPrimary }]}
+                  placeholder="e.g. Buy a Car, Emergency Fund" placeholderTextColor={theme.textMuted}
+                  value={newTitle} onChangeText={setNewTitle}
+                />
+              </View>
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Target Amount (₱)</Text>
-            <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
-              <Ionicons name="cash-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
-              <TextInput
-                style={[styles.inputInner, { color: theme.textPrimary }]}
-                placeholder="e.g. 50,000.00" placeholderTextColor={theme.textMuted}
-                value={newTarget} onChangeText={v => setNewTarget(fmtMoney(v))} keyboardType="decimal-pad"
-              />
-            </View>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Target Amount (₱)</Text>
+              <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+                <Ionicons name="cash-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+                <TextInput
+                  style={[styles.inputInner, { color: theme.textPrimary }]}
+                  placeholder="e.g. 50,000.00" placeholderTextColor={theme.textMuted}
+                  value={newTarget} onChangeText={v => setNewTarget(fmtMoney(v))} keyboardType="decimal-pad"
+                />
+              </View>
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon (optional)</Text>
-            <IconPicker selected={newIcon} onSelect={setNewIcon} theme={theme} />
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon (optional)</Text>
+              <IconPicker selected={newIcon} onSelect={setNewIcon} theme={theme} />
 
-            <TouchableOpacity
-              style={[styles.primaryBtn, saving && { opacity: 0.6 }]}
-              onPress={handleSaveGoal} disabled={saving} activeOpacity={0.85}
-            >
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create Goal</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddModal(false)}>
-              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primaryBtn, saving && { opacity: 0.6 }]}
+                onPress={handleSaveGoal} disabled={saving} activeOpacity={0.85}
+              >
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create Goal</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddModal(false)}>
+                <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -663,53 +723,55 @@ export default function SavingsGoalsScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowEditModal(false)} />
           <View style={[styles.modalSheet, { backgroundColor: theme.modalBg }]}>
-            <View style={[styles.modalHandle, { backgroundColor: theme.divider }]} />
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
+              <View style={[styles.modalHandle, { backgroundColor: theme.divider }]} />
 
-            {/* Modal header row */}
-            <View style={styles.editModalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.textPrimary, marginBottom: 0 }]}>Edit Goal</Text>
-              {editingGoal && (
-                <View style={[styles.editCurrentBadge, { backgroundColor: theme.surface }]}>
-                  <Text style={[styles.editCurrentLabel, { color: theme.textMuted }]}>Saved</Text>
-                  <Text style={[styles.editCurrentValue, { color: theme.textPrimary }]}>
-                    {formatCurrency(editingGoal.current_amount)}
-                  </Text>
-                </View>
-              )}
-            </View>
+              {/* Modal header row */}
+              <View style={styles.editModalHeader}>
+                <Text style={[styles.modalTitle, { color: theme.textPrimary, marginBottom: 0 }]}>Edit Goal</Text>
+                {editingGoal && (
+                  <View style={[styles.editCurrentBadge, { backgroundColor: theme.surface }]}>
+                    <Text style={[styles.editCurrentLabel, { color: theme.textMuted }]}>Saved</Text>
+                    <Text style={[styles.editCurrentValue, { color: theme.textPrimary }]}>
+                      {formatCurrency(editingGoal.current_amount)}
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Goal Name</Text>
-            <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
-              <Ionicons name="flag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
-              <TextInput
-                style={[styles.inputInner, { color: theme.textPrimary }]}
-                placeholder="e.g. Buy a Car, Emergency Fund" placeholderTextColor={theme.textMuted}
-                value={editTitle} onChangeText={setEditTitle}
-              />
-            </View>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Goal Name</Text>
+              <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+                <Ionicons name="flag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+                <TextInput
+                  style={[styles.inputInner, { color: theme.textPrimary }]}
+                  placeholder="e.g. Buy a Car, Emergency Fund" placeholderTextColor={theme.textMuted}
+                  value={editTitle} onChangeText={setEditTitle}
+                />
+              </View>
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Target Amount (₱)</Text>
-            <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
-              <Ionicons name="cash-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
-              <TextInput
-                style={[styles.inputInner, { color: theme.textPrimary }]}
-                placeholder="e.g. 50,000.00" placeholderTextColor={theme.textMuted}
-                value={editTarget} onChangeText={v => setEditTarget(fmtMoney(v))} keyboardType="decimal-pad"
-              />
-            </View>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Target Amount (₱)</Text>
+              <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+                <Ionicons name="cash-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+                <TextInput
+                  style={[styles.inputInner, { color: theme.textPrimary }]}
+                  placeholder="e.g. 50,000.00" placeholderTextColor={theme.textMuted}
+                  value={editTarget} onChangeText={v => setEditTarget(fmtMoney(v))} keyboardType="decimal-pad"
+                />
+              </View>
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon (optional)</Text>
-            <IconPicker selected={editIcon} onSelect={setEditIcon} theme={theme} />
+              <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon (optional)</Text>
+              <IconPicker selected={editIcon} onSelect={setEditIcon} theme={theme} />
 
-            <TouchableOpacity
-              style={[styles.primaryBtn, editSaving && { opacity: 0.6 }]}
-              onPress={handleEditGoal} disabled={editSaving} activeOpacity={0.85}
-            >
-              {editSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Save Changes</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditModal(false)}>
-              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primaryBtn, editSaving && { opacity: 0.6 }]}
+                onPress={handleEditGoal} disabled={editSaving} activeOpacity={0.85}
+              >
+                {editSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Save Changes</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditModal(false)}>
+                <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -751,58 +813,60 @@ export default function SavingsGoalsScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setShowFundsModal(false)} />
           <View style={[styles.modalSheet, { backgroundColor: theme.modalBg }]}>
-            <View style={[styles.modalHandle, { backgroundColor: theme.divider }]} />
-            <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Add Funds</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} bounces={false}>
+              <View style={[styles.modalHandle, { backgroundColor: theme.divider }]} />
+              <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>Add Funds</Text>
 
-            {selectedGoal && (
-              <>
-                <View style={[styles.goalSummary, { backgroundColor: theme.surface }]}>
-                  <CircularRing
-                    size={52}
-                    stroke={4}
-                    pct={Math.min(100, (selectedGoal.current_amount / selectedGoal.target_amount) * 100)}
-                    color="#4895EF"
-                    track="rgba(72,149,239,0.18)"
-                    icon={selectedGoal.icon}
-                    iconSize={18}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.goalTitle, { color: theme.textPrimary }]}>{selectedGoal.title}</Text>
-                    <Text style={[styles.goalAmounts, { color: theme.textSecondary }]}>
-                      {formatCurrency(selectedGoal.current_amount)} / {formatCurrency(selectedGoal.target_amount)}
+              {selectedGoal && (
+                <>
+                  <View style={[styles.goalSummary, { backgroundColor: theme.surface }]}>
+                    <CircularRing
+                      size={52}
+                      stroke={4}
+                      pct={Math.min(100, (selectedGoal.current_amount / selectedGoal.target_amount) * 100)}
+                      color="#4895EF"
+                      track="rgba(72,149,239,0.18)"
+                      icon={selectedGoal.icon}
+                      iconSize={18}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.goalTitle, { color: theme.textPrimary }]}>{selectedGoal.title}</Text>
+                      <Text style={[styles.goalAmounts, { color: theme.textSecondary }]}>
+                        {formatCurrency(selectedGoal.current_amount)} / {formatCurrency(selectedGoal.target_amount)}
+                      </Text>
+                    </View>
+                    <Text style={styles.pctBadge}>
+                      {Math.min(100, (selectedGoal.current_amount / selectedGoal.target_amount) * 100).toFixed(0)}%
                     </Text>
                   </View>
-                  <Text style={styles.pctBadge}>
-                    {Math.min(100, (selectedGoal.current_amount / selectedGoal.target_amount) * 100).toFixed(0)}%
-                  </Text>
-                </View>
-                {selectedGoal.current_amount < selectedGoal.target_amount && (
-                  <Text style={[styles.remainingHint, { color: theme.textMuted }]}>
-                    {formatCurrency(selectedGoal.target_amount - selectedGoal.current_amount)} remaining to goal
-                  </Text>
-                )}
-              </>
-            )}
+                  {selectedGoal.current_amount < selectedGoal.target_amount && (
+                    <Text style={[styles.remainingHint, { color: theme.textMuted }]}>
+                      {formatCurrency(selectedGoal.target_amount - selectedGoal.current_amount)} remaining to goal
+                    </Text>
+                  )}
+                </>
+              )}
 
-            <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: 16 }]}>Amount to Add (₱)</Text>
-            <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
-              <Ionicons name="trending-up-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
-              <TextInput
-                style={[styles.inputInner, { color: theme.textPrimary }]}
-                placeholder="e.g. 1,000.00" placeholderTextColor={theme.textMuted}
-                value={fundsAmount} onChangeText={v => setFundsAmount(fmtMoney(v))} keyboardType="decimal-pad" autoFocus
-              />
-            </View>
+              <Text style={[styles.inputLabel, { color: theme.textSecondary, marginTop: 16 }]}>Amount to Add (₱)</Text>
+              <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+                <Ionicons name="trending-up-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
+                <TextInput
+                  style={[styles.inputInner, { color: theme.textPrimary }]}
+                  placeholder="e.g. 1,000.00" placeholderTextColor={theme.textMuted}
+                  value={fundsAmount} onChangeText={v => setFundsAmount(fmtMoney(v))} keyboardType="decimal-pad" autoFocus
+                />
+              </View>
 
-            <TouchableOpacity
-              style={[styles.primaryBtn, addingFunds && { opacity: 0.6 }]}
-              onPress={handleAddFunds} disabled={addingFunds} activeOpacity={0.85}
-            >
-              {addingFunds ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Add Funds</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowFundsModal(false)}>
-              <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.primaryBtn, addingFunds && { opacity: 0.6 }]}
+                onPress={handleAddFunds} disabled={addingFunds} activeOpacity={0.85}
+              >
+                {addingFunds ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Add Funds</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowFundsModal(false)}>
+                <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -894,7 +958,7 @@ const styles = StyleSheet.create({
   // Modals
   modalOverlay:  { flex: 1, justifyContent: 'flex-end' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-  modalSheet:    { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40 },
+  modalSheet:    { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 40, maxHeight: '90%' },
   modalHandle:   { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   modalTitle:    { fontFamily: Font.headerBold, fontSize: 20, marginBottom: 20 },
   inputLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, marginBottom: 6 },

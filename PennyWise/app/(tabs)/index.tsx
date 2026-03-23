@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -90,6 +97,11 @@ export default function HomeScreen() {
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
   const [errModal, setErrModal]                 = useState({ visible: false, title: '', message: '' });
   const userIdRef = useRef<string | null>(null);
+
+  // ── Goal carousel ───────────────────────────────────────────────────────────
+  const displayIdxRef               = useRef(0);
+  const [displayIdx, setDisplayIdx] = useState(0);
+  const goalFlipX  = useSharedValue(1);  // 1 = full face, 0 = edge, -1 = back face
 
   const showError = (title: string, msg: string) => setErrModal({ visible: true, title, message: msg });
 
@@ -251,6 +263,41 @@ export default function HomeScreen() {
   const goalsPct     = totalTarget > 0 ? Math.min(100, (totalSaved / totalTarget) * 100) : 0;
   const firstGoal    = savingsGoals[0] ?? null;
 
+  // Active goal in the carousel (2+ goals)
+  const activeGoal    = goalsCount > 0 ? savingsGoals[displayIdx % goalsCount] : null;
+  const activeGoalPct = activeGoal && activeGoal.target_amount > 0
+    ? Math.min(100, (activeGoal.current_amount / activeGoal.target_amount) * 100)
+    : 0;
+
+  // Auto-rotate when 2+ goals
+  useEffect(() => {
+    displayIdxRef.current = 0;
+    setDisplayIdx(0);
+    goalFlipX.value = 1;
+    if (goalsCount <= 1) return;
+
+    const id = setInterval(() => {
+      const nextIdx = (displayIdxRef.current + 1) % goalsCount;
+      displayIdxRef.current = nextIdx;
+
+      // First half: squeeze to edge (coin turning away)
+      goalFlipX.value = withTiming(0, { duration: 220, easing: Easing.in(Easing.quad) }, () => {
+        // Swap content at the midpoint (coin edge — nothing visible)
+        runOnJS(setDisplayIdx)(nextIdx);
+        // Second half: expand from edge (new face reveals)
+        goalFlipX.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.quad) });
+      });
+    }, 3500);
+
+    return () => clearInterval(id);
+  }, [goalsCount]);
+
+  const goalInfoStyle = useAnimatedStyle(() => ({
+    transform: [{ scaleX: Math.abs(goalFlipX.value) }],
+    // Dim slightly at the edge to simulate the coin turning away from the light
+    opacity: 0.4 + Math.abs(goalFlipX.value) * 0.6,
+  }));
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
@@ -350,39 +397,66 @@ export default function HomeScreen() {
               >
                 {/* Left: goal summary */}
                 <View style={styles.savingsLeft}>
-                  {/* Circular progress ring */}
-                  <View style={{ marginBottom: 8 }}>
-                    <CircularRing
-                      size={72}
-                      stroke={5}
-                      pct={goalsCount > 0 ? goalsPct : 0}
-                      color={goalsPct >= 100 ? '#3ECBA8' : '#fff'}
-                      track="rgba(255,255,255,0.18)"
-                      icon={goalsCount === 0 ? 'flag-outline' : firstGoal!.icon}
-                      iconSize={24}
-                      innerBg={goalsPct >= 100 ? '#3ECBA8' : 'rgba(255,255,255,0.15)'}
-                    />
-                  </View>
-
                   {goalsCount === 0 ? (
                     <>
+                      <View style={{ marginBottom: 8 }}>
+                        <CircularRing
+                          size={72} stroke={5} pct={0}
+                          color="#fff" track="rgba(255,255,255,0.18)"
+                          icon="flag-outline" iconSize={24}
+                          innerBg="rgba(255,255,255,0.15)"
+                        />
+                      </View>
                       <Text style={styles.savingsLabel}>Savings{'\n'}On Goals</Text>
                       <Text style={styles.savingsTapHint}>Tap to set a goal</Text>
                     </>
                   ) : goalsCount === 1 ? (
                     <>
+                      <View style={{ marginBottom: 8 }}>
+                        <CircularRing
+                          size={72} stroke={5} pct={goalsPct}
+                          color={goalsPct >= 100 ? '#3ECBA8' : '#fff'}
+                          track="rgba(255,255,255,0.18)"
+                          icon={firstGoal!.icon} iconSize={24}
+                          innerBg={goalsPct >= 100 ? '#3ECBA8' : 'rgba(255,255,255,0.15)'}
+                        />
+                      </View>
                       <Text style={styles.savingsLabel} numberOfLines={2}>{firstGoal!.title}</Text>
                       <Text style={styles.savingsProgressText}>
                         {formatCurrency(firstGoal!.current_amount)}{' / '}{formatCurrency(firstGoal!.target_amount)}
                       </Text>
                     </>
                   ) : (
-                    <>
-                      <Text style={styles.savingsLabel}>{goalsCount} Active{'\n'}Goals</Text>
+                    /* 2+ goals — animated carousel */
+                    <Animated.View style={[{ alignItems: 'center' }, goalInfoStyle]}>
+                      <View style={{ marginBottom: 10 }}>
+                        <CircularRing
+                          size={72} stroke={5} pct={activeGoalPct}
+                          color={activeGoalPct >= 100 ? '#3ECBA8' : '#fff'}
+                          track="rgba(255,255,255,0.18)"
+                          icon={activeGoal!.icon} iconSize={24}
+                          innerBg={activeGoalPct >= 100 ? '#3ECBA8' : 'rgba(255,255,255,0.15)'}
+                        />
+                      </View>
+                      <Text style={styles.savingsLabel} numberOfLines={1}>{activeGoal!.title}</Text>
                       <Text style={styles.savingsProgressText}>
-                        {formatCurrency(totalSaved)}{'\n'}of {formatCurrency(totalTarget)}
+                        {formatCurrency(activeGoal!.current_amount)}{'\n'}of {formatCurrency(activeGoal!.target_amount)}
                       </Text>
-                    </>
+                      {/* Dot indicators */}
+                      <View style={{ flexDirection: 'row', gap: 4, marginTop: 8, alignItems: 'center' }}>
+                        {savingsGoals.map((_, i) => (
+                          <View
+                            key={i}
+                            style={{
+                              height: 4,
+                              width: i === displayIdx ? 16 : 4,
+                              borderRadius: 2,
+                              backgroundColor: i === displayIdx ? '#fff' : 'rgba(255,255,255,0.3)',
+                            }}
+                          />
+                        ))}
+                      </View>
+                    </Animated.View>
                   )}
                 </View>
 
@@ -659,21 +733,22 @@ const styles = StyleSheet.create({
   savingsLeft: {
     alignItems: 'center',
     flex: 1,
+    overflow: 'hidden',
   },
   savingsLabel: {
-    fontFamily: Font.bodyMedium,
-    fontSize: 11,
+    fontFamily: Font.bodySemiBold,
+    fontSize: 13,
     color: '#fff',
     textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 18,
   },
   savingsProgressText: {
     fontFamily: Font.bodyRegular,
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.72)',
     textAlign: 'center',
     marginTop: 3,
-    lineHeight: 14,
+    lineHeight: 15,
   },
   savingsTapHint: {
     fontFamily: Font.bodyRegular,

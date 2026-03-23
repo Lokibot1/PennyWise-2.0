@@ -20,6 +20,7 @@ import { Font } from '@/constants/fonts';
 import { sfx } from '@/lib/sfx';
 import { loadingBar } from '@/components/GlobalLoadingBar';
 import { useAppTheme } from '@/contexts/AppTheme';
+import ConfirmModal from '@/components/ConfirmModal';
 
 type Props = {
   visible: boolean;
@@ -38,9 +39,10 @@ function formatWithCommas(raw: string): string {
 
 export default function BudgetLimitModal({ visible, current, onClose, onSave }: Props) {
   const { theme } = useAppTheme();
-  const [value, setValue]   = useState('');
-  const [saving, setSaving] = useState(false);
-  const [errMsg, setErrMsg] = useState('');
+  const [value, setValue]       = useState('');
+  const [saving, setSaving]     = useState(false);
+  const [errMsg, setErrMsg]     = useState('');
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Pre-fill with formatted current value each time the modal opens
   useEffect(() => {
@@ -57,6 +59,7 @@ export default function BudgetLimitModal({ visible, current, onClose, onSave }: 
 
   async function handleSave() {
     if (!isValid || saving) return;
+    setShowConfirm(false);
     setSaving(true);
     loadingBar.start();
     try {
@@ -71,6 +74,8 @@ export default function BudgetLimitModal({ visible, current, onClose, onSave }: 
       setSaving(false);
     }
   }
+
+  const formattedAmount = `₱${parsed.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <Modal
@@ -136,7 +141,7 @@ export default function BudgetLimitModal({ visible, current, onClose, onSave }: 
           {/* Save button */}
           <TouchableOpacity
             style={[st.saveBtn, { backgroundColor: isValid ? '#1B7A4A' : theme.surface }]}
-            onPress={handleSave}
+            onPress={() => { if (isValid && !saving) setShowConfirm(true); }}
             disabled={!isValid || saving}
             activeOpacity={0.85}
           >
@@ -151,6 +156,20 @@ export default function BudgetLimitModal({ visible, current, onClose, onSave }: 
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Confirmation modal */}
+      <ConfirmModal
+        visible={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={handleSave}
+        title="Update Monthly Budget?"
+        message={`You're about to set your monthly spending limit to ${formattedAmount}. This will apply starting now.`}
+        confirmLabel="Yes, Set Budget"
+        confirmColor="#1B7A4A"
+        icon="wallet-outline"
+        iconBg="rgba(27,122,74,0.1)"
+        iconColor="#1B7A4A"
+      />
     </Modal>
   );
 }
