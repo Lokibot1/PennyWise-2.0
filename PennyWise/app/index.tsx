@@ -45,12 +45,20 @@ export default function SplashScreen() {
   const subY         = useSharedValue(14);
 
   // ── Animated styles ───────────────────────────────────────────────────────
-  const coinStyle = useAnimatedStyle(() => ({
-    opacity: coinOpacity.value,
+  // iOS REQUIRES perspective to be alone with its rotation in a dedicated layer.
+  // Mixing perspective with translateY/scale in one array causes visual artifacts.
+  const coinOuterStyle = useAnimatedStyle(() => ({
+    opacity:   coinOpacity.value,
     transform: [
-      { translateY:  coinY.value    },
-      { scale:       coinScale.value },
-      { perspective: 1400            },
+      { translateY: coinY.value    },
+      { scale:      coinScale.value },
+    ],
+  }));
+
+  // Flip layer: perspective must be FIRST, rotation SECOND — no other transforms.
+  const coinFlipStyle = useAnimatedStyle(() => ({
+    transform: [
+      { perspective: 1400 },
       { rotateX:    `${flipDeg.value}deg` },
     ],
   }));
@@ -188,15 +196,21 @@ export default function SplashScreen() {
         {/* Glow ripple ring */}
         <Animated.View style={[styles.glowRing, glowStyle]} />
 
-        {/* Coin — rotateX = horizontal flip (tossed forward), high perspective = minimal distortion */}
-        <Animated.View style={coinStyle}>
-          <View style={styles.coin}>
-            <Image
-              source={require('@/assets/images/logo.jpg')}
-              style={styles.coinImg}
-              resizeMode="cover"
-            />
-          </View>
+        {/* Outer: position + opacity. Inner flip layer: perspective+rotateX isolated for iOS. */}
+        <Animated.View style={coinOuterStyle}>
+          <Animated.View
+            style={coinFlipStyle}
+            shouldRasterizeIOS
+            renderToHardwareTextureAndroid
+          >
+            <View style={styles.coin}>
+              <Image
+                source={require('@/assets/images/logo.jpg')}
+                style={styles.coinImg}
+                resizeMode="cover"
+              />
+            </View>
+          </Animated.View>
         </Animated.View>
       </View>
 
