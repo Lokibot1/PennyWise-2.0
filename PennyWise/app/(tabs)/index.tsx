@@ -58,6 +58,12 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 }
 
+function fmt12h(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
 function filterByPeriod(txs: TxRow[], period: Period): TxRow[] {
   const now = new Date();
   return txs.filter(tx => {
@@ -559,7 +565,7 @@ export default function HomeScreen() {
                   <View style={styles.txInfo}>
                     <Text style={[styles.txTitle, { color: theme.textPrimary }]}>{tx.title}</Text>
                     <Text style={[styles.txMeta, { color: theme.textSecondary }]}>
-                      {tx.time} · {formatDate(tx.date)}
+                      {fmt12h(tx.time)} · {formatDate(tx.date)}
                     </Text>
                   </View>
                   <Text style={[styles.txCategory, { color: theme.textSecondary }]}>{tx.category}</Text>

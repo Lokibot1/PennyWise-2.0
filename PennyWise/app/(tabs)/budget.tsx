@@ -106,6 +106,7 @@ const MONTHS = [
 ];
 
 const fmtDateShort = (iso: string) => { const [,m,d] = iso.split('-').map(Number); return `${MONTHS[m-1]} ${d}`; };
+const fmt12h = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); const ampm = h >= 12 ? 'PM' : 'AM'; return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${ampm}`; };
 const monthLabel   = (iso: string) => MONTHS[+iso.split('-')[1] - 1];
 const monthYearKey = (iso: string) => iso.slice(0, 7);
 
@@ -640,7 +641,7 @@ function CategoryDetailScreen({
       <TouchableOpacity style={{ flex: 1 }} onPress={() => onEditExpense(exp.id)} activeOpacity={0.85}>
         <Text style={[s.expTitle, { color: theme.textPrimary }]}>{exp.title}</Text>
         <Text style={[s.expMeta, { color: theme.textMuted }]}>
-          {exp.time} · {fmtDateShort(exp.date)}{exp.isRecurring ? ` · ${exp.frequency}` : ''}
+          {fmt12h(exp.time)} · {fmtDateShort(exp.date)}{exp.isRecurring ? ` · ${exp.frequency}` : ''}
         </Text>
       </TouchableOpacity>
       <Text style={s.expAmt}>-{fmtAmt(exp.amount)}</Text>
