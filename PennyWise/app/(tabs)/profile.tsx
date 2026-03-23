@@ -1162,14 +1162,43 @@ function SettingsView({
 
   async function confirmDelete() {
     loadingBar.start();
-    const { error } = await supabase.auth.signOut();
-    loadingBar.finish();
-    if (error)
+    try {
+      const {
+        data: { user },
+        error: uErr,
+      } = await supabase.auth.getUser();
+      if (uErr || !user) throw new Error(uErr?.message ?? "Could not retrieve user.");
+
+      // Delete avatar from storage if it exists
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("avatar_url")
+        .eq("id", user.id)
+        .single();
+
+      if (profileData?.avatar_url) {
+        const parts = profileData.avatar_url.split(
+          "/storage/v1/object/public/avatars/"
+        );
+        if (parts[1]) {
+          await supabase.storage.from("avatars").remove([parts[1]]);
+        }
+      }
+
+      // Delete the user account — cascades to all user data via DB foreign keys
+      const { error: deleteError } = await supabase.rpc("delete_user");
+      if (deleteError) throw deleteError;
+
+      // Clear local session
+      await supabase.auth.signOut();
+    } catch (err: any) {
+      loadingBar.finish();
       setErrModal({
         visible: true,
-        title: "Sign Out Failed",
-        message: error.message,
+        title: "Delete Account Failed",
+        message: err?.message ?? "Something went wrong. Please try again.",
       });
+    }
   }
 
   return (

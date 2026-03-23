@@ -236,6 +236,27 @@ create policy "Users manage own activity logs"
 
 
 -- =============================================================================
+-- DELETE USER RPC
+-- Called from the client to permanently delete the authenticated user and all
+-- their data. SECURITY DEFINER allows the function to delete from auth.users,
+-- which cascades to all public tables via foreign key constraints.
+-- Run in Supabase SQL Editor: Dashboard → SQL Editor → New Query → paste & run
+-- =============================================================================
+
+create or replace function public.delete_user()
+returns void
+language sql security definer
+as $$
+  delete from auth.users where id = auth.uid();
+$$;
+
+-- Revoke public execute, grant only to authenticated users
+revoke execute on function public.delete_user() from public;
+grant execute on function public.delete_user() to authenticated;
+
+
+
+-- =============================================================================
 -- AUTO-UPDATE updated_at TRIGGER
 -- =============================================================================
 
