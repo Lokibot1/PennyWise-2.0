@@ -16,10 +16,12 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { FormInput } from '@/components/form-input';
 import { Font } from '@/constants/fonts';
+import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { loadingBar } from '@/components/GlobalLoadingBar';
 
 export default function ForgotPasswordScreen() {
+  const { theme } = useAppTheme();
   const [email, setEmail]   = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]   = useState('');
@@ -46,7 +48,7 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]}>
       <StatusBar style="light" />
 
       {/* ── Green header ── */}
@@ -54,13 +56,13 @@ export default function ForgotPasswordScreen() {
         <Text style={styles.headerTitle}>Forgot Password</Text>
       </View>
 
-      {/* ── White card ── */}
+      {/* ── Card ── */}
       <KeyboardAvoidingView
         style={styles.cardWrapper}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          style={styles.card}
+          style={[styles.card, { backgroundColor: theme.cardBg }]}
           contentContainerStyle={styles.cardContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -69,8 +71,8 @@ export default function ForgotPasswordScreen() {
             /* ── Success state ── */
             <View style={styles.successBox}>
               <Ionicons name="mail-outline" size={48} color="#1B7A4A" />
-              <Text style={styles.successTitle}>Check Your Email</Text>
-              <Text style={styles.successDesc}>
+              <Text style={[styles.successTitle, { color: theme.textPrimary }]}>Check Your Email</Text>
+              <Text style={[styles.successDesc, { color: theme.textMuted }]}>
                 We sent a password reset link to{'\n'}
                 <Text style={styles.successEmail}>{email}</Text>
               </Text>
@@ -86,8 +88,8 @@ export default function ForgotPasswordScreen() {
             <>
               {/* Reset section */}
               <View style={styles.resetSection}>
-                <Text style={styles.resetTitle}>Reset Password?</Text>
-                <Text style={styles.resetDescription}>
+                <Text style={[styles.resetTitle, { color: theme.textPrimary }]}>Reset Password?</Text>
+                <Text style={[styles.resetDescription, { color: theme.textMuted }]}>
                   Enter the email address linked to your account and we'll send
                   you a link to reset your password.
                 </Text>
@@ -105,7 +107,7 @@ export default function ForgotPasswordScreen() {
 
               {/* Error message */}
               {error !== '' && (
-                <View style={styles.errorBox}>
+                <View style={[styles.errorBox, { backgroundColor: theme.isDark ? 'rgba(224,88,88,0.12)' : '#FFF0F0' }]}>
                   <Ionicons name="alert-circle-outline" size={16} color="#E05858" />
                   <Text style={styles.errorText}>{error}</Text>
                 </View>
@@ -126,33 +128,33 @@ export default function ForgotPasswordScreen() {
 
               {/* Sign Up */}
               <TouchableOpacity
-                style={styles.secondaryButton}
+                style={[styles.secondaryButton, { backgroundColor: theme.isDark ? theme.surface : '#EDF7F1' }]}
                 onPress={() => router.push('/create-account')}
                 activeOpacity={0.85}
               >
-                <Text style={styles.secondaryButtonText}>Sign Up</Text>
+                <Text style={[styles.secondaryButtonText, { color: theme.textPrimary }]}>Sign Up</Text>
               </TouchableOpacity>
 
               {/* Social divider */}
               <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>or sign up with</Text>
-                <View style={styles.dividerLine} />
+                <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
+                <Text style={[styles.dividerText, { color: theme.textMuted }]}>or sign up with</Text>
+                <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
               </View>
 
               {/* Social buttons */}
               <View style={styles.socialRow}>
-                <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
+                <TouchableOpacity style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]} activeOpacity={0.7}>
                   <Ionicons name="logo-facebook" size={22} color="#1877F2" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.socialButton} activeOpacity={0.7}>
+                <TouchableOpacity style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]} activeOpacity={0.7}>
                   <Ionicons name="logo-google" size={20} color="#EA4335" />
                 </TouchableOpacity>
               </View>
 
               {/* Footer */}
               <View style={styles.footerRow}>
-                <Text style={styles.footerText}>Don't have an account? </Text>
+                <Text style={[styles.footerText, { color: theme.textMuted }]}>Don't have an account? </Text>
                 <TouchableOpacity onPress={() => router.push('/create-account')} activeOpacity={0.7}>
                   <Text style={styles.footerLink}>Sign Up</Text>
                 </TouchableOpacity>

@@ -18,6 +18,7 @@ import { FormInput } from '@/components/form-input';
 import { PasswordStrength } from '@/components/password-strength';
 import DatePickerModal from '@/components/DatePickerModal';
 import { Font } from '@/constants/fonts';
+import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { loadingBar } from '@/components/GlobalLoadingBar';
 
@@ -40,6 +41,7 @@ function formatDob(date: Date): string {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function CreateAccountScreen() {
+  const { theme } = useAppTheme();
   const [fullName, setFullName]               = useState('');
   const [email, setEmail]                     = useState('');
   const [phone, setPhone]                     = useState('');
@@ -93,7 +95,7 @@ export default function CreateAccountScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]}>
       <StatusBar style="light" />
 
       {/* ── Green header ── */}
@@ -101,13 +103,13 @@ export default function CreateAccountScreen() {
         <Text style={styles.headerTitle}>Create Account</Text>
       </View>
 
-      {/* ── White card ── */}
+      {/* ── Card ── */}
       <KeyboardAvoidingView
         style={styles.cardWrapper}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          style={styles.card}
+          style={[styles.card, { backgroundColor: theme.cardBg }]}
           contentContainerStyle={styles.cardContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -144,19 +146,19 @@ export default function CreateAccountScreen() {
 
             {/* ── Date of Birth ── */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Date of Birth</Text>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Date of Birth</Text>
               <TouchableOpacity
-                style={[styles.dobRow, !dob && styles.dobRowEmpty]}
+                style={[styles.dobRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}
                 onPress={() => setShowPicker(true)}
                 activeOpacity={0.75}
               >
-                <Ionicons name="calendar-outline" size={17} color="#9E9E9E" style={styles.dobIcon} />
-                <Text style={[styles.dobText, !dob && styles.dobPlaceholder]}>
+                <Ionicons name="calendar-outline" size={17} color={theme.textMuted} style={styles.dobIcon} />
+                <Text style={[styles.dobText, { color: dob ? theme.textPrimary : theme.textMuted }]}>
                   {dob ? formatDob(dob) : 'Select your date of birth'}
                 </Text>
-                <Ionicons name="chevron-down" size={16} color="#9E9E9E" />
+                <Ionicons name="chevron-down" size={16} color={theme.textMuted} />
               </TouchableOpacity>
-              <Text style={styles.dobHint}>You must be at least 13 years old.</Text>
+              <Text style={[styles.dobHint, { color: theme.textMuted }]}>You must be at least 13 years old.</Text>
             </View>
 
             <FormInput
@@ -183,14 +185,14 @@ export default function CreateAccountScreen() {
 
           {/* ── Error banner ── */}
           {error !== '' && (
-            <View style={styles.errorBox}>
+            <View style={[styles.errorBox, { backgroundColor: theme.isDark ? 'rgba(224,88,88,0.12)' : '#FFF0F0' }]}>
               <Ionicons name="alert-circle-outline" size={16} color="#E05858" />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
 
           {/* ── Terms ── */}
-          <Text style={styles.termsText}>
+          <Text style={[styles.termsText, { color: theme.textMuted }]}>
             By continuing, you agree to{'\n'}
             <Text style={styles.termsLink}>Terms of Use</Text>
             {' '}and{' '}
@@ -212,7 +214,7 @@ export default function CreateAccountScreen() {
 
           {/* ── Footer ── */}
           <View style={styles.footerRow}>
-            <Text style={styles.footerText}>Already have an account? </Text>
+            <Text style={[styles.footerText, { color: theme.textMuted }]}>Already have an account? </Text>
             <TouchableOpacity onPress={() => router.push('/login-form')} activeOpacity={0.7}>
               <Text style={styles.footerLink}>Log In</Text>
             </TouchableOpacity>
