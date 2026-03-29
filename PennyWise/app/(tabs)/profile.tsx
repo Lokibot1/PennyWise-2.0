@@ -4,8 +4,9 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
@@ -1130,6 +1131,33 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
     message: "",
   });
   const [successModal, setSuccessModal] = useState(false);
+  const [countdown, setCountdown] = useState(5);
+  const barAnim = useRef(new Animated.Value(1)).current;
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!successModal) return;
+    setCountdown(5);
+    barAnim.setValue(1);
+    Animated.timing(barAnim, {
+      toValue: 0,
+      duration: 5000,
+      useNativeDriver: false,
+    }).start();
+    intervalRef.current = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(intervalRef.current!);
+          supabase.auth.signOut();
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [successModal]);
 
   const pwRules = [
     { label: "At least 9 characters", met: newPassword.length >= 9 },
@@ -1139,7 +1167,7 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
   ];
   const allRulesMet = pwRules.every((r) => r.met);
   const confirmMatches = confirmPassword.length > 0 && confirmPassword === newPassword;
-  const confirmMismatch = confirmPassword.length > 0 && confirmPassword !== newPassword;
+
 
   async function handleChangePassword() {
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -1194,6 +1222,16 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
       return;
     }
 
+    // Send email BEFORE updateUser — pass data as query params to avoid RN body serialization issues
+    const emailParams = new URLSearchParams({
+      email: user.email,
+      name:  user.user_metadata?.full_name ?? "",
+    });
+    supabase.functions
+      .invoke(`send-password-changed-email?${emailParams.toString()}`)
+      .then(({ error }) => { if (error) console.warn("[email] error:", error.message); })
+      .catch((err) => console.warn("[email] failed:", err));
+
     const { error: updateError } = await supabase.auth.updateUser({
       password: newPassword,
     });
@@ -1207,6 +1245,7 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
       });
       return;
     }
+
     setSuccessModal(true);
   }
 
@@ -1430,22 +1469,40 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
         message={errModal.message}
         onClose={() => setErrModal((e) => ({ ...e, visible: false }))}
       />
-      <ConfirmModal
-        visible={successModal}
-        title="Password Updated"
-        message="Your password has been changed successfully."
-        confirmLabel="Done"
-        confirmColor="#1B7A4A"
-        icon="checkmark-circle-outline"
-        onClose={() => {
-          setSuccessModal(false);
-          onBack();
-        }}
-        onConfirm={() => {
-          setSuccessModal(false);
-          onBack();
-        }}
-      />
+      <Modal visible={successModal} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.pwSuccessOverlay}>
+          <View style={[styles.pwSuccessCard, { backgroundColor: theme.surface }]}>
+            <View style={styles.pwSuccessIconWrap}>
+              <Ionicons name="checkmark-circle" size={56} color="#1B7A4A" />
+            </View>
+            <Text style={[styles.pwSuccessTitle, { color: theme.textPrimary }]}>
+              Password Changed!
+            </Text>
+            <Text style={[styles.pwSuccessBody, { color: theme.textMuted }]}>
+              Your password has been updated successfully. For your security, you'll be signed out automatically.
+            </Text>
+            <View style={[styles.pwSuccessBarTrack, { backgroundColor: theme.divider }]}>
+              <Animated.View
+                style={[
+                  styles.pwSuccessBarFill,
+                  {
+                    width: barAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["0%", "100%"],
+                    }),
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[styles.pwSuccessCountdown, { color: theme.textMuted }]}>
+              Signing out in{" "}
+              <Text style={{ color: "#1B7A4A", fontFamily: Font.headerBold }}>
+                {countdown}s
+              </Text>
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -2165,6 +2222,60 @@ const styles = StyleSheet.create({
   pwRuleText: {
     fontFamily: Font.bodyRegular,
     fontSize: 12,
+  },
+
+  // Password change success modal
+  pwSuccessOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  pwSuccessCard: {
+    width: "100%",
+    borderRadius: 24,
+    paddingHorizontal: 28,
+    paddingTop: 32,
+    paddingBottom: 28,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  pwSuccessIconWrap: {
+    marginBottom: 16,
+  },
+  pwSuccessTitle: {
+    fontFamily: Font.headerBold,
+    fontSize: 22,
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  pwSuccessBody: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  pwSuccessBarTrack: {
+    width: "100%",
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  pwSuccessBarFill: {
+    height: "100%",
+    backgroundColor: "#1B7A4A",
+    borderRadius: 3,
+  },
+  pwSuccessCountdown: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
   },
 
   // Terms
