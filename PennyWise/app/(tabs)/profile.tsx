@@ -40,7 +40,7 @@ import { sfx } from "@/lib/sfx";
 import { supabase } from "@/lib/supabase";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Screen = "profile" | "edit" | "terms" | "settings" | "notif-settings";
+type Screen = "profile" | "edit" | "terms" | "settings" | "notif-settings" | "change-password";
 type IoniconName = keyof typeof Ionicons.glyphMap;
 type ProfileData = {
   full_name: string;
@@ -1113,6 +1113,288 @@ function DeleteAccountModal({
   );
 }
 
+// ── Change password view ──────────────────────────────────────────────────────
+function ChangePasswordView({ onBack }: { onBack: () => void }) {
+  const { theme } = useAppTheme();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [errModal, setErrModal] = useState({
+    visible: false,
+    title: "",
+    message: "",
+  });
+  const [successModal, setSuccessModal] = useState(false);
+
+  async function handleChangePassword() {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setErrModal({
+        visible: true,
+        title: "Missing Fields",
+        message: "Please fill in all fields.",
+      });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setErrModal({
+        visible: true,
+        title: "Passwords Don't Match",
+        message: "New password and confirm password must match.",
+      });
+      return;
+    }
+    if (newPassword.length < 8) {
+      setErrModal({
+        visible: true,
+        title: "Password Too Short",
+        message: "New password must be at least 8 characters.",
+      });
+      return;
+    }
+
+    setSaving(true);
+    loadingBar.start();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) {
+      loadingBar.finish();
+      setSaving(false);
+      setErrModal({
+        visible: true,
+        title: "Authentication Error",
+        message: "Could not retrieve user. Please log in again.",
+      });
+      return;
+    }
+
+    // Verify current password by re-authenticating
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+    if (signInError) {
+      loadingBar.finish();
+      setSaving(false);
+      setErrModal({
+        visible: true,
+        title: "Incorrect Password",
+        message: "Your current password is incorrect.",
+      });
+      return;
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    loadingBar.finish();
+    setSaving(false);
+    if (updateError) {
+      setErrModal({
+        visible: true,
+        title: "Update Failed",
+        message: updateError.message,
+      });
+      return;
+    }
+    setSuccessModal(true);
+  }
+
+  return (
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: theme.headerBg }]}
+      edges={["top"]}
+    >
+      <StatusBar style="light" />
+      <View style={styles.greenSection}>
+        <NavHeader title="Change Password" onBack={onBack} />
+      </View>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          style={[styles.card, { backgroundColor: theme.cardBg }]}
+          contentContainerStyle={styles.cardContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text
+            style={[
+              styles.formSectionTitle,
+              { color: theme.textMuted, marginBottom: 12 },
+            ]}
+          >
+            UPDATE YOUR PASSWORD
+          </Text>
+
+          <View
+            style={[styles.formSection, { backgroundColor: theme.surface }]}
+          >
+            {/* Current Password */}
+            <View
+              style={[
+                styles.formField,
+                { borderBottomWidth: 1, borderBottomColor: theme.divider },
+              ]}
+            >
+              <View style={styles.formFieldIcon}>
+                <Ionicons name="lock-closed-outline" size={16} color="#1B7A4A" />
+              </View>
+              <View style={styles.formFieldBody}>
+                <Text
+                  style={[styles.formFieldLabel, { color: theme.textMuted }]}
+                >
+                  Current Password
+                </Text>
+                <TextInput
+                  style={[
+                    styles.formFieldInput,
+                    { color: theme.textPrimary },
+                  ]}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry={!showCurrent}
+                  placeholder="Enter current password"
+                  placeholderTextColor={theme.textMuted}
+                  autoCapitalize="none"
+                />
+              </View>
+              <TouchableOpacity onPress={() => setShowCurrent((v) => !v)}>
+                <Ionicons
+                  name={showCurrent ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={theme.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* New Password */}
+            <View
+              style={[
+                styles.formField,
+                { borderBottomWidth: 1, borderBottomColor: theme.divider },
+              ]}
+            >
+              <View style={styles.formFieldIcon}>
+                <Ionicons name="key-outline" size={16} color="#1B7A4A" />
+              </View>
+              <View style={styles.formFieldBody}>
+                <Text
+                  style={[styles.formFieldLabel, { color: theme.textMuted }]}
+                >
+                  New Password
+                </Text>
+                <TextInput
+                  style={[
+                    styles.formFieldInput,
+                    { color: theme.textPrimary },
+                  ]}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry={!showNew}
+                  placeholder="Enter new password"
+                  placeholderTextColor={theme.textMuted}
+                  autoCapitalize="none"
+                />
+              </View>
+              <TouchableOpacity onPress={() => setShowNew((v) => !v)}>
+                <Ionicons
+                  name={showNew ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={theme.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Confirm New Password */}
+            <View style={styles.formField}>
+              <View style={styles.formFieldIcon}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#1B7A4A" />
+              </View>
+              <View style={styles.formFieldBody}>
+                <Text
+                  style={[styles.formFieldLabel, { color: theme.textMuted }]}
+                >
+                  Confirm New Password
+                </Text>
+                <TextInput
+                  style={[
+                    styles.formFieldInput,
+                    { color: theme.textPrimary },
+                  ]}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirm}
+                  placeholder="Confirm new password"
+                  placeholderTextColor={theme.textMuted}
+                  autoCapitalize="none"
+                />
+              </View>
+              <TouchableOpacity onPress={() => setShowConfirm((v) => !v)}>
+                <Ionicons
+                  name={showConfirm ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={theme.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && styles.saveBtnOff]}
+            onPress={handleChangePassword}
+            disabled={saving}
+            activeOpacity={0.85}
+          >
+            {saving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveBtnText}>Update Password</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.cancelBtn}
+            onPress={onBack}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={16} color={theme.textMuted} />
+            <Text style={[styles.cancelBtnText, { color: theme.textMuted }]}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <ErrorModal
+        visible={errModal.visible}
+        title={errModal.title}
+        message={errModal.message}
+        onClose={() => setErrModal((e) => ({ ...e, visible: false }))}
+      />
+      <ConfirmModal
+        visible={successModal}
+        title="Password Updated"
+        message="Your password has been changed successfully."
+        confirmLabel="Done"
+        confirmColor="#1B7A4A"
+        icon="checkmark-circle-outline"
+        onClose={() => {
+          setSuccessModal(false);
+          onBack();
+        }}
+        onConfirm={() => {
+          setSuccessModal(false);
+          onBack();
+        }}
+      />
+    </SafeAreaView>
+  );
+}
+
 // ── Settings view ─────────────────────────────────────────────────────────────
 function SettingsView({
   onBack,
@@ -1312,8 +1594,9 @@ function SettingsView({
           <MenuItem
             icon="lock-closed-outline"
             iconBg="#115533"
-            label="Password Settings"
+            label="Change Password"
             last
+            onPress={() => navigate("change-password")}
           />
         </View>
 
@@ -1611,6 +1894,8 @@ export default function ProfileScreen() {
     return <TermsView onBack={() => setScreen("profile")} />;
   if (screen === "notif-settings")
     return <NotificationSettingsView onBack={() => setScreen("settings")} />;
+  if (screen === "change-password")
+    return <ChangePasswordView onBack={() => setScreen("settings")} />;
   if (screen === "settings")
     return (
       <SettingsView onBack={() => setScreen("profile")} navigate={setScreen} />
