@@ -1123,12 +1123,23 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [currentPwError, setCurrentPwError] = useState(false);
   const [errModal, setErrModal] = useState({
     visible: false,
     title: "",
     message: "",
   });
   const [successModal, setSuccessModal] = useState(false);
+
+  const pwRules = [
+    { label: "At least 9 characters", met: newPassword.length >= 9 },
+    { label: "One uppercase letter", met: /[A-Z]/.test(newPassword) },
+    { label: "One number", met: /[0-9]/.test(newPassword) },
+    { label: "One special character", met: /[^A-Za-z0-9]/.test(newPassword) },
+  ];
+  const allRulesMet = pwRules.every((r) => r.met);
+  const confirmMatches = confirmPassword.length > 0 && confirmPassword === newPassword;
+  const confirmMismatch = confirmPassword.length > 0 && confirmPassword !== newPassword;
 
   async function handleChangePassword() {
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -1139,19 +1150,19 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
       });
       return;
     }
-    if (newPassword !== confirmPassword) {
+    if (!allRulesMet) {
+      setErrModal({
+        visible: true,
+        title: "Weak Password",
+        message: "Please meet all password requirements.",
+      });
+      return;
+    }
+    if (!confirmMatches) {
       setErrModal({
         visible: true,
         title: "Passwords Don't Match",
         message: "New password and confirm password must match.",
-      });
-      return;
-    }
-    if (newPassword.length < 8) {
-      setErrModal({
-        visible: true,
-        title: "Password Too Short",
-        message: "New password must be at least 8 characters.",
       });
       return;
     }
@@ -1179,11 +1190,7 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
     if (signInError) {
       loadingBar.finish();
       setSaving(false);
-      setErrModal({
-        visible: true,
-        title: "Incorrect Password",
-        message: "Your current password is incorrect.",
-      });
+      setCurrentPwError(true);
       return;
     }
 
@@ -1237,28 +1244,42 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
             <View
               style={[
                 styles.formField,
-                { borderBottomWidth: 1, borderBottomColor: theme.divider },
+                {
+                  borderBottomWidth: 1,
+                  borderBottomColor: currentPwError ? "#E05555" : theme.divider,
+                },
+                { flexWrap: "wrap" },
               ]}
             >
               <View style={styles.formFieldIcon}>
-                <Ionicons name="lock-closed-outline" size={16} color="#1B7A4A" />
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={16}
+                  color={currentPwError ? "#E05555" : "#1B7A4A"}
+                />
               </View>
               <View style={styles.formFieldBody}>
                 <Text
-                  style={[styles.formFieldLabel, { color: theme.textMuted }]}
+                  style={[
+                    styles.formFieldLabel,
+                    { color: currentPwError ? "#E05555" : theme.textMuted },
+                  ]}
                 >
                   Current Password
                 </Text>
                 <TextInput
                   style={[
                     styles.formFieldInput,
-                    { color: theme.textPrimary },
+                    { color: currentPwError ? "#E05555" : theme.textPrimary },
                   ]}
                   value={currentPassword}
-                  onChangeText={setCurrentPassword}
+                  onChangeText={(v) => {
+                    setCurrentPassword(v);
+                    if (currentPwError) setCurrentPwError(false);
+                  }}
                   secureTextEntry={!showCurrent}
                   placeholder="Enter current password"
-                  placeholderTextColor={theme.textMuted}
+                  placeholderTextColor={currentPwError ? "#E05555" : theme.textMuted}
                   autoCapitalize="none"
                 />
               </View>
@@ -1266,9 +1287,19 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
                 <Ionicons
                   name={showCurrent ? "eye-off-outline" : "eye-outline"}
                   size={20}
-                  color={theme.textMuted}
+                  color={currentPwError ? "#E05555" : theme.textMuted}
                 />
               </TouchableOpacity>
+              {currentPwError && (
+                <View style={styles.pwRulesContainer}>
+                  <View style={styles.pwRuleRow}>
+                    <Ionicons name="close-circle" size={14} color="#E05555" />
+                    <Text style={[styles.pwRuleText, { color: "#E05555" }]}>
+                      Incorrect password. Please try again.
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* New Password */}
@@ -1276,6 +1307,7 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
               style={[
                 styles.formField,
                 { borderBottomWidth: 1, borderBottomColor: theme.divider },
+                { flexWrap: "wrap" },
               ]}
             >
               <View style={styles.formFieldIcon}>
@@ -1288,10 +1320,7 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
                   New Password
                 </Text>
                 <TextInput
-                  style={[
-                    styles.formFieldInput,
-                    { color: theme.textPrimary },
-                  ]}
+                  style={[styles.formFieldInput, { color: theme.textPrimary }]}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry={!showNew}
@@ -1307,10 +1336,31 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
                   color={theme.textMuted}
                 />
               </TouchableOpacity>
+              {newPassword.length > 0 && (
+                <View style={styles.pwRulesContainer}>
+                  {pwRules.map((rule) => (
+                    <View key={rule.label} style={styles.pwRuleRow}>
+                      <Ionicons
+                        name={rule.met ? "checkmark-circle" : "ellipse-outline"}
+                        size={14}
+                        color={rule.met ? "#1B7A4A" : theme.textMuted}
+                      />
+                      <Text
+                        style={[
+                          styles.pwRuleText,
+                          { color: rule.met ? "#1B7A4A" : theme.textMuted },
+                        ]}
+                      >
+                        {rule.label}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
 
             {/* Confirm New Password */}
-            <View style={styles.formField}>
+            <View style={[styles.formField, { flexWrap: "wrap" }]}>
               <View style={styles.formFieldIcon}>
                 <Ionicons name="checkmark-circle-outline" size={16} color="#1B7A4A" />
               </View>
@@ -1321,10 +1371,7 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
                   Confirm New Password
                 </Text>
                 <TextInput
-                  style={[
-                    styles.formFieldInput,
-                    { color: theme.textPrimary },
-                  ]}
+                  style={[styles.formFieldInput, { color: theme.textPrimary }]}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirm}
@@ -1340,6 +1387,25 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
                   color={theme.textMuted}
                 />
               </TouchableOpacity>
+              {confirmPassword.length > 0 && (
+                <View style={styles.pwRulesContainer}>
+                  <View style={styles.pwRuleRow}>
+                    <Ionicons
+                      name={confirmMatches ? "checkmark-circle" : "close-circle"}
+                      size={14}
+                      color={confirmMatches ? "#1B7A4A" : "#E05555"}
+                    />
+                    <Text
+                      style={[
+                        styles.pwRuleText,
+                        { color: confirmMatches ? "#1B7A4A" : "#E05555" },
+                      ]}
+                    >
+                      {confirmMatches ? "Passwords match" : "Passwords do not match"}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
           </View>
 
@@ -1354,17 +1420,6 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
             ) : (
               <Text style={styles.saveBtnText}>Update Password</Text>
             )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.cancelBtn}
-            onPress={onBack}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={16} color={theme.textMuted} />
-            <Text style={[styles.cancelBtnText, { color: theme.textMuted }]}>
-              Cancel
-            </Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -2094,6 +2149,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   cancelBtnText: { fontFamily: Font.bodySemiBold, fontSize: 15 },
+
+  // Password rules
+  pwRulesContainer: {
+    width: "100%",
+    paddingTop: 10,
+    paddingBottom: 4,
+    gap: 6,
+  },
+  pwRuleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  pwRuleText: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 12,
+  },
 
   // Terms
   termsScroll: {
