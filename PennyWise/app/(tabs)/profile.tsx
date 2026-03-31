@@ -39,6 +39,8 @@ import { useAppTheme } from "@/contexts/AppTheme";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { sfx } from "@/lib/sfx";
 import { supabase } from "@/lib/supabase";
+import { DataCache } from "@/lib/dataCache";
+import { Cache } from "@/lib/cache";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = "profile" | "edit" | "terms" | "settings" | "notif-settings" | "change-password";
@@ -241,12 +243,15 @@ function ProfileView({
     loadingBar.start();
     const { error } = await supabase.auth.signOut();
     loadingBar.finish();
-    if (error)
+    if (error) {
       setErrModal({
         visible: true,
         title: "Sign Out Failed",
         message: error.message,
       });
+    } else {
+      Cache.clearAll();
+    }
   }
 
   return (
@@ -550,6 +555,8 @@ function EditProfileView({
         message: error.message,
       });
     } else {
+      DataCache.invalidateProfile(user.id);
+      DataCache.invalidateDashboard(user.id);
       sfx.success();
       onSaved({
         full_name: username.trim(),
@@ -1551,6 +1558,8 @@ function SettingsView({
       .update({ budget_limit: newLimit })
       .eq("id", user.id);
     if (error) throw error;
+    DataCache.invalidateProfile(user.id);
+    DataCache.invalidateDashboard(user.id);
     setBudgetLimit(newLimit);
   }
 
@@ -1585,6 +1594,7 @@ function SettingsView({
 
       // Clear local session
       await supabase.auth.signOut();
+      Cache.clearAll();
     } catch (err: any) {
       loadingBar.finish();
       setErrModal({
@@ -1973,21 +1983,34 @@ export default function ProfileScreen() {
         return;
       }
       const meta = (user.user_metadata ?? {}) as Record<string, string>;
-      supabase
-        .from("profiles")
-        .select("full_name, email, phone, avatar_url")
-        .eq("id", user.id)
-        .single()
-        .then(({ data }) => {
-          if (cancelled) return;
+      DataCache.fetchProfile(user.id).then((cached) => {
+        if (cancelled) return;
+        if (cached) {
           setProfile({
-            full_name: data?.full_name || meta.full_name || "",
-            email: data?.email || meta.email || "",
-            phone: data?.phone || meta.phone || "",
-            avatar_url: data?.avatar_url ?? undefined,
+            full_name:  cached.full_name  || meta.full_name || "",
+            email:      cached.email      || meta.email     || "",
+            phone:      cached.phone      || meta.phone     || "",
+            avatar_url: cached.avatar_url ?? undefined,
           });
           setLoading(false);
-        });
+        } else {
+          supabase
+            .from("profiles")
+            .select("full_name, budget_limit, email, phone, avatar_url")
+            .eq("id", user.id)
+            .single()
+            .then(({ data }) => {
+              if (cancelled) return;
+              setProfile({
+                full_name:  data?.full_name  || meta.full_name || "",
+                email:      data?.email      || meta.email     || "",
+                phone:      data?.phone      || meta.phone     || "",
+                avatar_url: data?.avatar_url ?? undefined,
+              });
+              setLoading(false);
+            });
+        }
+      });
     });
     return () => {
       cancelled = true;

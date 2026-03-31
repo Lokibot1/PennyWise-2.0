@@ -16,6 +16,7 @@ import { useCallback } from 'react';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
+import { DataCache } from '@/lib/dataCache';
 import { HomeDashboardSkeleton, TransactionRowSkeleton } from '@/components/SkeletonLoader';
 import NotificationBell from '@/components/NotificationBell';
 import SlideTabBar from '@/components/SlideTabBar';
@@ -115,6 +116,8 @@ export default function HomeScreen() {
     if (!userIdRef.current) return;
     const { error } = await supabase.from('profiles').update({ budget_limit: newLimit }).eq('id', userIdRef.current);
     if (error) throw error;
+    DataCache.invalidateProfile(userIdRef.current);
+    DataCache.invalidateDashboard(userIdRef.current);
     setBudgetLimit(newLimit);
   };
 
@@ -126,93 +129,48 @@ export default function HomeScreen() {
     weekAgo.setDate(now.getDate() - 7);
     const weekAgoStr = weekAgo.toISOString().slice(0, 10);
 
-    const [profileRes, incomeRes, expenseRes, goalsRes] = await Promise.all([
-      supabase
-        .from('profiles')
-        .select('full_name, budget_limit')
-        .eq('id', userId)
-        .single(),
+    const dashboard = await DataCache.fetchDashboard(userId);
+    if (!dashboard) throw new Error('Could not load dashboard data.');
 
-      // Income sources with category icon + label
-      supabase
-        .from('income_sources')
-        .select('id, title, amount, date, time, is_archived, income_categories(label, icon)')
-        .eq('user_id', userId)
-        .eq('is_archived', false)
-        .order('date', { ascending: false })
-        .order('time', { ascending: false }),
+    setUserName(dashboard.profile.full_name);
+    setBudgetLimit(dashboard.profile.budget_limit);
+    setSavingsGoals(dashboard.savingsGoals as SavingsGoalRow[]);
 
-      // Expenses with category icon + label
-      supabase
-        .from('expenses')
-        .select('id, title, amount, date, time, is_archived, expense_categories(label, icon)')
-        .eq('user_id', userId)
-        .eq('is_archived', false)
-        .order('date', { ascending: false })
-        .order('time', { ascending: false }),
-
-      // All active savings goals
-      supabase
-        .from('savings_goals')
-        .select('id, icon, title, target_amount, current_amount')
-        .eq('user_id', userId)
-        .eq('is_completed', false)
-        .eq('is_archived', false)
-        .order('created_at', { ascending: false }),
-    ]);
-
-    // Profile
-    if (profileRes.data) {
-      setUserName(profileRes.data.full_name || '');
-      setBudgetLimit(profileRes.data.budget_limit ?? 20000);
-    }
-
-    // Savings goals
-    if (goalsRes.data) setSavingsGoals(goalsRes.data as SavingsGoalRow[]);
-
-    // Build unified transaction list
-    const incomeTxs: TxRow[] = (incomeRes.data ?? []).map((r: any) => ({
+    const incomeTxs: TxRow[] = dashboard.incomeSources.map(r => ({
       id:       `inc-${r.id}`,
-      icon:     r.income_categories?.icon  ?? 'cash-outline',
+      icon:     r.category_icon,
       title:    r.title,
       time:     r.time,
       date:     r.date,
-      category: r.income_categories?.label ?? 'Income',
-      value:    Number(r.amount),   // positive
+      category: r.category_label,
+      value:    r.amount,
     }));
 
-    const expenseTxs: TxRow[] = (expenseRes.data ?? []).map((r: any) => ({
+    const expenseTxs: TxRow[] = dashboard.expenses.map(r => ({
       id:       `exp-${r.id}`,
-      icon:     r.expense_categories?.icon  ?? 'receipt-outline',
+      icon:     r.category_icon,
       title:    r.title,
       time:     r.time,
       date:     r.date,
-      category: r.expense_categories?.label ?? 'Expense',
-      value:    -Number(r.amount),  // negative
+      category: r.category_label,
+      value:    -r.amount,
     }));
 
-    // Merge and sort newest first
     const merged = [...incomeTxs, ...expenseTxs].sort((a, b) => {
       if (b.date !== a.date) return b.date.localeCompare(a.date);
       return b.time.localeCompare(a.time);
     });
     setAllTransactions(merged);
 
-    // Compute totals
     let totalInc = 0, totalExp = 0, revWeek = 0, expWeek = 0;
-
-    for (const r of incomeRes.data ?? []) {
-      const amt = Number((r as any).amount);
-      totalInc += amt;
-      if ((r as any).date >= weekAgoStr) revWeek += amt;
+    for (const r of dashboard.incomeSources) {
+      totalInc += r.amount;
+      if (r.date >= weekAgoStr) revWeek += r.amount;
     }
-
-    for (const r of expenseRes.data ?? []) {
-      const amt = Number((r as any).amount);
-      totalExp += amt;
-      if ((r as any).date >= weekAgoStr) expWeek += amt;
+    for (const r of dashboard.expenses) {
+      totalExp += r.amount;
+      if (r.date >= weekAgoStr) expWeek += r.amount;
     }
-
     setTotalIncome(totalInc);
     setTotalExpense(totalExp);
     setRevenueLastWeek(revWeek);

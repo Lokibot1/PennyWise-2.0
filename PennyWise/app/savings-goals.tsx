@@ -18,6 +18,7 @@ import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
 import { StatusBar } from 'expo-status-bar';
 
 import { supabase } from '@/lib/supabase';
+import { DataCache } from '@/lib/dataCache';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { sfx } from '@/lib/sfx';
 import { loadingBar } from '@/components/GlobalLoadingBar';
@@ -187,14 +188,10 @@ export default function SavingsGoalsScreen() {
   const [pendingDeleteGoal,  setPendingDeleteGoal]  = useState<Goal | null>(null);
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const fetchGoals = useCallback(async (uid: string) => {
-    const { data, error } = await supabase
-      .from('savings_goals')
-      .select('id, title, icon, target_amount, current_amount, is_completed, is_archived, completed_at, created_at')
-      .eq('user_id', uid)
-      .order('created_at', { ascending: false });
-
-    if (!error && data) setGoals(data as Goal[]);
+  const fetchGoals = useCallback(async (uid: string, forceRefresh = false) => {
+    if (forceRefresh) DataCache.invalidateSavingsGoals(uid);
+    const data = await DataCache.fetchSavingsGoals(uid);
+    setGoals(data as Goal[]);
     setLoading(false);
   }, []);
 
@@ -233,7 +230,8 @@ export default function SavingsGoalsScreen() {
     sfx.coin();
     setShowAddModal(false);
     setNewTitle(''); setNewTarget(''); setNewIcon('wallet-outline');
-    fetchGoals(userId);
+    DataCache.invalidateDashboard(userId);
+    fetchGoals(userId, true);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_CREATED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `New Goal: ${newTitle.trim()}`,
@@ -293,7 +291,8 @@ export default function SavingsGoalsScreen() {
 
     setShowEditModal(false);
     setEditingGoal(null);
-    fetchGoals(userId);
+    DataCache.invalidateDashboard(userId);
+    fetchGoals(userId, true);
 
     logActivity({
       user_id:     userId,
@@ -339,7 +338,8 @@ export default function SavingsGoalsScreen() {
     setShowFundsModal(false);
     setFundsAmount('');
     setSelectedGoal(null);
-    fetchGoals(userId);
+    DataCache.invalidateDashboard(userId);
+    fetchGoals(userId, true);
 
     if (isComplete) {
       sfx.complete();
@@ -386,7 +386,8 @@ export default function SavingsGoalsScreen() {
     loadingBar.start();
     await supabase.from('savings_goals').update({ is_archived: true }).eq('id', goal.id);
     loadingBar.finish();
-    fetchGoals(userId);
+    DataCache.invalidateDashboard(userId);
+    fetchGoals(userId, true);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_ARCHIVED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `Goal Archived: ${goal.title}`,
@@ -406,7 +407,8 @@ export default function SavingsGoalsScreen() {
     loadingBar.start();
     await supabase.from('savings_goals').delete().eq('id', goal.id);
     loadingBar.finish();
-    fetchGoals(userId);
+    DataCache.invalidateDashboard(userId);
+    fetchGoals(userId, true);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_DELETED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `Goal Deleted: ${goal.title}`,
@@ -421,7 +423,8 @@ export default function SavingsGoalsScreen() {
     loadingBar.start();
     await supabase.from('savings_goals').update({ is_archived: false }).eq('id', goal.id);
     loadingBar.finish();
-    fetchGoals(userId);
+    DataCache.invalidateDashboard(userId);
+    fetchGoals(userId, true);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_RESTORED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `Goal Restored: ${goal.title}`,

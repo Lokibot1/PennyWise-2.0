@@ -31,6 +31,7 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import type { Theme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
+import { DataCache } from '@/lib/dataCache';
 import Animated, {
   useSharedValue,
   withSpring,
@@ -918,28 +919,21 @@ export default function IncomeSourcesScreen() {
   useEffect(() => {
     async function loadData(userId: string) {
       try {
-        const [catRes, incRes] = await Promise.all([
-          supabase.from('income_categories').select('id, label, icon, is_archived').eq('user_id', userId),
-          supabase.from('income_sources').select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived').eq('user_id', userId),
+        const [cats, sources] = await Promise.all([
+          DataCache.fetchIncomeCategories(userId),
+          DataCache.fetchIncomeSources(userId),
         ]);
 
-        if (catRes.error) throw catRes.error;
-        if (incRes.error) throw incRes.error;
+        setCategories(cats.map(c => ({
+          id: c.id, label: c.label, icon: c.icon as IoniconName, isArchived: c.is_archived,
+        })));
 
-        if (catRes.data) {
-          setCategories(catRes.data.map(c => ({
-            id: c.id, label: c.label, icon: c.icon as IoniconName, isArchived: c.is_archived,
-          })));
-        }
-
-        if (incRes.data) {
-          setIncome(incRes.data.map(i => ({
-            id: i.id, categoryId: i.category_id, title: i.title,
-            amount: Number(i.amount), date: i.date, time: i.time,
-            description: i.description, isRecurring: i.is_recurring,
-            frequency: i.frequency as Frequency | null, isArchived: i.is_archived,
-          })));
-        }
+        setIncome(sources.map(i => ({
+          id: i.id, categoryId: i.category_id, title: i.title,
+          amount: Number(i.amount), date: i.date, time: i.time,
+          description: i.description, isRecurring: i.is_recurring,
+          frequency: i.frequency as Frequency | null, isArchived: i.is_archived,
+        })));
       } catch (err: any) {
         showError('Failed to Load', err?.message ?? 'Could not load income data. Please try again.');
       } finally {
@@ -1005,6 +999,8 @@ export default function IncomeSourcesScreen() {
           showError('Failed to Save Income', error.message);
           setSaving(false);
         } else if (data) {
+          DataCache.invalidateIncomeSources(userIdRef.current!);
+          DataCache.invalidateDashboard(userIdRef.current!);
           setIncome(prev => [...prev, {
             id: data.id, categoryId: data.category_id, title: data.title,
             amount: Number(data.amount), date: data.date, time: data.time,
@@ -1054,6 +1050,8 @@ export default function IncomeSourcesScreen() {
           showError('Failed to Update Income', error.message);
           setSaving(false);
         } else {
+          DataCache.invalidateIncomeSources(userIdRef.current!);
+          DataCache.invalidateDashboard(userIdRef.current!);
           setIncome(prev => prev.map(i =>
             i.id === screen.incomeId
               ? { ...i, categoryId: vals.categoryId, title: newTitle, amount: newAmount, date: vals.date, description: vals.description.trim(), isRecurring: vals.isRecurring, frequency: vals.isRecurring ? vals.frequency : null }
@@ -1111,6 +1109,8 @@ export default function IncomeSourcesScreen() {
         if (error) {
           showError('Failed to Archive Category', error.message);
         } else {
+          DataCache.invalidateIncomeCategories(userIdRef.current!);
+          DataCache.invalidateDashboard(userIdRef.current!);
           const archivedCat = categories.find(c => c.id === categoryId);
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
           sfx.warning();
@@ -1145,6 +1145,8 @@ export default function IncomeSourcesScreen() {
         if (error) {
           showError('Failed to Restore Category', error.message);
         } else {
+          DataCache.invalidateIncomeCategories(userIdRef.current!);
+          DataCache.invalidateDashboard(userIdRef.current!);
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
           sfx.success();
           showToast('Income category restored successfully.');
@@ -1177,6 +1179,9 @@ export default function IncomeSourcesScreen() {
         if (error) {
           showError('Failed to Delete Category', error.message);
         } else {
+          DataCache.invalidateIncomeCategories(userIdRef.current!);
+          DataCache.invalidateIncomeSources(userIdRef.current!);
+          DataCache.invalidateDashboard(userIdRef.current!);
           setCategories(prev => prev.filter(c => c.id !== categoryId));
           setIncome(prev => prev.filter(i => i.categoryId !== categoryId));
           sfx.error();
@@ -1210,6 +1215,8 @@ export default function IncomeSourcesScreen() {
         if (error) {
           showError('Failed to Archive Income', error.message);
         } else {
+          DataCache.invalidateIncomeSources(userIdRef.current!);
+          DataCache.invalidateDashboard(userIdRef.current!);
           setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: true } : i));
           sfx.warning();
           showToast('Income source archived.');
@@ -1243,6 +1250,8 @@ export default function IncomeSourcesScreen() {
         if (error) {
           showError('Failed to Restore Income', error.message);
         } else {
+          DataCache.invalidateIncomeSources(userIdRef.current!);
+          DataCache.invalidateDashboard(userIdRef.current!);
           setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: false } : i));
           sfx.success();
           showToast('Income source restored.');
@@ -1276,6 +1285,8 @@ export default function IncomeSourcesScreen() {
         if (error) {
           showError('Failed to Delete Income', error.message);
         } else {
+          DataCache.invalidateIncomeSources(userIdRef.current!);
+          DataCache.invalidateDashboard(userIdRef.current!);
           setIncome(prev => prev.filter(i => i.id !== incomeId));
           sfx.error();
           showToast('Income source permanently deleted.');
@@ -1306,6 +1317,8 @@ export default function IncomeSourcesScreen() {
     if (error) {
       showError('Failed to Update Category', error.message);
     } else {
+      DataCache.invalidateIncomeCategories(userIdRef.current!);
+      DataCache.invalidateDashboard(userIdRef.current!);
       setCategories(prev => prev.map(c => c.id === id ? { ...c, label, icon } : c));
       sfx.success();
       showToast('Category updated successfully.');
@@ -1337,6 +1350,8 @@ export default function IncomeSourcesScreen() {
     if (error) {
       showError('Failed to Create Category', error.message);
     } else if (data) {
+      DataCache.invalidateIncomeCategories(userIdRef.current!);
+      DataCache.invalidateDashboard(userIdRef.current!);
       const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
       setCategories(prev => [...prev, newCat]);
       sfx.success();
