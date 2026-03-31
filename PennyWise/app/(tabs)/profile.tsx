@@ -41,6 +41,7 @@ import { sfx } from "@/lib/sfx";
 import { supabase } from "@/lib/supabase";
 import { DataCache } from "@/lib/dataCache";
 import { Cache } from "@/lib/cache";
+import { sanitizeName, sanitizeEmail, sanitizePhone } from "@/lib/sanitize";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = "profile" | "edit" | "terms" | "settings" | "notif-settings" | "change-password";
@@ -537,12 +538,16 @@ function EditProfileView({
       newAvatarUrl = null;
     }
 
+    const cleanName  = sanitizeName(username);
+    const cleanPhone = sanitizePhone(phone);
+    const cleanEmail = sanitizeEmail(email);
+
     const { error } = await supabase
       .from("profiles")
       .update({
-        full_name: username.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
+        full_name: cleanName,
+        phone:     cleanPhone,
+        email:     cleanEmail,
         avatar_url: newAvatarUrl,
       })
       .eq("id", user.id);
@@ -559,9 +564,9 @@ function EditProfileView({
       DataCache.invalidateDashboard(user.id);
       sfx.success();
       onSaved({
-        full_name: username.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
+        full_name: cleanName,
+        phone:     cleanPhone,
+        email:     cleanEmail,
         avatar_url: newAvatarUrl ?? undefined,
       });
       onBack();

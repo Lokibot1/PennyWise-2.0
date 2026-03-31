@@ -19,6 +19,7 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { callFunction } from '@/lib/callFunction';
 import { loadingBar } from '@/components/GlobalLoadingBar';
+import { sanitizeEmail } from '@/lib/sanitize';
 
 function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
@@ -31,12 +32,12 @@ export default function ForgotPasswordScreen() {
   const [error, setError]     = useState('');
 
   async function handleReset() {
-    const trimmed = email.trim();
-    if (!trimmed) {
+    const cleanEmail = sanitizeEmail(email);
+    if (!cleanEmail) {
       setError('Please enter your email address.');
       return;
     }
-    if (!isValidEmail(trimmed)) {
+    if (!isValidEmail(cleanEmail)) {
       setError('Please enter a valid email address.');
       return;
     }
@@ -46,7 +47,7 @@ export default function ForgotPasswordScreen() {
     loadingBar.start();
 
     const { data, ok, status, rawError } = await callFunction('send-reset-otp', {
-      email: trimmed.toLowerCase(),
+      email: cleanEmail,
     });
 
     loadingBar.finish();
@@ -67,7 +68,7 @@ export default function ForgotPasswordScreen() {
     }
 
     // Always navigate on success — prevents user enumeration
-    router.push({ pathname: '/verify-code', params: { email: trimmed.toLowerCase() } });
+    router.push({ pathname: '/verify-code', params: { email: cleanEmail } });
   }
 
   return (

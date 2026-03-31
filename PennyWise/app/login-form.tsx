@@ -20,6 +20,7 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { loadingBar } from '@/components/GlobalLoadingBar';
+import { sanitizeEmail } from '@/lib/sanitize';
 
 export default function LoginFormScreen() {
   const { theme } = useAppTheme();
@@ -32,13 +33,14 @@ export default function LoginFormScreen() {
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: btnScale.value }] }));
 
   async function handleLogin() {
-    if (!email.trim() || !password) return;
+    const cleanEmail = sanitizeEmail(email);
+    if (!cleanEmail || !password) return;
     setLoading(true);
     setError('');
     loadingBar.start();
 
     const { error: authError } = await supabase.auth.signInWithPassword({
-      email:    email.trim(),
+      email:    cleanEmail,
       password,
     });
 

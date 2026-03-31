@@ -19,6 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 
 import { supabase } from '@/lib/supabase';
 import { DataCache } from '@/lib/dataCache';
+import { sanitizeTitle, parseAmount } from '@/lib/sanitize';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { sfx } from '@/lib/sfx';
 import { loadingBar } from '@/components/GlobalLoadingBar';
@@ -211,15 +212,16 @@ export default function SavingsGoalsScreen() {
 
   /* Create */
   const handleSaveGoal = async () => {
-    if (!newTitle.trim()) { Alert.alert('Missing info', 'Please enter a goal name.'); return; }
-    const target = parseFloat(newTarget.replace(/,/g, ''));
+    const cleanTitle = sanitizeTitle(newTitle);
+    if (!cleanTitle) { Alert.alert('Missing info', 'Please enter a goal name.'); return; }
+    const target = parseAmount(newTarget);
     if (!target || target <= 0) { Alert.alert('Missing info', 'Please enter a valid target amount.'); return; }
     if (!userId) return;
 
     setSaving(true);
     loadingBar.start();
     const { error } = await supabase.from('savings_goals').insert({
-      user_id: userId, title: newTitle.trim(), icon: newIcon,
+      user_id: userId, title: cleanTitle, icon: newIcon,
       target_amount: target, current_amount: 0,
       is_completed: false, is_archived: false,
     });
@@ -234,7 +236,7 @@ export default function SavingsGoalsScreen() {
     fetchGoals(userId, true);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_CREATED, entity_type: ENTITY.SAVINGS_GOAL,
-      title: `New Goal: ${newTitle.trim()}`,
+      title: `New Goal: ${cleanTitle}`,
       description: `Target: ${formatCurrency(target)}`,
       icon: newIcon,
     });
@@ -252,8 +254,9 @@ export default function SavingsGoalsScreen() {
   /* Save edit */
   const handleEditGoal = async () => {
     if (!editingGoal || !userId) return;
-    if (!editTitle.trim()) { Alert.alert('Missing info', 'Please enter a goal name.'); return; }
-    const target = parseFloat(editTarget.replace(/,/g, ''));
+    const cleanTitle = sanitizeTitle(editTitle);
+    if (!cleanTitle) { Alert.alert('Missing info', 'Please enter a goal name.'); return; }
+    const target = parseAmount(editTarget);
     if (!target || target <= 0) { Alert.alert('Missing info', 'Please enter a valid target amount.'); return; }
     if (target < editingGoal.current_amount) {
       Alert.alert('Invalid target', `Target can't be less than the amount already saved (${formatCurrency(editingGoal.current_amount)}).`);
@@ -269,7 +272,7 @@ export default function SavingsGoalsScreen() {
     const { error } = await supabase
       .from('savings_goals')
       .update({
-        title:         editTitle.trim(),
+        title:         cleanTitle,
         icon:          editIcon,
         target_amount: target,
         is_completed:  isNowComplete,
@@ -285,9 +288,9 @@ export default function SavingsGoalsScreen() {
     sfx.success();
     // Build change description
     const changes: string[] = [];
-    if (editTitle.trim() !== editingGoal.title)           changes.push(`Name → "${editTitle.trim()}"`);
-    if (target          !== editingGoal.target_amount)    changes.push(`Target → ${formatCurrency(target)}`);
-    if (editIcon        !== editingGoal.icon)             changes.push('Icon changed');
+    if (cleanTitle !== editingGoal.title)               changes.push(`Name → "${cleanTitle}"`);
+    if (target     !== editingGoal.target_amount)       changes.push(`Target → ${formatCurrency(target)}`);
+    if (editIcon   !== editingGoal.icon)                changes.push('Icon changed');
 
     setShowEditModal(false);
     setEditingGoal(null);
@@ -298,14 +301,14 @@ export default function SavingsGoalsScreen() {
       user_id:     userId,
       action_type: ACTION.SAVINGS_GOAL_UPDATED,
       entity_type: ENTITY.SAVINGS_GOAL,
-      title:       `Goal Updated: ${editTitle.trim()}`,
+      title:       `Goal Updated: ${cleanTitle}`,
       description: changes.length > 0 ? changes.join(' · ') : 'Goal details updated',
       icon:        editIcon,
     });
 
     if (isNowComplete && !editingGoal.is_completed) {
       setTimeout(() => {
-        Alert.alert('Goal Achieved!', `"${editTitle.trim()}" has reached its target!`);
+        Alert.alert('Goal Achieved!', `"${cleanTitle}" has reached its target!`);
       }, 400);
     }
   };
@@ -313,7 +316,7 @@ export default function SavingsGoalsScreen() {
   /* Add funds */
   const handleAddFunds = async () => {
     if (!selectedGoal || !userId) return;
-    const amount = parseFloat(fundsAmount.replace(/,/g, ''));
+    const amount = parseAmount(fundsAmount);
     if (!amount || amount <= 0) { Alert.alert('Missing info', 'Please enter a valid amount.'); return; }
 
     setAddingFunds(true);

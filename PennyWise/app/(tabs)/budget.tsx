@@ -32,6 +32,7 @@ import { useAppTheme } from '@/contexts/AppTheme';
 import type { Theme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { DataCache } from '@/lib/dataCache';
+import { sanitizeCategoryLabel, sanitizeTitle, sanitizeDescription, parseAmount } from '@/lib/sanitize';
 import Animated, {
   useSharedValue,
   withSpring,
@@ -1080,11 +1081,11 @@ export default function ManageExpenseScreen() {
           .insert({
             user_id:     userIdRef.current,
             category_id: vals.categoryId,
-            title:       vals.title.trim(),
-            amount:      parseFloat(vals.amount.replace(/,/g, '')) || 0,
+            title:       sanitizeTitle(vals.title),
+            amount:      parseAmount(vals.amount),
             date:        vals.date,
             time:        new Date().toTimeString().slice(0, 5),
-            description: vals.description.trim(),
+            description: sanitizeDescription(vals.description),
             is_recurring: vals.isRecurring,
             frequency:   vals.isRecurring ? vals.frequency : null,
           })
@@ -1116,8 +1117,8 @@ export default function ManageExpenseScreen() {
             user_id:     userIdRef.current!,
             action_type: ACTION.EXPENSE_ADDED,
             entity_type: ENTITY.EXPENSE,
-            title:       `Expense Added: ${vals.title.trim()}`,
-            description: `₱${(parseFloat(vals.amount.replace(/,/g, '')) || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Expense'}`,
+            title:       `Expense Added: ${sanitizeTitle(vals.title)}`,
+            description: `₱${parseAmount(vals.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Expense'}`,
             icon:        cat?.icon ?? 'receipt-outline',
           });
           setScreen({ name: 'detail', categoryId: screen.prefillCategoryId });
@@ -1125,8 +1126,9 @@ export default function ManageExpenseScreen() {
 
       } else if (screen.name === 'edit') {
         const oldExp    = expenses.find(e => e.id === screen.expenseId);
-        const newTitle  = vals.title.trim();
-        const newAmount = parseFloat(vals.amount.replace(/,/g, '')) || 0;
+        const newTitle  = sanitizeTitle(vals.title);
+        const newAmount = parseAmount(vals.amount);
+        const newDesc   = sanitizeDescription(vals.description);
         const catU      = categories.find(c => c.id === vals.categoryId);
         const oldCatLbl = categories.find(c => c.id === oldExp?.categoryId)?.label;
 
@@ -1137,7 +1139,7 @@ export default function ManageExpenseScreen() {
             title:        newTitle,
             amount:       newAmount,
             date:         vals.date,
-            description:  vals.description.trim(),
+            description:  newDesc,
             is_recurring: vals.isRecurring,
             frequency:    vals.isRecurring ? vals.frequency : null,
           })
@@ -1157,7 +1159,7 @@ export default function ManageExpenseScreen() {
                   title:       newTitle,
                   amount:      newAmount,
                   date:        vals.date,
-                  description: vals.description.trim(),
+                  description: newDesc,
                   isRecurring: vals.isRecurring,
                   frequency:   vals.isRecurring ? vals.frequency : null,
                 }
@@ -1201,26 +1203,27 @@ export default function ManageExpenseScreen() {
   };
 
   const handleSaveCategory = async (id: string, label: string, icon: IoniconName) => {
+    const cleanLabel = sanitizeCategoryLabel(label);
     const oldCat = categories.find(c => c.id === id);
     loadingBar.start();
-    const { error } = await supabase.from('expense_categories').update({ label, icon }).eq('id', id);
+    const { error } = await supabase.from('expense_categories').update({ label: cleanLabel, icon }).eq('id', id);
     loadingBar.finish();
     if (error) {
       showError('Failed to Update Category', error.message);
     } else {
       DataCache.invalidateExpenseCategories(userIdRef.current!);
       DataCache.invalidateDashboard(userIdRef.current!);
-      setCategories(prev => prev.map(c => c.id === id ? { ...c, label, icon } : c));
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, label: cleanLabel, icon } : c));
       sfx.success();
       showToast('Category updated successfully.');
       const changes: string[] = [];
-      if (oldCat?.label !== label) changes.push(`Name: "${oldCat?.label}" → "${label}"`);
+      if (oldCat?.label !== cleanLabel) changes.push(`Name: "${oldCat?.label}" → "${cleanLabel}"`);
       if (oldCat?.icon  !== icon)  changes.push('Icon changed');
       logActivity({
         user_id:     userIdRef.current!,
         action_type: ACTION.EXPENSE_CATEGORY_UPDATED,
         entity_type: ENTITY.EXPENSE_CATEGORY,
-        title:       `Category Updated: ${label}`,
+        title:       `Category Updated: ${cleanLabel}`,
         description: changes.length > 0 ? changes.join(' · ') : 'Details updated',
         icon,
       });
@@ -1415,10 +1418,11 @@ export default function ManageExpenseScreen() {
   };
 
   const handleNewCategory = async (label: string, icon: IoniconName) => {
+    const cleanLabel = sanitizeCategoryLabel(label);
     loadingBar.start();
     const { data, error } = await supabase
       .from('expense_categories')
-      .insert({ user_id: userIdRef.current, label, icon })
+      .insert({ user_id: userIdRef.current, label: cleanLabel, icon })
       .select()
       .single();
     loadingBar.finish();
@@ -1431,7 +1435,7 @@ export default function ManageExpenseScreen() {
       const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
       setCategories(prev => [...prev, newCat]);
       sfx.success();
-      showToast(`Category "${label}" created.`);
+      showToast(`Category "${cleanLabel}" created.`);
       logActivity({
         user_id:     userIdRef.current!,
         action_type: ACTION.EXPENSE_CATEGORY_CREATED,

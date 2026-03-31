@@ -21,6 +21,7 @@ import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { loadingBar } from '@/components/GlobalLoadingBar';
+import { sanitizeEmail, sanitizeName, sanitizePhone } from '@/lib/sanitize';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const MAX_DOB = (() => {
@@ -61,9 +62,13 @@ export default function CreateAccountScreen() {
   async function handleSignUp() {
     setError('');
 
-    if (!fullName.trim())      return setError('Full name is required.');
-    if (!email.trim())         return setError('Email is required.');
-    if (!phone.trim())         return setError('Mobile number is required.');
+    const cleanName  = sanitizeName(fullName);
+    const cleanEmail = sanitizeEmail(email);
+    const cleanPhone = sanitizePhone(phone);
+
+    if (!cleanName)            return setError('Full name is required.');
+    if (!cleanEmail)           return setError('Email is required.');
+    if (!cleanPhone)           return setError('Mobile number is required.');
     if (!dob)                  return setError('Date of birth is required.');
     if (!password)             return setError('Password is required.');
     if (password.length < 6)   return setError('Password must be at least 6 characters.');
@@ -73,12 +78,12 @@ export default function CreateAccountScreen() {
     loadingBar.start();
 
     const { error: authError } = await supabase.auth.signUp({
-      email:    email.trim(),
+      email:    cleanEmail,
       password,
       options: {
         data: {
-          full_name:     fullName.trim(),
-          phone:         phone.trim(),
+          full_name:     cleanName,
+          phone:         cleanPhone,
           date_of_birth: dob.toISOString().split('T')[0],
         },
       },
