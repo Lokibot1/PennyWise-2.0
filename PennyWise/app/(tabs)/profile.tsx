@@ -259,6 +259,7 @@ function ProfileView({
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
       edges={["top", "left", "right"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
 
@@ -577,6 +578,7 @@ function EditProfileView({
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
       edges={["top", "left", "right"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
 
@@ -879,6 +881,7 @@ function TermsView({ onBack }: { onBack: () => void }) {
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
       edges={["top", "left", "right"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
       <View
@@ -1265,6 +1268,7 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
       edges={["top"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style="light" />
       <View style={styles.greenSection}>
@@ -1614,6 +1618,7 @@ function SettingsView({
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
       edges={["top", "left", "right"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
 

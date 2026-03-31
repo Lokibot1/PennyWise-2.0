@@ -55,7 +55,7 @@ export default function LoginFormScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]} {...({ filterTouchesWhenObscured: true } as any)}>
       <StatusBar style="light" />
 
       {/* ── Green header ── */}

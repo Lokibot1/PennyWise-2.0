@@ -157,6 +157,7 @@ export default function ResetPasswordScreen() {
     return (
       <SafeAreaView
         style={[styles.safeArea, { backgroundColor: theme.headerBg }]}
+        {...({ filterTouchesWhenObscured: true } as any)}
       >
         <StatusBar style="light" />
         <View style={styles.header}>
@@ -199,6 +200,7 @@ export default function ResetPasswordScreen() {
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: theme.headerBg }]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style="light" />
 
