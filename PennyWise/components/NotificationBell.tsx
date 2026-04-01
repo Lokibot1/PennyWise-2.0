@@ -14,23 +14,28 @@ import { useNotifications } from '@/contexts/NotificationContext';
 type Props = {
   style?: StyleProp<ViewStyle>;
   iconColor?: string;
+  testID?: string;
 };
 
-export default function NotificationBell({ style, iconColor = '#fff' }: Props) {
+export default function NotificationBell({ style, iconColor = '#fff', testID }: Props) {
   const { unreadCount, openPanel } = useNotifications();
   const ref = useRef<TouchableOpacity>(null);
 
   const handlePress = () => {
+    let measured = false;
     ref.current?.measure((_x, _y, width, height, pageX, pageY) => {
+      measured = true;
       openPanel({ pageX, pageY, width, height });
     });
+    // Fallback for environments where measure doesn't invoke the callback (e.g. test renderer)
+    if (!measured) openPanel({ pageX: 0, pageY: 0, width: 0, height: 0 });
   };
 
   return (
-    <TouchableOpacity ref={ref} style={[{ position: 'relative' }, style]} onPress={handlePress} activeOpacity={0.8}>
+    <TouchableOpacity ref={ref} style={[{ position: 'relative' }, style]} onPress={handlePress} activeOpacity={0.8} testID={testID}>
       <Ionicons name="notifications-outline" size={20} color={iconColor} />
       {unreadCount > 0 && (
-        <View style={{
+        <View testID="notification-badge" style={{
           position:        'absolute',
           top:             -5,
           right:           -5,
