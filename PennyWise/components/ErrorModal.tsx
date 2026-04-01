@@ -27,9 +27,9 @@ export default function ErrorModal({ visible, onClose, title, message }: Props) 
       onRequestClose={onClose}
     >
       {/* Backdrop */}
-      <Pressable style={st.overlay} onPress={onClose}>
+      <Pressable style={st.overlay} onPress={onClose} testID="error-modal-backdrop">
         {/* Sheet — stop propagation */}
-        <Pressable style={[st.sheet, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
+        <Pressable style={[st.sheet, { backgroundColor: theme.modalBg }]} onPress={() => {}} testID="error-modal-sheet">
 
           {/* Handle */}
           <View style={[st.handle, { backgroundColor: theme.divider }]} />
