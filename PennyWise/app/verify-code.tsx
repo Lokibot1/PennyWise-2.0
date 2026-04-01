@@ -252,8 +252,10 @@ export default function VerifyCodeScreen() {
           <TouchableOpacity
             style={[styles.verifyButton, (!complete || loading || expired) && styles.verifyButtonDisabled]}
             activeOpacity={0.85}
-            disabled={!complete || loading || expired}
+            disabled={loading || expired}
             onPress={handleVerify}
+            testID="verify-btn"
+            accessibilityRole="button"
           >
             {loading
               ? <ActivityIndicator color="#fff" />
