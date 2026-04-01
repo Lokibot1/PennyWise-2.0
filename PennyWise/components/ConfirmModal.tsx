@@ -59,7 +59,12 @@ export default function ConfirmModal({
       onRequestClose={onClose}
     >
       {/* Backdrop — tap to dismiss */}
-      <Pressable style={st.overlay} onPress={onClose}>
+      <Pressable
+        style={st.overlay}
+        onPress={onClose}
+        testID="confirm-modal-backdrop"
+        accessibilityLabel="Close modal"
+      >
 
         {/* Sheet — stop touch propagation so taps inside don't close */}
         <Pressable style={[st.sheet, { backgroundColor: theme.modalBg }]} onPress={() => {}}>
