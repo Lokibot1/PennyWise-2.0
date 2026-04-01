@@ -135,7 +135,7 @@ export function HomeDashboardSkeleton() {
 export function TransactionRowSkeleton({ isLast = false }: { isLast?: boolean }) {
   const { theme } = useAppTheme();
   return (
-    <View style={{
+    <View testID="transaction-row-skeleton" style={{
       flexDirection: 'row', alignItems: 'center',
       paddingVertical: 14, gap: 10,
       borderBottomWidth: isLast ? 0 : 1,

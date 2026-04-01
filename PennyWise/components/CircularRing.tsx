@@ -50,7 +50,7 @@ export default function CircularRing({ size, stroke, pct, color, track, icon, ic
 
       {/* Right arc (0–50%) */}
       {p > 0 && (
-        <View style={{ position: 'absolute', right: 0, width: half, height: size, overflow: 'hidden' }}>
+        <View testID="ring-arc-right" style={{ position: 'absolute', right: 0, width: half, height: size, overflow: 'hidden' }}>
           <View style={{
             position: 'absolute', right: 0,
             width: size, height: size, borderRadius: half,
@@ -66,7 +66,7 @@ export default function CircularRing({ size, stroke, pct, color, track, icon, ic
 
       {/* Left arc (50–100%) */}
       {showLeft && (
-        <View style={{ position: 'absolute', left: 0, width: half, height: size, overflow: 'hidden' }}>
+        <View testID="ring-arc-left" style={{ position: 'absolute', left: 0, width: half, height: size, overflow: 'hidden' }}>
           <View style={{
             position: 'absolute', left: 0,
             width: size, height: size, borderRadius: half,
@@ -81,7 +81,7 @@ export default function CircularRing({ size, stroke, pct, color, track, icon, ic
       )}
 
       {/* Inner icon circle */}
-      <View style={{
+      <View testID="ring-inner" style={{
         position: 'absolute',
         top:  (size - innerSize) / 2,
         left: (size - innerSize) / 2,
