@@ -56,6 +56,8 @@ export function FormInput({
           <TouchableOpacity
             onPress={() => setShowPassword(v => !v)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
           >
             <Ionicons
               name={showPassword ? 'eye-outline' : 'eye-off-outline'}

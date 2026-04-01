@@ -59,10 +59,8 @@ describe('FormInput — rendering', () => {
   });
 
   it('does not render the eye toggle when isPassword is false', () => {
-    const { getAllByTestId } = render(<FormInput {...baseProps} isPassword={false} />);
-    const icons = getAllByTestId('icon');
-    // Only the left field icon should be present — no eye toggle icon
-    expect(icons).toHaveLength(1);
+    const { queryByRole } = render(<FormInput {...baseProps} isPassword={false} />);
+    expect(queryByRole('button')).toBeNull();
   });
 
   it('renders the eye-off icon by default when isPassword is true', () => {
@@ -87,33 +85,28 @@ describe('FormInput — password visibility toggle', () => {
   });
 
   it('pressing the eye toggle reveals the password', () => {
-    const { getByPlaceholderText, getAllByTestId } = render(
+    const { getByPlaceholderText, getByRole } = render(
       <FormInput {...baseProps} placeholder="Enter password" isPassword={true} />
     );
-    const eyeIcon = getAllByTestId('icon').find(i => i.props.children === 'eye-off-outline')!;
-    fireEvent.press(eyeIcon);
+    fireEvent.press(getByRole('button'));
     expect(getByPlaceholderText('Enter password').props.secureTextEntry).toBe(false);
   });
 
   it('pressing the eye toggle again re-hides the password', () => {
-    const { getByPlaceholderText, getAllByTestId } = render(
+    const { getByPlaceholderText, getByRole } = render(
       <FormInput {...baseProps} placeholder="Enter password" isPassword={true} />
     );
-    const getEyeIcon = () =>
-      getAllByTestId('icon').find(
-        i => i.props.children === 'eye-off-outline' || i.props.children === 'eye-outline'
-      )!;
-    fireEvent.press(getEyeIcon());
-    fireEvent.press(getEyeIcon());
+    const toggle = getByRole('button');
+    fireEvent.press(toggle);
+    fireEvent.press(toggle);
     expect(getByPlaceholderText('Enter password').props.secureTextEntry).toBe(true);
   });
 
   it('eye icon changes to eye-outline after toggle', () => {
-    const { getAllByTestId } = render(
+    const { getAllByTestId, getByRole } = render(
       <FormInput {...baseProps} isPassword={true} />
     );
-    const eyeOffIcon = getAllByTestId('icon').find(i => i.props.children === 'eye-off-outline')!;
-    fireEvent.press(eyeOffIcon);
+    fireEvent.press(getByRole('button'));
     const eyeIcon = getAllByTestId('icon').find(i => i.props.children === 'eye-outline');
     expect(eyeIcon).toBeTruthy();
   });
@@ -149,8 +142,7 @@ describe('FormInput — edge cases', () => {
   });
 
   it('renders correctly when isPassword is omitted', () => {
-    const { getAllByTestId } = render(<FormInput {...baseProps} />);
-    // Only the left field icon — no eye toggle
-    expect(getAllByTestId('icon')).toHaveLength(1);
+    const { queryByRole } = render(<FormInput {...baseProps} />);
+    expect(queryByRole('button')).toBeNull();
   });
 });
