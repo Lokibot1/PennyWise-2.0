@@ -24,7 +24,7 @@ import { PasswordStrength } from "@/components/password-strength";
 import { Font } from "@/constants/fonts";
 import { TERMS_SECTIONS, TERMS_VERSION } from "@/constants/terms";
 import { useAppTheme } from "@/contexts/AppTheme";
-import { sanitizeEmail, sanitizeName, sanitizePhone } from "@/lib/sanitize";
+import { sanitizeEmail, sanitizeName, sanitizePhone, filterName, filterEmail, filterPhone } from "@/lib/sanitize";
 import { supabase } from "@/lib/supabase";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -299,7 +299,7 @@ export default function CreateAccountScreen() {
               iconName="person-outline"
               value={fullName}
               onChangeText={(v) => {
-                setFullName(v);
+                setFullName(filterName(v));
                 setError("");
               }}
               autoCapitalize="words"
@@ -311,7 +311,7 @@ export default function CreateAccountScreen() {
               iconName="mail-outline"
               value={email}
               onChangeText={(v) => {
-                setEmail(v);
+                setEmail(filterEmail(v));
                 setError("");
               }}
               keyboardType="email-address"
@@ -323,7 +323,7 @@ export default function CreateAccountScreen() {
               iconName="call-outline"
               value={phone}
               onChangeText={(v) => {
-                setPhone(v);
+                setPhone(filterPhone(v));
                 setError("");
               }}
               keyboardType="phone-pad"

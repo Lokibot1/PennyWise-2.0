@@ -14,6 +14,38 @@
  *   - DOM XSS in-app — React Native Text components don't render HTML
  */
 
+// ── Keystroke-level input filters ─────────────────────────────────────────────
+// Applied inside onChangeText so invalid characters never reach state.
+
+/**
+ * Name fields (full name, username).
+ * Allows letters (Latin + extended/accented), spaces, hyphens, apostrophes,
+ * and periods. Blocks emojis, digits, and all other symbols.
+ */
+export function filterName(value: string): string {
+  // Allow: basic + extended Latin letters, spaces, hyphens, apostrophes, periods.
+  // \u00C0-\u024F covers Latin Extended-A/B (accented chars, ñ, etc.)
+  return value.replace(/[^a-zA-Z\u00C0-\u024F\s'\-.]/g, '');
+}
+
+/**
+ * Email fields.
+ * Restricts input to printable ASCII characters that are valid in an email
+ * address. Blocks emojis, Unicode letters, and all non-ASCII code points.
+ */
+export function filterEmail(value: string): string {
+  return value.replace(/[^a-zA-Z0-9@._+\-]/g, '');
+}
+
+/**
+ * Phone / mobile number fields.
+ * Allows digits, +, spaces, hyphens, and parentheses only.
+ * Consistent with sanitizePhone applied at submit time.
+ */
+export function filterPhone(value: string): string {
+  return value.replace(/[^\d+\s\-()]/g, '');
+}
+
 /** Remove HTML tags, null bytes, and control characters. Collapse whitespace. */
 function stripTags(value: string): string {
   return value
