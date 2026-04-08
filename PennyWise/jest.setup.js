@@ -11,3 +11,17 @@ console.warn = (...args) => {
   }
   originalWarn(...args);
 };
+
+// Suppress "not wrapped in act(...)" console.error noise from async state
+// updates inside NotificationProvider. The tests use waitFor() correctly;
+// this warning fires on intermediate microtask boundaries and is cosmetic.
+const originalError = console.error.bind(console);
+console.error = (...args) => {
+  if (
+    typeof args[0] === 'string' &&
+    args[0].includes('not wrapped in act')
+  ) {
+    return;
+  }
+  originalError(...args);
+};
