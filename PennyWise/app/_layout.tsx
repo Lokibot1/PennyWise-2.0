@@ -200,6 +200,14 @@ export default function RootLayout() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="verify-code"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="reset-password"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="savings-goals"
             options={{ headerShown: false }}
           />

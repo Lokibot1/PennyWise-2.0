@@ -68,8 +68,8 @@ function IOSPicker({ visible, value, onConfirm, onClose, maximumDate, minimumDat
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={st.overlay} onPress={onClose}>
-        <Pressable style={[st.sheet, { backgroundColor: theme.modalBg ?? '#fff' }]} onPress={() => {}}>
+      <Pressable style={st.overlay} onPress={onClose} testID="date-picker-backdrop">
+        <Pressable style={[st.sheet, { backgroundColor: theme.modalBg ?? '#fff' }]} onPress={() => {}} testID="date-picker-sheet">
 
           {/* Header */}
           <View style={st.header}>

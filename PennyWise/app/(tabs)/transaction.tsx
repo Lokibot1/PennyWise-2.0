@@ -22,6 +22,7 @@ import Animated, {
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
+import { DataCache } from '@/lib/dataCache';
 import { setNavTarget } from '@/lib/activityNavTarget';
 import { ActivityHistorySkeleton } from '@/components/SkeletonLoader';
 import ErrorModal from '@/components/ErrorModal';
@@ -163,29 +164,12 @@ function fmtAmount(n: number): string {
 
 // ── Build unified activity feed from source tables + activity_logs ─────────────
 async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
-  const [incomeRes, expenseRes, goalsRes, logsRes] = await Promise.all([
-    // All income sources (including archived)
-    supabase
-      .from('income_sources')
-      .select('id, title, amount, created_at, is_archived, income_categories(id, label, icon)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
-
-    // All expenses (including archived)
-    supabase
-      .from('expenses')
-      .select('id, title, amount, created_at, is_archived, expense_categories(id, label, icon)')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
-
-    // All savings goals (active + completed + archived)
-    supabase
-      .from('savings_goals')
-      .select('id, icon, title, target_amount, current_amount, is_completed, is_archived, completed_at, created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false }),
-
-    // activity_logs — only metadata events not covered by source tables
+  // income_sources, expenses, savings_goals served from cache when fresh.
+  // activity_logs is always fetched fresh (audit-only, not mutated by the user).
+  const [cachedIncome, cachedExpenses, cachedGoals, logsRes] = await Promise.all([
+    DataCache.fetchIncomeSources(userId),
+    DataCache.fetchExpenses(userId),
+    DataCache.fetchSavingsGoals(userId),
     supabase
       .from('activity_logs')
       .select('id, action_type, entity_type, title, description, icon, created_at')
@@ -194,69 +178,72 @@ async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
       .order('created_at', { ascending: false }),
   ]);
 
-  if (incomeRes.error)  throw incomeRes.error;
-  if (expenseRes.error) throw expenseRes.error;
-  if (goalsRes.error)   throw goalsRes.error;
-  if (logsRes.error)    throw logsRes.error;
+  // Fetch category lookups (also cached)
+  const [incomeCats, expenseCats] = await Promise.all([
+    DataCache.fetchIncomeCategories(userId),
+    DataCache.fetchExpenseCategories(userId),
+  ]);
+  const incomeCatMap  = Object.fromEntries(incomeCats.map(c => [c.id, c]));
+  const expenseCatMap = Object.fromEntries(expenseCats.map(c => [c.id, c]));
+
+  if (logsRes.error) throw logsRes.error;
 
   const items: ActivityItem[] = [];
 
   // ── Income sources ──────────────────────────────────────────────────────────
-  for (const r of incomeRes.data ?? []) {
-    const cat = (r as any).income_categories;
-    const amt = Number((r as any).amount);
+  for (const r of cachedIncome) {
+    const cat = incomeCatMap[r.category_id];
+    const amt = Number(r.amount);
     items.push({
       id:          `inc-${r.id}`,
       action_type: 'INCOME_SOURCE_ADDED',
       entity_type: 'income_source',
-      title:       `Income: ${(r as any).title}`,
-      description: `${fmtAmount(amt)} · ${cat?.label ?? 'Income'}${(r as any).is_archived ? ' · Archived' : ''}`,
+      title:       `Income: ${r.title}`,
+      description: `${fmtAmount(amt)} · ${cat?.label ?? 'Income'}${r.is_archived ? ' · Archived' : ''}`,
       icon:        cat?.icon ?? 'cash-outline',
       created_at:  (r as any).created_at,
-      category_id: (cat as any)?.id,
+      category_id: cat?.id,
     });
   }
 
   // ── Expenses ────────────────────────────────────────────────────────────────
-  for (const r of expenseRes.data ?? []) {
-    const cat = (r as any).expense_categories;
-    const amt = Number((r as any).amount);
+  for (const r of cachedExpenses) {
+    const cat = expenseCatMap[r.category_id];
+    const amt = Number(r.amount);
     items.push({
       id:          `exp-${r.id}`,
       action_type: 'EXPENSE_ADDED',
       entity_type: 'expense',
-      title:       `Expense: ${(r as any).title}`,
-      description: `${fmtAmount(amt)} · ${cat?.label ?? 'Expense'}${(r as any).is_archived ? ' · Archived' : ''}`,
+      title:       `Expense: ${r.title}`,
+      description: `${fmtAmount(amt)} · ${cat?.label ?? 'Expense'}${r.is_archived ? ' · Archived' : ''}`,
       icon:        cat?.icon ?? 'receipt-outline',
       created_at:  (r as any).created_at,
-      category_id: (cat as any)?.id,
+      category_id: cat?.id,
     });
   }
 
   // ── Savings goals ───────────────────────────────────────────────────────────
-  for (const r of goalsRes.data ?? []) {
-    const isCompleted = (r as any).is_completed || (r as any).is_archived;
-    // Completion event (uses completed_at as timestamp)
-    if (isCompleted && (r as any).completed_at) {
+  for (const r of cachedGoals) {
+    const isCompleted = r.is_completed || r.is_archived;
+    if (isCompleted && r.completed_at) {
       items.push({
         id:          `goal-done-${r.id}`,
         action_type: 'SAVINGS_GOAL_COMPLETED',
         entity_type: 'savings_goal',
-        title:       `Goal Achieved: ${(r as any).title}`,
-        description: `Target of ${fmtAmount((r as any).target_amount)} reached!`,
-        icon:        (r as any).icon ?? 'trophy-outline',
-        created_at:  (r as any).completed_at,
+        title:       `Goal Achieved: ${r.title}`,
+        description: `Target of ${fmtAmount(r.target_amount)} reached!`,
+        icon:        r.icon ?? 'trophy-outline',
+        created_at:  r.completed_at,
       });
     }
-    // Creation event (always shown)
     items.push({
       id:          `goal-${r.id}`,
       action_type: 'SAVINGS_GOAL_CREATED',
       entity_type: 'savings_goal',
-      title:       `Goal Created: ${(r as any).title}`,
-      description: `Target: ${fmtAmount((r as any).target_amount)}`,
-      icon:        (r as any).icon ?? 'flag-outline',
-      created_at:  (r as any).created_at,
+      title:       `Goal Created: ${r.title}`,
+      description: `Target: ${fmtAmount(r.target_amount)}`,
+      icon:        r.icon ?? 'flag-outline',
+      created_at:  r.created_at,
     });
   }
 

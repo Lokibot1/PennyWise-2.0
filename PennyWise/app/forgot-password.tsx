@@ -3,13 +3,13 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,38 +17,62 @@ import { Ionicons } from '@expo/vector-icons';
 import { FormInput } from '@/components/form-input';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
-import { supabase } from '@/lib/supabase';
+import { callFunction } from '@/lib/callFunction';
 import { loadingBar } from '@/components/GlobalLoadingBar';
+import { sanitizeEmail } from '@/lib/sanitize';
+
+function isValidEmail(email: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
 
 export default function ForgotPasswordScreen() {
   const { theme } = useAppTheme();
-  const [email, setEmail]   = useState('');
+  const [email, setEmail]     = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError]   = useState('');
-  const [sent, setSent]     = useState(false);
+  const [error, setError]     = useState('');
 
   async function handleReset() {
-    if (!email.trim()) return;
+    const cleanEmail = sanitizeEmail(email);
+    if (!cleanEmail) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!isValidEmail(cleanEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
     setLoading(true);
     setError('');
     loadingBar.start();
 
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim()
-    );
+    const { data, ok, status, rawError } = await callFunction('send-reset-otp', {
+      email: cleanEmail,
+    });
 
     loadingBar.finish();
     setLoading(false);
 
-    if (resetError) {
-      setError(resetError.message);
-    } else {
-      setSent(true);
+    if (rawError) {
+      setError('Network error. Please check your connection.');
+      return;
     }
+
+    if (!ok) {
+      if ((data as any)?.rateLimited) {
+        setError('Please wait a moment before requesting another code.');
+        return;
+      }
+      setError((data as any)?.error ?? `Error ${status}. Please try again.`);
+      return;
+    }
+
+    // Always navigate on success — prevents user enumeration
+    router.push({ pathname: '/verify-code', params: { email: cleanEmail } });
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]} {...({ filterTouchesWhenObscured: true } as any)}>
       <StatusBar style="light" />
 
       {/* ── Green header ── */}
@@ -67,100 +91,79 @@ export default function ForgotPasswordScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {sent ? (
-            /* ── Success state ── */
-            <View style={styles.successBox}>
-              <Ionicons name="mail-outline" size={48} color="#1B7A4A" />
-              <Text style={[styles.successTitle, { color: theme.textPrimary }]}>Check Your Email</Text>
-              <Text style={[styles.successDesc, { color: theme.textMuted }]}>
-                We sent a password reset link to{'\n'}
-                <Text style={styles.successEmail}>{email}</Text>
-              </Text>
-              <TouchableOpacity
-                style={styles.nextButton}
-                onPress={() => router.replace('/login-form')}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.nextButtonText}>Back to Login</Text>
-              </TouchableOpacity>
+          {/* Reset section */}
+          <View style={styles.resetSection}>
+            <Text style={[styles.resetTitle, { color: theme.textPrimary }]}>Reset Password?</Text>
+            <Text style={[styles.resetDescription, { color: theme.textMuted }]}>
+              Enter the email address linked to your account and we'll send
+              you a 6-digit verification code.
+            </Text>
+          </View>
+
+          {/* Email input */}
+          <FormInput
+            label="Enter Email Address"
+            placeholder="example@example.com"
+            iconName="mail-outline"
+            value={email}
+            onChangeText={(v) => { setEmail(v); setError(''); }}
+            keyboardType="email-address"
+          />
+
+          {/* Error message */}
+          {error !== '' && (
+            <View style={[styles.errorBox, { backgroundColor: theme.isDark ? 'rgba(224,88,88,0.12)' : '#FFF0F0' }]}>
+              <Ionicons name="alert-circle-outline" size={16} color="#E05858" />
+              <Text style={styles.errorText}>{error}</Text>
             </View>
-          ) : (
-            <>
-              {/* Reset section */}
-              <View style={styles.resetSection}>
-                <Text style={[styles.resetTitle, { color: theme.textPrimary }]}>Reset Password?</Text>
-                <Text style={[styles.resetDescription, { color: theme.textMuted }]}>
-                  Enter the email address linked to your account and we'll send
-                  you a link to reset your password.
-                </Text>
-              </View>
-
-              {/* Email input */}
-              <FormInput
-                label="Enter Email Address"
-                placeholder="example@example.com"
-                iconName="mail-outline"
-                value={email}
-                onChangeText={(v) => { setEmail(v); setError(''); }}
-                keyboardType="email-address"
-              />
-
-              {/* Error message */}
-              {error !== '' && (
-                <View style={[styles.errorBox, { backgroundColor: theme.isDark ? 'rgba(224,88,88,0.12)' : '#FFF0F0' }]}>
-                  <Ionicons name="alert-circle-outline" size={16} color="#E05858" />
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              )}
-
-              {/* Next Step */}
-              <TouchableOpacity
-                style={[styles.nextButton, loading && styles.nextButtonDisabled]}
-                activeOpacity={0.85}
-                disabled={loading}
-                onPress={handleReset}
-              >
-                {loading
-                  ? <ActivityIndicator color="#fff" />
-                  : <Text style={styles.nextButtonText}>Next Step</Text>
-                }
-              </TouchableOpacity>
-
-              {/* Sign Up */}
-              <TouchableOpacity
-                style={[styles.secondaryButton, { backgroundColor: theme.isDark ? theme.surface : '#EDF7F1' }]}
-                onPress={() => router.push('/create-account')}
-                activeOpacity={0.85}
-              >
-                <Text style={[styles.secondaryButtonText, { color: theme.textPrimary }]}>Sign Up</Text>
-              </TouchableOpacity>
-
-              {/* Social divider */}
-              <View style={styles.dividerRow}>
-                <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
-                <Text style={[styles.dividerText, { color: theme.textMuted }]}>or sign up with</Text>
-                <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
-              </View>
-
-              {/* Social buttons */}
-              <View style={styles.socialRow}>
-                <TouchableOpacity style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]} activeOpacity={0.7}>
-                  <Ionicons name="logo-facebook" size={22} color="#1877F2" />
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]} activeOpacity={0.7}>
-                  <Ionicons name="logo-google" size={20} color="#EA4335" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Footer */}
-              <View style={styles.footerRow}>
-                <Text style={[styles.footerText, { color: theme.textMuted }]}>Don't have an account? </Text>
-                <TouchableOpacity onPress={() => router.push('/create-account')} activeOpacity={0.7}>
-                  <Text style={styles.footerLink}>Sign Up</Text>
-                </TouchableOpacity>
-              </View>
-            </>
           )}
+
+          {/* Next Step */}
+          <TouchableOpacity
+            style={[styles.nextButton, loading && styles.nextButtonDisabled]}
+            activeOpacity={0.85}
+            disabled={loading}
+            onPress={handleReset}
+          >
+            {loading
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.nextButtonText}>Send Code</Text>
+            }
+          </TouchableOpacity>
+
+          {/* Sign Up */}
+          <TouchableOpacity
+            style={[styles.secondaryButton, { backgroundColor: theme.isDark ? theme.surface : '#EDF7F1' }]}
+            onPress={() => router.push('/create-account')}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.secondaryButtonText, { color: theme.textPrimary }]}>Sign Up</Text>
+          </TouchableOpacity>
+
+          {/* Social divider */}
+          <View style={styles.dividerRow}>
+            <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
+            <Text style={[styles.dividerText, { color: theme.textMuted }]}>or sign up with</Text>
+            <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
+          </View>
+
+          {/* Social buttons */}
+          <View style={styles.socialRow}>
+            <TouchableOpacity style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]} activeOpacity={0.7}>
+              <Ionicons name="logo-facebook" size={22} color="#1877F2" />
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]} activeOpacity={0.7}>
+              <Ionicons name="logo-google" size={20} color="#EA4335" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footerRow}>
+            <Text style={[styles.footerText, { color: theme.textMuted }]}>Don't have an account? </Text>
+            <TouchableOpacity onPress={() => router.push('/create-account')} activeOpacity={0.7}>
+              <Text style={styles.footerLink}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -236,29 +239,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#E05858',
     flex: 1,
-  },
-
-  // ── Success state ────────────────────────────────────
-  successBox: {
-    alignItems: 'center',
-    gap: 16,
-    paddingTop: 20,
-  },
-  successTitle: {
-    fontFamily: Font.headerBold,
-    fontSize: 24,
-    color: '#1E3A2E',
-  },
-  successDesc: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 14,
-    color: '#7A7A7A',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  successEmail: {
-    fontFamily: Font.bodySemiBold,
-    color: '#1B7A4A',
   },
 
   // ── Buttons ─────────────────────────────────────────

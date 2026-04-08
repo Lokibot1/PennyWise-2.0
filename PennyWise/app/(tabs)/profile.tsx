@@ -41,6 +41,9 @@ import { useAppTheme } from "@/contexts/AppTheme";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { sfx } from "@/lib/sfx";
 import { supabase } from "@/lib/supabase";
+import { DataCache } from "@/lib/dataCache";
+import { Cache } from "@/lib/cache";
+import { sanitizeName, sanitizeEmail, sanitizePhone } from "@/lib/sanitize";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = "profile" | "edit" | "terms" | "privacy" | "settings" | "notif-settings" | "change-password";
@@ -243,18 +246,22 @@ function ProfileView({
     loadingBar.start();
     const { error } = await supabase.auth.signOut();
     loadingBar.finish();
-    if (error)
+    if (error) {
       setErrModal({
         visible: true,
         title: "Sign Out Failed",
         message: error.message,
       });
+    } else {
+      Cache.clearAll();
+    }
   }
 
   return (
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
       edges={["top", "left", "right"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
 
@@ -540,12 +547,16 @@ function EditProfileView({
       newAvatarUrl = null;
     }
 
+    const cleanName  = sanitizeName(username);
+    const cleanPhone = sanitizePhone(phone);
+    const cleanEmail = sanitizeEmail(email);
+
     const { error } = await supabase
       .from("profiles")
       .update({
-        full_name: username.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
+        full_name: cleanName,
+        phone:     cleanPhone,
+        email:     cleanEmail,
         avatar_url: newAvatarUrl,
       })
       .eq("id", user.id);
@@ -558,11 +569,13 @@ function EditProfileView({
         message: error.message,
       });
     } else {
+      DataCache.invalidateProfile(user.id);
+      DataCache.invalidateDashboard(user.id);
       sfx.success();
       onSaved({
-        full_name: username.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
+        full_name: cleanName,
+        phone:     cleanPhone,
+        email:     cleanEmail,
         avatar_url: newAvatarUrl ?? undefined,
       });
       onBack();
@@ -573,6 +586,7 @@ function EditProfileView({
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
       edges={["top", "left", "right"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
 
@@ -863,6 +877,7 @@ function TermsView({ onBack }: { onBack: () => void }) {
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
       edges={["top", "left", "right"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
       <View
@@ -1314,6 +1329,7 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
       edges={["top"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style="light" />
       <View style={styles.greenSection}>
@@ -1612,6 +1628,8 @@ function SettingsView({
       .update({ budget_limit: newLimit })
       .eq("id", user.id);
     if (error) throw error;
+    DataCache.invalidateProfile(user.id);
+    DataCache.invalidateDashboard(user.id);
     setBudgetLimit(newLimit);
   }
 
@@ -1646,6 +1664,7 @@ function SettingsView({
 
       // Clear local session
       await supabase.auth.signOut();
+      Cache.clearAll();
     } catch (err: any) {
       loadingBar.finish();
       setErrModal({
@@ -1660,6 +1679,7 @@ function SettingsView({
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
       edges={["top", "left", "right"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
 
@@ -2034,21 +2054,34 @@ export default function ProfileScreen() {
         return;
       }
       const meta = (user.user_metadata ?? {}) as Record<string, string>;
-      supabase
-        .from("profiles")
-        .select("full_name, email, phone, avatar_url")
-        .eq("id", user.id)
-        .single()
-        .then(({ data }) => {
-          if (cancelled) return;
+      DataCache.fetchProfile(user.id).then((cached) => {
+        if (cancelled) return;
+        if (cached) {
           setProfile({
-            full_name: data?.full_name || meta.full_name || "",
-            email: data?.email || meta.email || "",
-            phone: data?.phone || meta.phone || "",
-            avatar_url: data?.avatar_url ?? undefined,
+            full_name:  cached.full_name  || meta.full_name || "",
+            email:      cached.email      || meta.email     || "",
+            phone:      cached.phone      || meta.phone     || "",
+            avatar_url: cached.avatar_url ?? undefined,
           });
           setLoading(false);
-        });
+        } else {
+          supabase
+            .from("profiles")
+            .select("full_name, budget_limit, email, phone, avatar_url")
+            .eq("id", user.id)
+            .single()
+            .then(({ data }) => {
+              if (cancelled) return;
+              setProfile({
+                full_name:  data?.full_name  || meta.full_name || "",
+                email:      data?.email      || meta.email     || "",
+                phone:      data?.phone      || meta.phone     || "",
+                avatar_url: data?.avatar_url ?? undefined,
+              });
+              setLoading(false);
+            });
+        }
+      });
     });
     return () => {
       cancelled = true;
