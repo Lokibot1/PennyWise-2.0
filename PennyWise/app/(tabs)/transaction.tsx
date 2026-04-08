@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDebounce } from '@/hooks/use-debounce';
 import { router, useFocusEffect } from 'expo-router';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import {
@@ -383,6 +384,7 @@ export default function TransactionHistoryScreen() {
   const [all, setAll]                   = useState<ActivityItem[]>([]);
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState('');
+  const debouncedSearch                 = useDebounce(search, 300);
   const [activeFilter, setActiveFilter] = useState<FilterType>('All');
   const [errModal, setErrModal]         = useState({ visible: false, title: '', message: '' });
   const userIdRef = useRef<string | null>(null);
@@ -444,7 +446,7 @@ export default function TransactionHistoryScreen() {
   const filtered = all.filter(item => {
     const types = ENTITY_TYPES[activeFilter];
     const matchFilter = activeFilter === 'All' || types.includes(item.entity_type);
-    const q = search.toLowerCase().trim();
+    const q = debouncedSearch.toLowerCase().trim();
     const matchSearch = q === '' ||
       item.title.toLowerCase().includes(q) ||
       item.description.toLowerCase().includes(q);
