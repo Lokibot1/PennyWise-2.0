@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
@@ -27,9 +28,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
 import type { Theme } from '@/contexts/AppTheme';
+import { useFormDraft } from '@/hooks/useFormDraft';
 import { supabase } from '@/lib/supabase';
 import { DataCache } from '@/lib/dataCache';
 import { sanitizeCategoryLabel, sanitizeTitle, sanitizeDescription, parseAmount } from '@/lib/sanitize';
@@ -774,6 +777,8 @@ function CategoryDetailScreen({
 }
 
 // ── ExpenseFormScreen ─────────────────────────────────────────────────────────
+const EXPENSE_DRAFT_KEY = 'draft:add-expense';
+
 function ExpenseFormScreen({
   initial, categories, screenTitle, isEdit, saving, onBack, onSave, theme,
 }: {
@@ -781,7 +786,19 @@ function ExpenseFormScreen({
   isEdit?: boolean; saving?: boolean;
   onBack: () => void; onSave: (vals: ExpenseFormValues) => void; theme: Theme;
 }) {
-  const [vals, setVals]           = useState<ExpenseFormValues>(initial);
+  // Use null key for edits so existing data is never overwritten by a draft
+  const {
+    draft: vals,
+    setDraftField,
+    saveStatus,
+    hasSavedDraft,
+    discardDraft,
+  } = useFormDraft<ExpenseFormValues>(
+    isEdit ? null : EXPENSE_DRAFT_KEY,
+    initial,
+  );
+
+  const [showResumeBanner, setShowResumeBanner] = useState(true);
   const [showCatPicker, setCat]   = useState(false);
   const [showFreqPicker, setFreq] = useState(false);
   const [showDatePicker, setDatePicker] = useState(false);
@@ -790,7 +807,7 @@ function ExpenseFormScreen({
   const btnStyle   = useAnimatedStyle(() => ({ transform: [{ scale: btnScale.value }] }));
 
   const set = <K extends keyof ExpenseFormValues>(key: K, value: ExpenseFormValues[K]) =>
-    setVals(prev => ({ ...prev, [key]: value }));
+    setDraftField(key, value);
 
   const activeCategories = categories.filter(c => !c.isArchived);
   const selectedCat      = activeCategories.find(c => c.id === vals.categoryId);
@@ -809,6 +826,20 @@ function ExpenseFormScreen({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Resume banner — only for new expenses with a saved draft */}
+            {!isEdit && hasSavedDraft && showResumeBanner && (
+              <View style={[s.resumeBanner, { backgroundColor: theme.isDark ? '#1A3B2C' : '#EDF7F1', borderColor: '#1B7A4A' }]}>
+                <Ionicons name="bookmark-outline" size={15} color="#1B7A4A" />
+                <Text style={[s.resumeText, { color: theme.textPrimary }]}>Resuming from where you left off</Text>
+                <TouchableOpacity onPress={async () => { await discardDraft(); setShowResumeBanner(false); }} hitSlop={8}>
+                  <Text style={s.resumeDiscard}>Start fresh</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Auto-save indicator */}
+            {!isEdit && <DraftSaveIndicator status={saveStatus} />}
+
             {/* Date */}
             <Text style={[s.label, { color: theme.textPrimary }]}>Date</Text>
             <TouchableOpacity
@@ -1112,6 +1143,7 @@ export default function ManageExpenseScreen() {
           }]);
           sfx.coin();
           showToast('Expense added successfully.');
+          AsyncStorage.removeItem(EXPENSE_DRAFT_KEY);
           const cat = categories.find(c => c.id === vals.categoryId);
           logActivity({
             user_id:     userIdRef.current!,
@@ -1667,6 +1699,10 @@ const s = StyleSheet.create({
 
   saveBtn:    { backgroundColor: '#1B7A4A', borderRadius: 50, paddingVertical: 16, alignItems: 'center', marginTop: 28 },
   saveBtnTxt: { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
+
+  resumeBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 12 },
+  resumeText:   { fontFamily: Font.bodyRegular, fontSize: 13, flex: 1 },
+  resumeDiscard: { fontFamily: Font.bodySemiBold, fontSize: 12, color: '#E05858' },
 
   pickerIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#2A7E8F', alignItems: 'center', justifyContent: 'center' },
 

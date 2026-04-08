@@ -421,10 +421,11 @@ function EditProfileView({
   onSaved: (u: ProfileData) => void;
 }) {
   const { theme } = useAppTheme();
+
   const [username, setUsername] = useState(profile.full_name);
-  const [phone, setPhone] = useState(profile.phone ?? "");
-  const [email, setEmail] = useState(profile.email);
-  const [saving, setSaving] = useState(false);
+  const [phone, setPhone]       = useState(profile.phone ?? "");
+  const [email, setEmail]       = useState(profile.email);
+  const [saving, setSaving]     = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [errModal, setErrModal] = useState({
     visible: false,
@@ -2453,4 +2454,5 @@ const styles = StyleSheet.create({
     marginRight: 14,
   },
   photoSheetLabel: { fontFamily: Font.bodySemiBold, fontSize: 15 },
+
 });

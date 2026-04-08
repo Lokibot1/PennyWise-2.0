@@ -23,8 +23,10 @@ import { sanitizeTitle, parseAmount } from '@/lib/sanitize';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { sfx } from '@/lib/sfx';
 import { loadingBar } from '@/components/GlobalLoadingBar';
+import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
+import { useFormDraft } from '@/hooks/useFormDraft';
 import ConfirmModal from '@/components/ConfirmModal';
 import SlideTabBar from '@/components/SlideTabBar';
 import CircularRing from '@/components/CircularRing';
@@ -164,9 +166,18 @@ export default function SavingsGoalsScreen() {
 
   // ── Add Goal modal state ───────────────────────────────────────────────────
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newTitle, setNewTitle]         = useState('');
-  const [newTarget, setNewTarget]       = useState('');
-  const [newIcon, setNewIcon]           = useState('wallet-outline');
+  const {
+    draft:         goalDraft,
+    setDraftField: setGoalField,
+    clearDraft:    clearGoalDraft,
+    discardDraft:  discardGoalDraft,
+    saveStatus:    goalSaveStatus,
+    hasSavedDraft: hasGoalDraft,
+  } = useFormDraft('draft:add-goal', { newTitle: '', newTarget: '', newIcon: 'wallet-outline' });
+  const newTitle  = goalDraft.newTitle  as string;
+  const newTarget = goalDraft.newTarget as string;
+  const newIcon   = goalDraft.newIcon   as string;
+  const [showGoalResumeBanner, setShowGoalResumeBanner] = useState(true);
   const [saving, setSaving]             = useState(false);
 
   // ── Edit Goal modal state ──────────────────────────────────────────────────
@@ -231,9 +242,15 @@ export default function SavingsGoalsScreen() {
 
     sfx.coin();
     setShowAddModal(false);
+<<<<<<< Updated upstream
     setNewTitle(''); setNewTarget(''); setNewIcon('wallet-outline');
     DataCache.invalidateDashboard(userId);
     fetchGoals(userId, true);
+=======
+    await clearGoalDraft();
+    setShowGoalResumeBanner(true);
+    fetchGoals(userId);
+>>>>>>> Stashed changes
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_CREATED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `New Goal: ${cleanTitle}`,
@@ -367,7 +384,6 @@ export default function SavingsGoalsScreen() {
   };
 
   const openAddModal = () => {
-    setNewTitle(''); setNewTarget(''); setNewIcon('wallet-outline');
     setShowAddModal(true);
   };
 
@@ -687,13 +703,27 @@ export default function SavingsGoalsScreen() {
               <View style={[styles.modalHandle, { backgroundColor: theme.divider }]} />
               <Text style={[styles.modalTitle, { color: theme.textPrimary }]}>New Savings Goal</Text>
 
+              {/* Resume banner */}
+              {hasGoalDraft && showGoalResumeBanner && (
+                <View style={[styles.resumeBanner, { backgroundColor: theme.isDark ? '#1A3B2C' : '#EDF7F1', borderColor: '#1B7A4A' }]}>
+                  <Ionicons name="bookmark-outline" size={15} color="#1B7A4A" />
+                  <Text style={[styles.resumeText, { color: theme.textPrimary }]}>Resuming from where you left off</Text>
+                  <TouchableOpacity onPress={async () => { await discardGoalDraft(); setShowGoalResumeBanner(false); }} hitSlop={8}>
+                    <Text style={styles.resumeDiscard}>Start fresh</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Auto-save indicator */}
+              <DraftSaveIndicator status={goalSaveStatus} />
+
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Goal Name</Text>
               <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
                 <Ionicons name="flag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
                 <TextInput
                   style={[styles.inputInner, { color: theme.textPrimary }]}
                   placeholder="e.g. Buy a Car, Emergency Fund" placeholderTextColor={theme.textMuted}
-                  value={newTitle} onChangeText={setNewTitle}
+                  value={newTitle} onChangeText={v => setGoalField('newTitle', v)}
                 />
               </View>
 
@@ -703,12 +733,12 @@ export default function SavingsGoalsScreen() {
                 <TextInput
                   style={[styles.inputInner, { color: theme.textPrimary }]}
                   placeholder="e.g. 50,000.00" placeholderTextColor={theme.textMuted}
-                  value={newTarget} onChangeText={v => setNewTarget(fmtMoney(v))} keyboardType="decimal-pad"
+                  value={newTarget} onChangeText={v => setGoalField('newTarget', fmtMoney(v))} keyboardType="decimal-pad"
                 />
               </View>
 
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon (optional)</Text>
-              <IconPicker selected={newIcon} onSelect={setNewIcon} theme={theme} />
+              <IconPicker selected={newIcon} onSelect={v => setGoalField('newIcon', v)} theme={theme} />
 
               <TouchableOpacity
                 style={[styles.primaryBtn, saving && { opacity: 0.6 }]}
@@ -1002,6 +1032,10 @@ const styles = StyleSheet.create({
   primaryBtnText: { fontFamily: Font.bodySemiBold, fontSize: 16, color: '#fff' },
   cancelBtn:      { alignItems: 'center', paddingVertical: 10 },
   cancelBtnText:  { fontFamily: Font.bodyMedium, fontSize: 14 },
+
+  resumeBanner:  { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 12 },
+  resumeText:    { fontFamily: Font.bodyRegular, fontSize: 12, flex: 1 },
+  resumeDiscard: { fontFamily: Font.bodySemiBold, fontSize: 11, color: '#E05858' },
 
   // Funds modal extras
   goalSummary:    { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 12, gap: 12, marginBottom: 12 },

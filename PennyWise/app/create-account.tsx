@@ -88,7 +88,6 @@ function TermsModal({
       <SafeAreaView style={[tStyles.safe, { backgroundColor: theme.headerBg }]}>
         <StatusBar style="light" />
 
-        {/* Header */}
         <View style={[tStyles.header, { backgroundColor: theme.headerBg }]}>
           <Text style={tStyles.headerTitle}>Terms & Conditions</Text>
           <TouchableOpacity onPress={handleClose} hitSlop={12}>
@@ -96,7 +95,6 @@ function TermsModal({
           </TouchableOpacity>
         </View>
 
-        {/* Scroll hint */}
         {!scrolledToEnd && (
           <View style={[tStyles.hint, { backgroundColor: theme.headerBg }]}>
             <Ionicons
@@ -108,7 +106,6 @@ function TermsModal({
           </View>
         )}
 
-        {/* Content */}
         <ScrollView
           style={[tStyles.scroll, { backgroundColor: theme.cardBg }]}
           contentContainerStyle={tStyles.content}
@@ -123,10 +120,7 @@ function TermsModal({
               <Text
                 style={[
                   tStyles.sectionTitle,
-                  {
-                    color: theme.textPrimary,
-                    fontSize: i === 0 ? 17 : 14,
-                  },
+                  { color: theme.textPrimary, fontSize: i === 0 ? 17 : 14 },
                 ]}
               >
                 {section.title}
@@ -153,7 +147,6 @@ function TermsModal({
             </View>
           ))}
 
-          {/* Checkbox */}
           <TouchableOpacity
             style={tStyles.checkRow}
             onPress={() => scrolledToEnd && setAccepted((v) => !v)}
@@ -184,7 +177,6 @@ function TermsModal({
             </Text>
           )}
 
-          {/* Accept button */}
           <TouchableOpacity
             style={[
               tStyles.acceptBtn,
@@ -222,7 +214,6 @@ export default function CreateAccountScreen() {
     setError("");
   }
 
-  // ── Sign-up logic ─────────────────────────────────────────────────────────
   async function handleSignUp() {
     setError("");
 
@@ -275,12 +266,10 @@ export default function CreateAccountScreen() {
     >
       <StatusBar style="light" />
 
-      {/* ── Green header ── */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Create Account</Text>
       </View>
 
-      {/* ── Card ── */}
       <KeyboardAvoidingView
         style={styles.cardWrapper}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -291,7 +280,6 @@ export default function CreateAccountScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* ── Fields ── */}
           <View style={styles.form}>
             <FormInput
               label="Full Name"
@@ -304,7 +292,6 @@ export default function CreateAccountScreen() {
               }}
               autoCapitalize="words"
             />
-
             <FormInput
               label="Email"
               placeholder="example@example.com"
@@ -316,7 +303,6 @@ export default function CreateAccountScreen() {
               }}
               keyboardType="email-address"
             />
-
             <FormInput
               label="Mobile Number"
               placeholder="+63 912 345 6789"
@@ -328,8 +314,6 @@ export default function CreateAccountScreen() {
               }}
               keyboardType="phone-pad"
             />
-
-            {/* ── Date of Birth ── */}
             <View style={styles.fieldContainer}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
                 Date of Birth
@@ -369,7 +353,6 @@ export default function CreateAccountScreen() {
                 You must be at least 13 years old.
               </Text>
             </View>
-
             <FormInput
               label="Password"
               placeholder="••••••••"
@@ -381,9 +364,7 @@ export default function CreateAccountScreen() {
               }}
               isPassword
             />
-
             <PasswordStrength password={password} />
-
             <FormInput
               label="Confirm Password"
               placeholder="••••••••"
@@ -414,7 +395,7 @@ export default function CreateAccountScreen() {
             </View>
           )}
 
-          {/* ── Terms & Conditions row ── */}
+          {/* Terms & Conditions row */}
           <Pressable
             style={[
               styles.termsRow,
@@ -455,7 +436,6 @@ export default function CreateAccountScreen() {
             />
           </Pressable>
 
-          {/* ── Sign Up button ── */}
           <TouchableOpacity
             style={[
               styles.primaryButton,
@@ -472,7 +452,6 @@ export default function CreateAccountScreen() {
             )}
           </TouchableOpacity>
 
-          {/* ── Footer ── */}
           <View style={styles.footerRow}>
             <Text style={[styles.footerText, { color: theme.textMuted }]}>
               Already have an account?{" "}
@@ -545,7 +524,6 @@ const styles = StyleSheet.create({
   },
   form: { gap: 14 },
 
-  // ── Date of Birth field ──────────────────────────────
   fieldContainer: { gap: 7 },
   fieldLabel: {
     fontFamily: Font.bodySemiBold,
@@ -669,7 +647,6 @@ const styles = StyleSheet.create({
   },
 });
 
-// ── Terms modal styles ────────────────────────────────────────────────────────
 const tStyles = StyleSheet.create({
   safe: { flex: 1 },
   header: {
