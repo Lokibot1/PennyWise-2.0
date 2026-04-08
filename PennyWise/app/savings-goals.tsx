@@ -242,15 +242,10 @@ export default function SavingsGoalsScreen() {
 
     sfx.coin();
     setShowAddModal(false);
-<<<<<<< Updated upstream
-    setNewTitle(''); setNewTarget(''); setNewIcon('wallet-outline');
-    DataCache.invalidateDashboard(userId);
-    fetchGoals(userId, true);
-=======
     await clearGoalDraft();
     setShowGoalResumeBanner(true);
-    fetchGoals(userId);
->>>>>>> Stashed changes
+    DataCache.invalidateDashboard(userId);
+    fetchGoals(userId, true);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_CREATED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `New Goal: ${cleanTitle}`,
