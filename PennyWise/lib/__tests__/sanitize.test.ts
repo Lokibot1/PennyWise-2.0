@@ -6,6 +6,9 @@ import {
   sanitizeTitle,
   sanitizeDescription,
   parseAmount,
+  filterName,
+  filterEmail,
+  filterPhone,
 } from '../sanitize';
 
 // ─── sanitizeName ────────────────────────────────────────────────────────────
@@ -211,5 +214,97 @@ describe('parseAmount', () => {
 
   it('returns 0 for zero', () => {
     expect(parseAmount('0')).toBe(0);
+  });
+});
+
+// ─── filterName ───────────────────────────────────────────────────────────────
+
+describe('filterName', () => {
+  it('allows plain letters and spaces', () => {
+    expect(filterName('John Doe')).toBe('John Doe');
+  });
+
+  it('allows accented / extended Latin characters', () => {
+    expect(filterName('José Ñoño')).toBe('José Ñoño');
+  });
+
+  it('allows hyphens and apostrophes (common in names)', () => {
+    expect(filterName("O'Brien-Smith")).toBe("O'Brien-Smith");
+  });
+
+  it('allows periods (e.g. initials)', () => {
+    expect(filterName('J. R. Tolkien')).toBe('J. R. Tolkien');
+  });
+
+  it('strips emoji characters', () => {
+    expect(filterName('John 😀 Doe')).toBe('John  Doe');
+  });
+
+  it('strips digits', () => {
+    expect(filterName('John123')).toBe('John');
+  });
+
+  it('strips special symbols', () => {
+    expect(filterName('John@#$%')).toBe('John');
+  });
+
+  it('returns empty string for emoji-only input', () => {
+    expect(filterName('🔥🚀')).toBe('');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(filterName('')).toBe('');
+  });
+});
+
+// ─── filterEmail ──────────────────────────────────────────────────────────────
+
+describe('filterEmail', () => {
+  it('passes through a valid email address unchanged', () => {
+    expect(filterEmail('user@example.com')).toBe('user@example.com');
+  });
+
+  it('allows valid email special characters', () => {
+    expect(filterEmail('user+tag@sub.domain.com')).toBe('user+tag@sub.domain.com');
+  });
+
+  it('strips emoji characters', () => {
+    expect(filterEmail('user😀@example.com')).toBe('user@example.com');
+  });
+
+  it('strips non-ASCII Unicode letters', () => {
+    expect(filterEmail('üser@example.com')).toBe('ser@example.com');
+  });
+
+  it('strips spaces', () => {
+    expect(filterEmail('user @example.com')).toBe('user@example.com');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(filterEmail('')).toBe('');
+  });
+});
+
+// ─── filterPhone ──────────────────────────────────────────────────────────────
+
+describe('filterPhone', () => {
+  it('allows digits, +, spaces, hyphens, and parentheses', () => {
+    expect(filterPhone('+63 (912) 345-6789')).toBe('+63 (912) 345-6789');
+  });
+
+  it('strips emoji characters', () => {
+    expect(filterPhone('0912😀345')).toBe('0912345');
+  });
+
+  it('strips letters', () => {
+    expect(filterPhone('091abc2345')).toBe('0912345');
+  });
+
+  it('strips special symbols', () => {
+    expect(filterPhone('0912@#$345')).toBe('0912345');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(filterPhone('')).toBe('');
   });
 });

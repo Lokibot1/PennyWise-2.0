@@ -43,7 +43,7 @@ import { sfx } from "@/lib/sfx";
 import { supabase } from "@/lib/supabase";
 import { DataCache } from "@/lib/dataCache";
 import { Cache } from "@/lib/cache";
-import { sanitizeName, sanitizeEmail, sanitizePhone } from "@/lib/sanitize";
+import { sanitizeName, sanitizeEmail, sanitizePhone, filterName, filterEmail, filterPhone } from "@/lib/sanitize";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = "profile" | "edit" | "terms" | "privacy" | "settings" | "notif-settings" | "change-password";
@@ -767,7 +767,7 @@ function EditProfileView({
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={username}
-                onChangeText={setUsername}
+                onChangeText={(v) => setUsername(filterName(v))}
                 placeholderTextColor={theme.textMuted}
                 placeholder="e.g. John Smith"
               />
@@ -790,7 +790,7 @@ function EditProfileView({
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(v) => setPhone(filterPhone(v))}
                 keyboardType="phone-pad"
                 placeholderTextColor={theme.textMuted}
                 placeholder="e.g. +63 912 345 6789"
@@ -809,7 +809,7 @@ function EditProfileView({
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(v) => setEmail(filterEmail(v))}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 placeholderTextColor={theme.textMuted}
