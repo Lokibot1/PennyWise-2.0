@@ -10,15 +10,21 @@ jest.mock('expo-router', () => ({
   useFocusEffect: jest.fn((cb: any) => cb()),
 }));
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = require('react-native');
+  return {
+    SafeAreaView: ({ children, ...props }: any) => <View {...props}>{children}</View>,
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  };
+});
 
 let mockOnAuthCb: ((event: string, session: any) => void) | null = null;
 const mockUnsubscribe = jest.fn();
 
 // activity_logs chain mock
-const mockActivityLogsData = jest.fn().mockResolvedValue({ data: [], error: null });
-const mockIn   = jest.fn(() => ({ order: mockOrder }));
-const mockOrder = jest.fn(() => ({ data: [], error: null, then: mockActivityLogsData }));
-const mockEq    = jest.fn(() => ({ in: mockIn }));
+const mockOrder  = jest.fn().mockResolvedValue({ data: [], error: null });
+const mockIn     = jest.fn(() => ({ order: mockOrder }));
+const mockEq     = jest.fn(() => ({ in: mockIn }));
 const mockSelect = jest.fn(() => ({ eq: mockEq }));
 
 jest.mock('@/lib/supabase', () => ({
@@ -62,6 +68,7 @@ jest.mock('@/contexts/AppTheme', () => ({
       headerBg: '#1B3D2B', cardBg: '#FFFFFF', textPrimary: '#0F1F17',
       textSecondary: '#4A6355', textMuted: '#8FAF9A', surface: '#F2F8F4',
       inputBg: '#F2F8F4', inputBorder: '#C8DDD2', divider: '#E0EDE6',
+      iconBtnBg: 'rgba(255,255,255,0.15)', iconBtnColor: '#FFFFFF',
       isDark: false, statusBar: 'light',
     },
   }),
