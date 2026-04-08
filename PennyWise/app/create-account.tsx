@@ -2,7 +2,11 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -18,6 +22,7 @@ import { FormInput } from '@/components/form-input';
 import { PasswordStrength } from '@/components/password-strength';
 import DatePickerModal from '@/components/DatePickerModal';
 import { Font } from '@/constants/fonts';
+import { TERMS_SECTIONS, TERMS_VERSION } from '@/constants/terms';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { loadingBar } from '@/components/GlobalLoadingBar';
@@ -25,7 +30,7 @@ import { loadingBar } from '@/components/GlobalLoadingBar';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const MAX_DOB = (() => {
   const d = new Date();
-  d.setFullYear(d.getFullYear() - 13); // must be at least 13 years old
+  d.setFullYear(d.getFullYear() - 13);
   return d;
 })();
 
@@ -37,6 +42,139 @@ function formatDob(date: Date): string {
     day:   'numeric',
     year:  'numeric',
   });
+}
+
+function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: NativeScrollEvent) {
+  return layoutMeasurement.height + contentOffset.y >= contentSize.height - 40;
+}
+
+// ── Terms Modal ───────────────────────────────────────────────────────────────
+function TermsModal({
+  visible,
+  onAccept,
+  onClose,
+}: {
+  visible: boolean;
+  onAccept: () => void;
+  onClose: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const [scrolledToEnd, setScrolledToEnd] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+
+  function handleClose() {
+    setScrolledToEnd(false);
+    setAccepted(false);
+    onClose();
+  }
+
+  function handleAccept() {
+    setScrolledToEnd(false);
+    setAccepted(false);
+    onAccept();
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={handleClose}
+    >
+      <SafeAreaView style={[tStyles.safe, { backgroundColor: theme.headerBg }]}>
+        <StatusBar style="light" />
+
+        {/* Header */}
+        <View style={[tStyles.header, { backgroundColor: theme.headerBg }]}>
+          <Text style={tStyles.headerTitle}>Terms & Conditions</Text>
+          <TouchableOpacity onPress={handleClose} hitSlop={12}>
+            <Ionicons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Scroll hint */}
+        {!scrolledToEnd && (
+          <View style={[tStyles.hint, { backgroundColor: theme.headerBg }]}>
+            <Ionicons name="arrow-down-circle-outline" size={15} color="rgba(255,255,255,0.7)" />
+            <Text style={tStyles.hintText}>Scroll to the bottom to accept</Text>
+          </View>
+        )}
+
+        {/* Content */}
+        <ScrollView
+          style={[tStyles.scroll, { backgroundColor: theme.cardBg }]}
+          contentContainerStyle={tStyles.content}
+          showsVerticalScrollIndicator={false}
+          onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            if (isCloseToBottom(e.nativeEvent)) setScrolledToEnd(true);
+          }}
+          scrollEventThrottle={16}
+        >
+          {TERMS_SECTIONS.map((section, i) => (
+            <View key={i} style={{ marginBottom: 20 }}>
+              <Text
+                style={[
+                  tStyles.sectionTitle,
+                  {
+                    color: theme.textPrimary,
+                    fontSize: i === 0 ? 17 : 14,
+                  },
+                ]}
+              >
+                {section.title}
+              </Text>
+              {section.subtitle ? (
+                <Text style={[tStyles.body, { color: theme.textSecondary, fontStyle: 'italic', marginTop: 2 }]}>
+                  {section.subtitle}
+                </Text>
+              ) : null}
+              {section.body ? (
+                <Text style={[tStyles.body, { color: theme.textSecondary }]}>
+                  {section.body}
+                </Text>
+              ) : null}
+            </View>
+          ))}
+
+          {/* Checkbox */}
+          <TouchableOpacity
+            style={tStyles.checkRow}
+            onPress={() => scrolledToEnd && setAccepted(v => !v)}
+            activeOpacity={scrolledToEnd ? 0.8 : 1}
+          >
+            <View
+              style={[
+                tStyles.checkbox,
+                { borderColor: scrolledToEnd ? '#1B7A4A' : '#ccc' },
+                accepted && tStyles.checkboxOn,
+              ]}
+            >
+              {accepted && <Ionicons name="checkmark" size={13} color="#fff" />}
+            </View>
+            <Text style={[tStyles.checkLabel, { color: scrolledToEnd ? theme.textPrimary : theme.textMuted }]}>
+              I have read and agree to the Terms & Conditions
+            </Text>
+          </TouchableOpacity>
+
+          {!scrolledToEnd && (
+            <Text style={[tStyles.scrollNote, { color: theme.textMuted }]}>
+              Please scroll to the bottom before accepting.
+            </Text>
+          )}
+
+          {/* Accept button */}
+          <TouchableOpacity
+            style={[tStyles.acceptBtn, (!scrolledToEnd || !accepted) && tStyles.acceptBtnOff]}
+            activeOpacity={scrolledToEnd && accepted ? 0.85 : 1}
+            disabled={!scrolledToEnd || !accepted}
+            onPress={handleAccept}
+          >
+            <Text style={tStyles.acceptBtnText}>Accept & Continue</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  );
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -51,6 +189,8 @@ export default function CreateAccountScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading]                 = useState(false);
   const [error, setError]                     = useState('');
+  const [termsAccepted, setTermsAccepted]     = useState(false);
+  const [showTerms, setShowTerms]             = useState(false);
 
   function onDobConfirm(date: Date) {
     setDob(date);
@@ -68,6 +208,7 @@ export default function CreateAccountScreen() {
     if (!password)             return setError('Password is required.');
     if (password.length < 6)   return setError('Password must be at least 6 characters.');
     if (password !== confirmPassword) return setError('Passwords do not match.');
+    if (!termsAccepted)        return setError('You must accept the Terms & Conditions to continue.');
 
     setLoading(true);
     loadingBar.start();
@@ -77,9 +218,10 @@ export default function CreateAccountScreen() {
       password,
       options: {
         data: {
-          full_name:     fullName.trim(),
-          phone:         phone.trim(),
-          date_of_birth: dob.toISOString().split('T')[0],
+          full_name:              fullName.trim(),
+          phone:                  phone.trim(),
+          date_of_birth:          dob.toISOString().split('T')[0],
+          terms_accepted_version: TERMS_VERSION,
         },
       },
     });
@@ -191,13 +333,27 @@ export default function CreateAccountScreen() {
             </View>
           )}
 
-          {/* ── Terms ── */}
-          <Text style={[styles.termsText, { color: theme.textMuted }]}>
-            By continuing, you agree to{'\n'}
-            <Text style={styles.termsLink}>Terms of Use</Text>
-            {' '}and{' '}
-            <Text style={styles.termsLink}>Privacy Policy</Text>.
-          </Text>
+          {/* ── Terms & Conditions row ── */}
+          <Pressable
+            style={[
+              styles.termsRow,
+              { backgroundColor: theme.inputBg, borderColor: termsAccepted ? '#1B7A4A' : theme.inputBorder },
+            ]}
+            onPress={() => setShowTerms(true)}
+          >
+            <View style={[styles.termsCheck, { borderColor: termsAccepted ? '#1B7A4A' : '#ccc' }, termsAccepted && styles.termsCheckOn]}>
+              {termsAccepted && <Ionicons name="checkmark" size={12} color="#fff" />}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.termsRowLabel, { color: theme.textPrimary }]}>
+                Terms & Conditions
+              </Text>
+              <Text style={[styles.termsRowSub, { color: theme.textMuted }]}>
+                {termsAccepted ? 'Accepted — tap to review' : 'Tap to read and accept'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </Pressable>
 
           {/* ── Sign Up button ── */}
           <TouchableOpacity
@@ -230,6 +386,12 @@ export default function CreateAccountScreen() {
         onClose={() => setShowPicker(false)}
         maximumDate={MAX_DOB}
         minimumDate={MIN_DOB}
+      />
+
+      <TermsModal
+        visible={showTerms}
+        onAccept={() => { setTermsAccepted(true); setShowTerms(false); setError(''); }}
+        onClose={() => setShowTerms(false)}
       />
 
     </SafeAreaView>
@@ -326,17 +488,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ── Terms ───────────────────────────────────────────
-  termsText: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 12,
-    color: '#7A7A7A',
-    textAlign: 'center',
-    lineHeight: 18,
+  // ── Terms row ───────────────────────────────────────
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  termsLink: {
+  termsCheck: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  termsCheckOn: {
+    backgroundColor: '#1B7A4A',
+    borderColor: '#1B7A4A',
+  },
+  termsRowLabel: {
     fontFamily: Font.bodySemiBold,
-    color: '#1B7A4A',
+    fontSize: 13,
+  },
+  termsRowSub: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 11,
+    marginTop: 1,
   },
 
   // ── Button ──────────────────────────────────────────
@@ -375,5 +556,102 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#1B7A4A',
   },
+});
 
+// ── Terms modal styles ────────────────────────────────────────────────────────
+const tStyles = StyleSheet.create({
+  safe: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  headerTitle: {
+    fontFamily: Font.headerBold,
+    fontSize: 20,
+    color: '#fff',
+  },
+  hint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  hintText: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+  },
+  scroll: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 44,
+  },
+  sectionTitle: {
+    fontFamily: Font.headerBold,
+    marginBottom: 4,
+  },
+  body: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    lineHeight: 22,
+    marginTop: 2,
+  },
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxOn: {
+    backgroundColor: '#1B7A4A',
+    borderColor: '#1B7A4A',
+  },
+  checkLabel: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    flex: 1,
+  },
+  scrollNote: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  acceptBtn: {
+    backgroundColor: '#1B7A4A',
+    borderRadius: 50,
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: '#1B7A4A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.32,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  acceptBtnOff: { opacity: 0.4 },
+  acceptBtnText: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 16,
+    color: '#fff',
+    letterSpacing: 0.4,
+  },
 });

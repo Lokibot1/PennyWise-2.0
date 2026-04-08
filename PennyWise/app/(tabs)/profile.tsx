@@ -35,13 +35,15 @@ import {
   ProfileInfoSkeleton,
 } from "@/components/SkeletonLoader";
 import { Font } from "@/constants/fonts";
+import { PRIVACY_SECTIONS } from "@/constants/privacy";
+import { TERMS_SECTIONS } from "@/constants/terms";
 import { useAppTheme } from "@/contexts/AppTheme";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { sfx } from "@/lib/sfx";
 import { supabase } from "@/lib/supabase";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Screen = "profile" | "edit" | "terms" | "settings" | "notif-settings" | "change-password";
+type Screen = "profile" | "edit" | "terms" | "privacy" | "settings" | "notif-settings" | "change-password";
 type IoniconName = keyof typeof Ionicons.glyphMap;
 type ProfileData = {
   full_name: string;
@@ -332,6 +334,12 @@ function ProfileView({
                 iconBg="#2D7A5A"
                 label="Terms & Conditions"
                 onPress={() => navigate("terms")}
+              />
+              <MenuItem
+                icon="shield-checkmark-outline"
+                iconBg="#1B6B3A"
+                label="Privacy Policy"
+                onPress={() => navigate("privacy")}
                 last
               />
             </MenuGroup>
@@ -847,21 +855,9 @@ function EditProfileView({
 }
 
 // ── Terms view ────────────────────────────────────────────────────────────────
-const TERMS_TEXT = `These terms and conditions outline the rules and regulations for the use of PennyWise.
-
-1. By accessing this app we assume you accept these terms and conditions.
-
-2. All personal financial data you enter is stored securely. We do not sell your data to third parties.
-
-3. You are responsible for maintaining the security of your device and account.
-
-4. We reserve the right to modify these terms at any time.
-
-5. This app is provided "as is" without any warranties.`;
 
 function TermsView({ onBack }: { onBack: () => void }) {
   const { theme } = useAppTheme();
-  const [accepted, setAccepted] = useState(false);
 
   return (
     <SafeAreaView
@@ -883,34 +879,99 @@ function TermsView({ onBack }: { onBack: () => void }) {
         contentContainerStyle={styles.termsContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.termsText, { color: theme.textSecondary }]}>
-          {TERMS_TEXT}
-        </Text>
-        <TouchableOpacity
-          style={styles.checkRow}
-          onPress={() => setAccepted((v) => !v)}
-          activeOpacity={0.8}
-        >
-          <View
-            style={[
-              styles.checkbox,
-              { borderColor: "#1B7A4A" },
-              accepted && styles.checkboxOn,
-            ]}
-          >
-            {accepted && <Ionicons name="checkmark" size={13} color="#fff" />}
+        {TERMS_SECTIONS.map((section, i) => (
+          <View key={i} style={{ marginBottom: 20 }}>
+            <Text
+              style={[
+                styles.termsText,
+                {
+                  color: theme.textPrimary,
+                  fontFamily: Font.headerBold,
+                  fontSize: i === 0 ? 17 : 14,
+                  marginBottom: 4,
+                },
+              ]}
+            >
+              {section.title}
+            </Text>
+            {section.subtitle ? (
+              <Text
+                style={[
+                  styles.termsText,
+                  { color: theme.textSecondary, fontStyle: "italic", marginBottom: 6 },
+                ]}
+              >
+                {section.subtitle}
+              </Text>
+            ) : null}
+            {section.body ? (
+              <Text style={[styles.termsText, { color: theme.textSecondary }]}>
+                {section.body}
+              </Text>
+            ) : null}
           </View>
-          <Text style={[styles.checkLabel, { color: theme.textPrimary }]}>
-            I accept all the terms and conditions
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.saveBtn, !accepted && styles.saveBtnOff]}
-          activeOpacity={accepted ? 0.85 : 1}
-          disabled={!accepted}
-        >
-          <Text style={styles.saveBtnText}>Accept</Text>
-        </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// ── Privacy Policy view ───────────────────────────────────────────────────────
+function PrivacyView({ onBack }: { onBack: () => void }) {
+  const { theme } = useAppTheme();
+
+  return (
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: theme.headerBg }]}
+      edges={["top", "left", "right"]}
+    >
+      <StatusBar style={theme.statusBar} />
+      <View
+        style={[
+          styles.greenSection,
+          styles.termsHeader,
+          { backgroundColor: theme.headerBg },
+        ]}
+      >
+        <NavHeader title="Privacy Policy" onBack={onBack} />
+      </View>
+      <ScrollView
+        style={[styles.termsScroll, { backgroundColor: theme.cardBg }]}
+        contentContainerStyle={styles.termsContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {PRIVACY_SECTIONS.map((section, i) => (
+          <View key={i} style={{ marginBottom: 20 }}>
+            <Text
+              style={[
+                styles.termsText,
+                {
+                  color: theme.textPrimary,
+                  fontFamily: Font.headerBold,
+                  fontSize: i === 0 ? 17 : 14,
+                  marginBottom: 4,
+                },
+              ]}
+            >
+              {section.title}
+            </Text>
+            {section.subtitle ? (
+              <Text
+                style={[
+                  styles.termsText,
+                  { color: theme.textSecondary, fontStyle: "italic", marginBottom: 6 },
+                ]}
+              >
+                {section.subtitle}
+              </Text>
+            ) : null}
+            {section.body ? (
+              <Text style={[styles.termsText, { color: theme.textSecondary }]}>
+                {section.body}
+              </Text>
+            ) : null}
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
@@ -2004,6 +2065,8 @@ export default function ProfileScreen() {
     );
   if (screen === "terms")
     return <TermsView onBack={() => setScreen("profile")} />;
+  if (screen === "privacy")
+    return <PrivacyView onBack={() => setScreen("profile")} />;
   if (screen === "notif-settings")
     return <NotificationSettingsView onBack={() => setScreen("settings")} />;
   if (screen === "change-password")
