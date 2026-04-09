@@ -114,11 +114,15 @@ export default function HomeScreen() {
 
   const saveBudgetLimit = async (newLimit: number) => {
     if (!userIdRef.current) return;
+    const prev = budgetLimit;
+    setBudgetLimit(newLimit); // optimistic
     const { error } = await supabase.from('profiles').update({ budget_limit: newLimit }).eq('id', userIdRef.current);
-    if (error) throw error;
+    if (error) {
+      setBudgetLimit(prev); // rollback
+      throw error;
+    }
     DataCache.invalidateProfile(userIdRef.current);
     DataCache.invalidateDashboard(userIdRef.current);
-    setBudgetLimit(newLimit);
   };
 
   // ── Data loading ───────────────────────────────────────────────────────────

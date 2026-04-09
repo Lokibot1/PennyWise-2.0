@@ -989,16 +989,41 @@ export default function IncomeSourcesScreen() {
       loadingBar.start();
 
       if (screen.name === 'add') {
+        const tempId     = `temp-${Date.now()}`;
+        const now        = new Date().toTimeString().slice(0, 5);
+        const cleanTitle = sanitizeTitle(vals.title);
+        const amount     = parseAmount(vals.amount);
+        const cleanDesc  = sanitizeDescription(vals.description);
+        const tempInc = {
+          id: tempId, categoryId: vals.categoryId, title: cleanTitle,
+          amount, date: vals.date, time: now, description: cleanDesc,
+          isRecurring: vals.isRecurring,
+          frequency: vals.isRecurring ? vals.frequency : null,
+          isArchived: false,
+        };
+
+        // Optimistic: add temp item and navigate immediately
+        setIncome(prev => [...prev, tempInc]);
+        sfx.coin();
+        showToast('Income source added successfully.');
+        setScreen(
+          screen.prefillCategoryId
+            ? { name: 'detail', categoryId: screen.prefillCategoryId }
+            : { name: 'categories' },
+        );
+        loadingBar.finish();
+        setSaving(false);
+
         const { data, error } = await supabase
           .from('income_sources')
           .insert({
             user_id:      userIdRef.current,
             category_id:  vals.categoryId,
-            title:        sanitizeTitle(vals.title),
-            amount:       parseAmount(vals.amount),
+            title:        cleanTitle,
+            amount,
             date:         vals.date,
-            time:         new Date().toTimeString().slice(0, 5),
-            description:  sanitizeDescription(vals.description),
+            time:         now,
+            description:  cleanDesc,
             is_recurring: vals.isRecurring,
             frequency:    vals.isRecurring ? vals.frequency : null,
           })
@@ -1006,43 +1031,50 @@ export default function IncomeSourcesScreen() {
           .single();
 
         if (error) {
+          setIncome(prev => prev.filter(i => i.id !== tempId));
           showError('Failed to Save Income', error.message);
-          setSaving(false);
         } else if (data) {
-          DataCache.invalidateIncomeSources(userIdRef.current!);
-          DataCache.invalidateDashboard(userIdRef.current!);
-          setIncome(prev => [...prev, {
+          setIncome(prev => prev.map(i => i.id === tempId ? {
             id: data.id, categoryId: data.category_id, title: data.title,
             amount: Number(data.amount), date: data.date, time: data.time,
             description: data.description, isRecurring: data.is_recurring,
             frequency: data.frequency as Frequency | null, isArchived: data.is_archived,
-          }]);
-          sfx.coin();
-          showToast('Income source added successfully.');
+          } : i));
+          DataCache.invalidateIncomeSources(userIdRef.current!);
+          DataCache.invalidateDashboard(userIdRef.current!);
           const cat = categories.find(c => c.id === vals.categoryId);
           logActivity({
             user_id:     userIdRef.current!,
             action_type: ACTION.INCOME_SOURCE_ADDED,
             entity_type: ENTITY.INCOME_SOURCE,
-            title:       `Income Added: ${sanitizeTitle(vals.title)}`,
-            description: `₱${parseAmount(vals.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Income'}`,
+            title:       `Income Added: ${cleanTitle}`,
+            description: `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Income'}`,
             icon:        cat?.icon ?? 'cash-outline',
           });
-          // Return to the category detail if we came from one, otherwise go to categories grid
-          setScreen(
-            screen.name === 'add' && screen.prefillCategoryId
-              ? { name: 'detail', categoryId: screen.prefillCategoryId }
-              : { name: 'categories' },
-          );
         }
+        return;
 
       } else if (screen.name === 'edit') {
-        const oldInc     = income.find(i => i.id === screen.incomeId);
-        const newTitle   = sanitizeTitle(vals.title);
-        const newAmount  = parseAmount(vals.amount);
-        const newDesc    = sanitizeDescription(vals.description);
-        const catU       = categories.find(c => c.id === vals.categoryId);
-        const oldCatLbl  = categories.find(c => c.id === oldInc?.categoryId)?.label;
+        const oldInc    = income.find(i => i.id === screen.incomeId);
+        const newTitle  = sanitizeTitle(vals.title);
+        const newAmount = parseAmount(vals.amount);
+        const newDesc   = sanitizeDescription(vals.description);
+        const catU      = categories.find(c => c.id === vals.categoryId);
+        const oldCatLbl = categories.find(c => c.id === oldInc?.categoryId)?.label;
+        const updatedFields = {
+          categoryId: vals.categoryId, title: newTitle, amount: newAmount,
+          date: vals.date, description: newDesc,
+          isRecurring: vals.isRecurring,
+          frequency: vals.isRecurring ? vals.frequency : null,
+        };
+
+        // Optimistic: apply update and navigate immediately
+        setIncome(prev => prev.map(i => i.id === screen.incomeId ? { ...i, ...updatedFields } : i));
+        sfx.success();
+        showToast('Income source updated successfully.');
+        setScreen({ name: 'categories' });
+        loadingBar.finish();
+        setSaving(false);
 
         const { error } = await supabase
           .from('income_sources')
@@ -1058,18 +1090,11 @@ export default function IncomeSourcesScreen() {
           .eq('id', screen.incomeId);
 
         if (error) {
+          if (oldInc) setIncome(prev => prev.map(i => i.id === screen.incomeId ? oldInc : i));
           showError('Failed to Update Income', error.message);
-          setSaving(false);
         } else {
           DataCache.invalidateIncomeSources(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setIncome(prev => prev.map(i =>
-            i.id === screen.incomeId
-              ? { ...i, categoryId: vals.categoryId, title: newTitle, amount: newAmount, date: vals.date, description: newDesc, isRecurring: vals.isRecurring, frequency: vals.isRecurring ? vals.frequency : null }
-              : i,
-          ));
-          sfx.success();
-          showToast('Income source updated successfully.');
 
           const changes: string[] = [];
           if (oldInc) {
@@ -1095,8 +1120,8 @@ export default function IncomeSourcesScreen() {
             description: changes.length > 0 ? changes.join(' · ') : `${fmtAmt(newAmount)} · ${catU?.label ?? 'Income'}`,
             icon:        catU?.icon ?? 'cash-outline',
           });
-          setScreen({ name: 'categories' });
         }
+        return;
       }
 
       loadingBar.finish();
@@ -1106,35 +1131,31 @@ export default function IncomeSourcesScreen() {
   };
 
   const handleArchiveCategory = (categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
     showConfirm({
-      title:        'Archive Category?',
-      message:      'Are you sure you want to archive this Income Category?',
-      icon:         'archive-outline',
-      confirmLabel: 'Archive',
-      confirmColor: '#F59E0B',
+      title: 'Archive Category?', message: 'Are you sure you want to archive this Income Category?',
+      icon: 'archive-outline', confirmLabel: 'Archive', confirmColor: '#F59E0B',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
+        sfx.warning();
+        showToast('Income category archived successfully.');
+        setScreen({ name: 'categories' });
+
         const { error } = await supabase.from('income_categories').update({ is_archived: true }).eq('id', categoryId);
-        loadingBar.finish();
         if (error) {
+          setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
           showError('Failed to Archive Category', error.message);
         } else {
           DataCache.invalidateIncomeCategories(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          const archivedCat = categories.find(c => c.id === categoryId);
-          setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
-          sfx.warning();
-          showToast('Income category archived successfully.');
           logActivity({
-            user_id:     userIdRef.current!,
-            action_type: ACTION.INCOME_CATEGORY_ARCHIVED,
+            user_id: userIdRef.current!, action_type: ACTION.INCOME_CATEGORY_ARCHIVED,
             entity_type: ENTITY.INCOME_CATEGORY,
-            title:       `Category Archived: ${archivedCat?.label ?? 'Income Category'}`,
+            title: `Category Archived: ${cat?.label ?? 'Income Category'}`,
             description: 'Income category and its sources archived.',
-            icon:        archivedCat?.icon ?? 'archive-outline',
+            icon: cat?.icon ?? 'archive-outline',
           });
-          setScreen({ name: 'categories' });
         }
       },
     });
@@ -1143,31 +1164,27 @@ export default function IncomeSourcesScreen() {
   const handleRestore = (categoryId: string) => {
     const cat = categories.find(c => c.id === categoryId);
     showConfirm({
-      title:        'Restore Category?',
-      message:      'Are you sure you want to restore this Income Category?',
-      icon:         'refresh-outline',
-      confirmLabel: 'Restore',
-      confirmColor: '#3ECBA8',
+      title: 'Restore Category?', message: 'Are you sure you want to restore this Income Category?',
+      icon: 'refresh-outline', confirmLabel: 'Restore', confirmColor: '#3ECBA8',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
+        sfx.success();
+        showToast('Income category restored successfully.');
+
         const { error } = await supabase.from('income_categories').update({ is_archived: false }).eq('id', categoryId);
-        loadingBar.finish();
         if (error) {
+          setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
           showError('Failed to Restore Category', error.message);
         } else {
           DataCache.invalidateIncomeCategories(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
-          sfx.success();
-          showToast('Income category restored successfully.');
           logActivity({
-            user_id:     userIdRef.current!,
-            action_type: ACTION.INCOME_CATEGORY_RESTORED,
+            user_id: userIdRef.current!, action_type: ACTION.INCOME_CATEGORY_RESTORED,
             entity_type: ENTITY.INCOME_CATEGORY,
-            title:       `Category Restored: ${cat?.label ?? 'Income Category'}`,
+            title: `Category Restored: ${cat?.label ?? 'Income Category'}`,
             description: 'Income source category restored from archive.',
-            icon:        cat?.icon ?? 'refresh-outline',
+            icon: cat?.icon ?? 'refresh-outline',
           });
         }
       },
@@ -1176,34 +1193,33 @@ export default function IncomeSourcesScreen() {
 
   const handleDeleteCategory = (categoryId: string) => {
     const cat = categories.find(c => c.id === categoryId);
+    const removedIncome = income.filter(i => i.categoryId === categoryId);
     showConfirm({
-      title:        'Delete Permanently?',
-      message:      `This will permanently delete "${cat?.label ?? 'this category'}" and all its income sources. This cannot be undone.`,
-      icon:         'trash-outline',
-      confirmLabel: 'Delete',
-      confirmColor: '#E05858',
+      title: 'Delete Permanently?',
+      message: `This will permanently delete "${cat?.label ?? 'this category'}" and all its income sources. This cannot be undone.`,
+      icon: 'trash-outline', confirmLabel: 'Delete', confirmColor: '#E05858',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setCategories(prev => prev.filter(c => c.id !== categoryId));
+        setIncome(prev => prev.filter(i => i.categoryId !== categoryId));
+        sfx.error();
+        showToast('Category permanently deleted.');
+
         const { error } = await supabase.from('income_categories').delete().eq('id', categoryId);
-        loadingBar.finish();
         if (error) {
+          if (cat) setCategories(prev => [...prev, cat]);
+          setIncome(prev => [...prev, ...removedIncome]);
           showError('Failed to Delete Category', error.message);
         } else {
           DataCache.invalidateIncomeCategories(userIdRef.current!);
           DataCache.invalidateIncomeSources(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setCategories(prev => prev.filter(c => c.id !== categoryId));
-          setIncome(prev => prev.filter(i => i.categoryId !== categoryId));
-          sfx.error();
-          showToast('Category permanently deleted.');
           logActivity({
-            user_id:     userIdRef.current!,
-            action_type: ACTION.INCOME_CATEGORY_DELETED,
+            user_id: userIdRef.current!, action_type: ACTION.INCOME_CATEGORY_DELETED,
             entity_type: ENTITY.INCOME_CATEGORY,
-            title:       `Category Deleted: ${cat?.label ?? 'Income Category'}`,
+            title: `Category Deleted: ${cat?.label ?? 'Income Category'}`,
             description: 'Income category and all its sources permanently deleted.',
-            icon:        cat?.icon ?? 'trash-outline',
+            icon: cat?.icon ?? 'trash-outline',
           });
         }
       },
@@ -1213,32 +1229,28 @@ export default function IncomeSourcesScreen() {
   const handleArchiveIncome = (incomeId: string) => {
     const inc = income.find(i => i.id === incomeId);
     showConfirm({
-      title:        'Archive Income Source?',
-      message:      `Are you sure you want to archive "${inc?.title ?? 'this income source'}"?`,
-      icon:         'archive-outline',
-      confirmLabel: 'Archive',
-      confirmColor: '#F59E0B',
+      title: 'Archive Income Source?', message: `Are you sure you want to archive "${inc?.title ?? 'this income source'}"?`,
+      icon: 'archive-outline', confirmLabel: 'Archive', confirmColor: '#F59E0B',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: true } : i));
+        sfx.warning();
+        showToast('Income source archived.');
+
         const { error } = await supabase.from('income_sources').update({ is_archived: true }).eq('id', incomeId);
-        loadingBar.finish();
         if (error) {
+          setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: false } : i));
           showError('Failed to Archive Income', error.message);
         } else {
           DataCache.invalidateIncomeSources(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: true } : i));
-          sfx.warning();
-          showToast('Income source archived.');
           const cat = categories.find(c => c.id === inc?.categoryId);
           logActivity({
-            user_id:     userIdRef.current!,
-            action_type: ACTION.INCOME_SOURCE_ARCHIVED,
+            user_id: userIdRef.current!, action_type: ACTION.INCOME_SOURCE_ARCHIVED,
             entity_type: ENTITY.INCOME_SOURCE,
-            title:       `Income Archived: ${inc?.title ?? 'Income Source'}`,
+            title: `Income Archived: ${inc?.title ?? 'Income Source'}`,
             description: `${fmtAmt(inc?.amount ?? 0)} · ${cat?.label ?? 'Income'}`,
-            icon:        cat?.icon ?? 'archive-outline',
+            icon: cat?.icon ?? 'archive-outline',
           });
         }
       },
@@ -1248,32 +1260,28 @@ export default function IncomeSourcesScreen() {
   const handleRestoreIncome = (incomeId: string) => {
     const inc = income.find(i => i.id === incomeId);
     showConfirm({
-      title:        'Restore Income Source?',
-      message:      `Are you sure you want to restore "${inc?.title ?? 'this income source'}"?`,
-      icon:         'refresh-outline',
-      confirmLabel: 'Restore',
-      confirmColor: '#3ECBA8',
+      title: 'Restore Income Source?', message: `Are you sure you want to restore "${inc?.title ?? 'this income source'}"?`,
+      icon: 'refresh-outline', confirmLabel: 'Restore', confirmColor: '#3ECBA8',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: false } : i));
+        sfx.success();
+        showToast('Income source restored.');
+
         const { error } = await supabase.from('income_sources').update({ is_archived: false }).eq('id', incomeId);
-        loadingBar.finish();
         if (error) {
+          setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: true } : i));
           showError('Failed to Restore Income', error.message);
         } else {
           DataCache.invalidateIncomeSources(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: false } : i));
-          sfx.success();
-          showToast('Income source restored.');
           const cat = categories.find(c => c.id === inc?.categoryId);
           logActivity({
-            user_id:     userIdRef.current!,
-            action_type: ACTION.INCOME_SOURCE_RESTORED,
+            user_id: userIdRef.current!, action_type: ACTION.INCOME_SOURCE_RESTORED,
             entity_type: ENTITY.INCOME_SOURCE,
-            title:       `Income Restored: ${inc?.title ?? 'Income Source'}`,
+            title: `Income Restored: ${inc?.title ?? 'Income Source'}`,
             description: `${fmtAmt(inc?.amount ?? 0)} · ${cat?.label ?? 'Income'}`,
-            icon:        cat?.icon ?? 'refresh-outline',
+            icon: cat?.icon ?? 'refresh-outline',
           });
         }
       },
@@ -1283,32 +1291,29 @@ export default function IncomeSourcesScreen() {
   const handleDeleteIncome = (incomeId: string) => {
     const inc = income.find(i => i.id === incomeId);
     showConfirm({
-      title:        'Delete Permanently?',
-      message:      `This will permanently delete "${inc?.title ?? 'this income source'}". This cannot be undone.`,
-      icon:         'trash-outline',
-      confirmLabel: 'Delete',
-      confirmColor: '#E05858',
+      title: 'Delete Permanently?',
+      message: `This will permanently delete "${inc?.title ?? 'this income source'}". This cannot be undone.`,
+      icon: 'trash-outline', confirmLabel: 'Delete', confirmColor: '#E05858',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setIncome(prev => prev.filter(i => i.id !== incomeId));
+        sfx.error();
+        showToast('Income source permanently deleted.');
+
         const { error } = await supabase.from('income_sources').delete().eq('id', incomeId);
-        loadingBar.finish();
         if (error) {
+          if (inc) setIncome(prev => [...prev, inc]);
           showError('Failed to Delete Income', error.message);
         } else {
           DataCache.invalidateIncomeSources(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setIncome(prev => prev.filter(i => i.id !== incomeId));
-          sfx.error();
-          showToast('Income source permanently deleted.');
           const cat = categories.find(c => c.id === inc?.categoryId);
           logActivity({
-            user_id:     userIdRef.current!,
-            action_type: ACTION.INCOME_SOURCE_DELETED,
+            user_id: userIdRef.current!, action_type: ACTION.INCOME_SOURCE_DELETED,
             entity_type: ENTITY.INCOME_SOURCE,
-            title:       `Income Deleted: ${inc?.title ?? 'Income Source'}`,
+            title: `Income Deleted: ${inc?.title ?? 'Income Source'}`,
             description: `${fmtAmt(inc?.amount ?? 0)} · ${cat?.label ?? 'Income'} · Permanently deleted`,
-            icon:        cat?.icon ?? 'trash-outline',
+            icon: cat?.icon ?? 'trash-outline',
           });
         }
       },
@@ -1318,64 +1323,63 @@ export default function IncomeSourcesScreen() {
   const handleSaveCategory = async (id: string, label: string, icon: IoniconName) => {
     const cleanLabel = sanitizeCategoryLabel(label);
     const oldCat = categories.find(c => c.id === id);
-    loadingBar.start();
 
-    const { error } = await supabase
-      .from('income_categories')
-      .update({ label: cleanLabel, icon })
-      .eq('id', id);
+    // Optimistic
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, label: cleanLabel, icon } : c));
+    sfx.success();
+    showToast('Category updated successfully.');
 
-    loadingBar.finish();
+    const { error } = await supabase.from('income_categories').update({ label: cleanLabel, icon }).eq('id', id);
     if (error) {
+      if (oldCat) setCategories(prev => prev.map(c => c.id === id ? oldCat : c));
       showError('Failed to Update Category', error.message);
     } else {
       DataCache.invalidateIncomeCategories(userIdRef.current!);
       DataCache.invalidateDashboard(userIdRef.current!);
-      setCategories(prev => prev.map(c => c.id === id ? { ...c, label: cleanLabel, icon } : c));
-      sfx.success();
-      showToast('Category updated successfully.');
-
       const changes: string[] = [];
       if (oldCat?.label !== cleanLabel) changes.push(`Name: "${oldCat?.label}" → "${cleanLabel}"`);
-      if (oldCat?.icon  !== icon)  changes.push('Icon changed');
-
+      if (oldCat?.icon  !== icon)       changes.push('Icon changed');
       logActivity({
-        user_id:     userIdRef.current!,
-        action_type: ACTION.INCOME_CATEGORY_UPDATED,
+        user_id: userIdRef.current!, action_type: ACTION.INCOME_CATEGORY_UPDATED,
         entity_type: ENTITY.INCOME_CATEGORY,
-        title:       `Category Updated: ${cleanLabel}`,
+        title: `Category Updated: ${cleanLabel}`,
         description: changes.length > 0 ? changes.join(' · ') : 'Details updated',
-        icon:        icon,
+        icon,
       });
     }
   };
 
   const handleNewCategory = async (label: string, icon: IoniconName) => {
     const cleanLabel = sanitizeCategoryLabel(label);
-    loadingBar.start();
+    const tempId = `temp-${Date.now()}`;
+
+    // Optimistic: add temp category immediately
+    setCategories(prev => [...prev, { id: tempId, label: cleanLabel, icon, isArchived: false }]);
+    sfx.success();
+    showToast(`Category "${cleanLabel}" created.`);
+
     const { data, error } = await supabase
       .from('income_categories')
       .insert({ user_id: userIdRef.current, label: cleanLabel, icon })
       .select()
       .single();
-    loadingBar.finish();
 
     if (error) {
+      setCategories(prev => prev.filter(c => c.id !== tempId));
       showError('Failed to Create Category', error.message);
     } else if (data) {
+      setCategories(prev => prev.map(c => c.id === tempId
+        ? { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false }
+        : c,
+      ));
       DataCache.invalidateIncomeCategories(userIdRef.current!);
       DataCache.invalidateDashboard(userIdRef.current!);
-      const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
-      setCategories(prev => [...prev, newCat]);
-      sfx.success();
-      showToast(`Category "${cleanLabel}" created.`);
       logActivity({
-        user_id:     userIdRef.current!,
-        action_type: ACTION.INCOME_CATEGORY_CREATED,
+        user_id: userIdRef.current!, action_type: ACTION.INCOME_CATEGORY_CREATED,
         entity_type: ENTITY.INCOME_CATEGORY,
-        title:       `New Income Category: ${label}`,
+        title: `New Income Category: ${label}`,
         description: 'Income source category created.',
-        icon:        icon,
+        icon,
       });
     }
   };

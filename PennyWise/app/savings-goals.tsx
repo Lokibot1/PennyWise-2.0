@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal,
-  TextInput, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  TextInput, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,7 +22,6 @@ import { DataCache } from '@/lib/dataCache';
 import { sanitizeTitle, parseAmount } from '@/lib/sanitize';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { sfx } from '@/lib/sfx';
-import { loadingBar } from '@/components/GlobalLoadingBar';
 import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
@@ -178,7 +177,6 @@ export default function SavingsGoalsScreen() {
   const newTarget = goalDraft.newTarget as string;
   const newIcon   = goalDraft.newIcon   as string;
   const [showGoalResumeBanner, setShowGoalResumeBanner] = useState(true);
-  const [saving, setSaving]             = useState(false);
 
   // ── Edit Goal modal state ──────────────────────────────────────────────────
   const [showEditModal, setShowEditModal]   = useState(false);
@@ -193,13 +191,11 @@ export default function SavingsGoalsScreen() {
   const editTitle  = editDraft.editTitle  as string;
   const editTarget = editDraft.editTarget as string;
   const editIcon   = editDraft.editIcon   as string;
-  const [editSaving, setEditSaving]         = useState(false);
 
   // ── Add Funds modal state ──────────────────────────────────────────────────
   const [showFundsModal, setShowFundsModal] = useState(false);
   const [selectedGoal, setSelectedGoal]     = useState<Goal | null>(null);
   const [fundsAmount, setFundsAmount]       = useState('');
-  const [addingFunds, setAddingFunds]       = useState(false);
 
   // ── Kebab menu state ───────────────────────────────────────────────────────
   const [menuGoalId, setMenuGoalId]                 = useState<string | null>(null);
@@ -236,23 +232,35 @@ export default function SavingsGoalsScreen() {
     if (!target || target <= 0) { Alert.alert('Missing info', 'Please enter a valid target amount.'); return; }
     if (!userId) return;
 
-    setSaving(true);
-    loadingBar.start();
-    const { error } = await supabase.from('savings_goals').insert({
-      user_id: userId, title: cleanTitle, icon: newIcon,
+    // Optimistic: close modal and add temp item immediately
+    const tempId = `temp-${Date.now()}`;
+    const tempGoal: Goal = {
+      id: tempId, title: cleanTitle, icon: newIcon,
       target_amount: target, current_amount: 0,
       is_completed: false, is_archived: false,
-    });
-    setSaving(false);
-    loadingBar.finish();
-    if (error) { Alert.alert('Error', error.message); return; }
-
-    sfx.coin();
+      completed_at: null, created_at: new Date().toISOString(),
+    };
+    setGoals(prev => [...prev, tempGoal]);
     setShowAddModal(false);
     await clearGoalDraft();
     setShowGoalResumeBanner(true);
+    sfx.coin();
+
+    const { data, error } = await supabase.from('savings_goals').insert({
+      user_id: userId, title: cleanTitle, icon: newIcon,
+      target_amount: target, current_amount: 0,
+      is_completed: false, is_archived: false,
+    }).select().single();
+
+    if (error) {
+      setGoals(prev => prev.filter(g => g.id !== tempId));
+      Alert.alert('Error', error.message);
+      return;
+    }
+
+    // Swap temp item for the real one returned by the server
+    setGoals(prev => prev.map(g => g.id === tempId ? (data as Goal) : g));
     DataCache.invalidateDashboard(userId);
-    fetchGoals(userId, true);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_CREATED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `New Goal: ${cleanTitle}`,
@@ -280,51 +288,52 @@ export default function SavingsGoalsScreen() {
       return;
     }
 
-    setEditSaving(true);
-    loadingBar.start();
-
-    // Check if this edit makes the goal complete
     const isNowComplete = editingGoal.current_amount >= target;
+    const completedAt   = isNowComplete ? new Date().toISOString() : editingGoal.completed_at;
+
+    // Optimistic: snapshot original, apply update immediately
+    const original = { ...editingGoal };
+    const updated: Goal = {
+      ...editingGoal,
+      title: cleanTitle, icon: editIcon,
+      target_amount: target, is_completed: isNowComplete,
+      is_archived: isNowComplete, completed_at: completedAt,
+    };
+    setGoals(prev => prev.map(g => g.id === editingGoal.id ? updated : g));
+    setShowEditModal(false);
+    setEditingGoal(null);
+    sfx.success();
+    await clearEditDraft();
+
+    const changes: string[] = [];
+    if (cleanTitle !== original.title)         changes.push(`Name → "${cleanTitle}"`);
+    if (target     !== original.target_amount) changes.push(`Target → ${formatCurrency(target)}`);
+    if (editIcon   !== original.icon)          changes.push('Icon changed');
 
     const { error } = await supabase
       .from('savings_goals')
       .update({
-        title:         cleanTitle,
-        icon:          editIcon,
-        target_amount: target,
-        is_completed:  isNowComplete,
-        is_archived:   isNowComplete,
-        completed_at:  isNowComplete ? new Date().toISOString() : editingGoal.completed_at,
+        title: cleanTitle, icon: editIcon,
+        target_amount: target, is_completed: isNowComplete,
+        is_archived: isNowComplete, completed_at: completedAt,
       })
-      .eq('id', editingGoal.id);
+      .eq('id', original.id);
 
-    loadingBar.finish();
-    setEditSaving(false);
-    if (error) { Alert.alert('Error', error.message); return; }
+    if (error) {
+      setGoals(prev => prev.map(g => g.id === original.id ? original : g));
+      Alert.alert('Error', error.message);
+      return;
+    }
 
-    sfx.success();
-    await clearEditDraft();
-    // Build change description
-    const changes: string[] = [];
-    if (cleanTitle !== editingGoal.title)               changes.push(`Name → "${cleanTitle}"`);
-    if (target     !== editingGoal.target_amount)       changes.push(`Target → ${formatCurrency(target)}`);
-    if (editIcon   !== editingGoal.icon)                changes.push('Icon changed');
-
-    setShowEditModal(false);
-    setEditingGoal(null);
     DataCache.invalidateDashboard(userId);
-    fetchGoals(userId, true);
-
     logActivity({
-      user_id:     userId,
-      action_type: ACTION.SAVINGS_GOAL_UPDATED,
-      entity_type: ENTITY.SAVINGS_GOAL,
+      user_id: userId, action_type: ACTION.SAVINGS_GOAL_UPDATED, entity_type: ENTITY.SAVINGS_GOAL,
       title:       `Goal Updated: ${cleanTitle}`,
       description: changes.length > 0 ? changes.join(' · ') : 'Goal details updated',
       icon:        editIcon,
     });
 
-    if (isNowComplete && !editingGoal.is_completed) {
+    if (isNowComplete && !original.is_completed) {
       setTimeout(() => {
         Alert.alert('Goal Achieved!', `"${cleanTitle}" has reached its target!`);
       }, 400);
@@ -337,33 +346,37 @@ export default function SavingsGoalsScreen() {
     const amount = parseAmount(fundsAmount);
     if (!amount || amount <= 0) { Alert.alert('Missing info', 'Please enter a valid amount.'); return; }
 
-    setAddingFunds(true);
-    loadingBar.start();
-    const newCurrent = selectedGoal.current_amount + amount;
-    const isComplete = newCurrent >= selectedGoal.target_amount;
+    const newCurrent  = selectedGoal.current_amount + amount;
+    const isComplete  = newCurrent >= selectedGoal.target_amount;
+    const completedAt = isComplete ? new Date().toISOString() : null;
+    const goal        = selectedGoal;
 
-    const { error } = await supabase
-      .from('savings_goals')
-      .update({
-        current_amount: newCurrent,
-        is_completed:   isComplete,
-        is_archived:    isComplete,
-        completed_at:   isComplete ? new Date().toISOString() : null,
-      })
-      .eq('id', selectedGoal.id);
-    loadingBar.finish();
-    setAddingFunds(false);
-    if (error) { Alert.alert('Error', error.message); return; }
-
-    const goal = selectedGoal;
+    // Optimistic: update list immediately and close modal
+    const original = { ...goal };
+    setGoals(prev => prev.map(g =>
+      g.id === goal.id
+        ? { ...g, current_amount: newCurrent, is_completed: isComplete, is_archived: isComplete, completed_at: completedAt }
+        : g,
+    ));
     setShowFundsModal(false);
     setFundsAmount('');
     setSelectedGoal(null);
+    if (isComplete) { sfx.complete(); } else { sfx.coin(); }
+
+    const { error } = await supabase
+      .from('savings_goals')
+      .update({ current_amount: newCurrent, is_completed: isComplete, is_archived: isComplete, completed_at: completedAt })
+      .eq('id', goal.id);
+
+    if (error) {
+      setGoals(prev => prev.map(g => g.id === goal.id ? original : g));
+      Alert.alert('Error', error.message);
+      return;
+    }
+
     DataCache.invalidateDashboard(userId);
-    fetchGoals(userId, true);
 
     if (isComplete) {
-      sfx.complete();
       logActivity({
         user_id: userId, action_type: ACTION.SAVINGS_GOAL_COMPLETED, entity_type: ENTITY.SAVINGS_GOAL,
         title: `Goal Achieved: ${goal.title}`,
@@ -374,7 +387,6 @@ export default function SavingsGoalsScreen() {
         Alert.alert('Goal Achieved!', `Congratulations! You have reached your "${goal.title}" savings goal!`);
       }, 400);
     } else {
-      sfx.coin();
       logActivity({
         user_id: userId, action_type: ACTION.SAVINGS_GOAL_FUNDED, entity_type: ENTITY.SAVINGS_GOAL,
         title: `Goal Funded: ${goal.title}`,
@@ -403,11 +415,18 @@ export default function SavingsGoalsScreen() {
     const goal = pendingArchiveGoal;
     setPendingArchiveGoal(null);
     sfx.warning();
-    loadingBar.start();
-    await supabase.from('savings_goals').update({ is_archived: true }).eq('id', goal.id);
-    loadingBar.finish();
+
+    // Optimistic: mark archived immediately
+    setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, is_archived: true } : g));
+
+    const { error } = await supabase.from('savings_goals').update({ is_archived: true }).eq('id', goal.id);
+    if (error) {
+      setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, is_archived: false } : g));
+      Alert.alert('Error', error.message);
+      return;
+    }
+
     DataCache.invalidateDashboard(userId);
-    fetchGoals(userId, true);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_ARCHIVED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `Goal Archived: ${goal.title}`,
@@ -424,11 +443,18 @@ export default function SavingsGoalsScreen() {
     const goal = pendingDeleteGoal;
     setPendingDeleteGoal(null);
     sfx.error();
-    loadingBar.start();
-    await supabase.from('savings_goals').delete().eq('id', goal.id);
-    loadingBar.finish();
+
+    // Optimistic: remove immediately
+    setGoals(prev => prev.filter(g => g.id !== goal.id));
+
+    const { error } = await supabase.from('savings_goals').delete().eq('id', goal.id);
+    if (error) {
+      setGoals(prev => [...prev, goal]);
+      Alert.alert('Error', error.message);
+      return;
+    }
+
     DataCache.invalidateDashboard(userId);
-    fetchGoals(userId, true);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_DELETED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `Goal Deleted: ${goal.title}`,
@@ -440,11 +466,18 @@ export default function SavingsGoalsScreen() {
   /* Restore */
   const handleRestoreGoal = async (goal: Goal) => {
     if (!userId) return;
-    loadingBar.start();
-    await supabase.from('savings_goals').update({ is_archived: false }).eq('id', goal.id);
-    loadingBar.finish();
+
+    // Optimistic: un-archive immediately
+    setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, is_archived: false } : g));
+
+    const { error } = await supabase.from('savings_goals').update({ is_archived: false }).eq('id', goal.id);
+    if (error) {
+      setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, is_archived: true } : g));
+      Alert.alert('Error', error.message);
+      return;
+    }
+
     DataCache.invalidateDashboard(userId);
-    fetchGoals(userId, true);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_RESTORED, entity_type: ENTITY.SAVINGS_GOAL,
       title: `Goal Restored: ${goal.title}`,
@@ -742,10 +775,10 @@ export default function SavingsGoalsScreen() {
               <IconPicker selected={newIcon} onSelect={v => setGoalField('newIcon', v)} theme={theme} />
 
               <TouchableOpacity
-                style={[styles.primaryBtn, saving && { opacity: 0.6 }]}
-                onPress={handleSaveGoal} disabled={saving} activeOpacity={0.85}
+                style={styles.primaryBtn}
+                onPress={handleSaveGoal} activeOpacity={0.85}
               >
-                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Create Goal</Text>}
+                <Text style={styles.primaryBtnText}>Create Goal</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddModal(false)}>
                 <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
@@ -802,10 +835,10 @@ export default function SavingsGoalsScreen() {
               <IconPicker selected={editIcon} onSelect={v => setEditField('editIcon', v)} theme={theme} />
 
               <TouchableOpacity
-                style={[styles.primaryBtn, editSaving && { opacity: 0.6 }]}
-                onPress={handleEditGoal} disabled={editSaving} activeOpacity={0.85}
+                style={styles.primaryBtn}
+                onPress={handleEditGoal} activeOpacity={0.85}
               >
-                {editSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Save Changes</Text>}
+                <Text style={styles.primaryBtnText}>Save Changes</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditModal(false)}>
                 <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
@@ -897,10 +930,10 @@ export default function SavingsGoalsScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.primaryBtn, addingFunds && { opacity: 0.6 }]}
-                onPress={handleAddFunds} disabled={addingFunds} activeOpacity={0.85}
+                style={styles.primaryBtn}
+                onPress={handleAddFunds} activeOpacity={0.85}
               >
-                {addingFunds ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Add Funds</Text>}
+                <Text style={styles.primaryBtnText}>Add Funds</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowFundsModal(false)}>
                 <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>

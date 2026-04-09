@@ -1107,54 +1107,67 @@ export default function ManageExpenseScreen() {
         loadingBar.start();
 
       if (screen.name === 'add') {
+        const tempId = `temp-${Date.now()}`;
+        const now = new Date().toTimeString().slice(0, 5);
+        const cleanTitle = sanitizeTitle(vals.title);
+        const amount     = parseAmount(vals.amount);
+        const cleanDesc  = sanitizeDescription(vals.description);
+        const tempExp = {
+          id: tempId, categoryId: vals.categoryId, title: cleanTitle,
+          amount, date: vals.date, time: now, description: cleanDesc,
+          isRecurring: vals.isRecurring,
+          frequency: vals.isRecurring ? vals.frequency : null,
+          isArchived: false,
+        };
+
+        // Optimistic: add temp item and navigate immediately
+        setExpenses(prev => [...prev, tempExp]);
+        sfx.coin();
+        showToast('Expense added successfully.');
+        AsyncStorage.removeItem(EXPENSE_DRAFT_KEY);
+        setScreen({ name: 'detail', categoryId: screen.prefillCategoryId });
+        loadingBar.finish();
+        setSaving(false);
+
         const { data, error } = await supabase
           .from('expenses')
           .insert({
-            user_id:     userIdRef.current,
-            category_id: vals.categoryId,
-            title:       sanitizeTitle(vals.title),
-            amount:      parseAmount(vals.amount),
-            date:        vals.date,
-            time:        new Date().toTimeString().slice(0, 5),
-            description: sanitizeDescription(vals.description),
+            user_id:      userIdRef.current,
+            category_id:  vals.categoryId,
+            title:        cleanTitle,
+            amount,
+            date:         vals.date,
+            time:         now,
+            description:  cleanDesc,
             is_recurring: vals.isRecurring,
-            frequency:   vals.isRecurring ? vals.frequency : null,
+            frequency:    vals.isRecurring ? vals.frequency : null,
           })
           .select()
           .single();
 
         if (error) {
+          setExpenses(prev => prev.filter(e => e.id !== tempId));
           showError('Failed to Save Expense', error.message);
-          setSaving(false);
         } else if (data) {
+          setExpenses(prev => prev.map(e => e.id === tempId ? {
+            id: data.id, categoryId: data.category_id, title: data.title,
+            amount: Number(data.amount), date: data.date, time: data.time,
+            description: data.description, isRecurring: data.is_recurring,
+            frequency: data.frequency as Frequency | null, isArchived: data.is_archived,
+          } : e));
           DataCache.invalidateExpenses(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setExpenses(prev => [...prev, {
-            id:          data.id,
-            categoryId:  data.category_id,
-            title:       data.title,
-            amount:      Number(data.amount),
-            date:        data.date,
-            time:        data.time,
-            description: data.description,
-            isRecurring: data.is_recurring,
-            frequency:   data.frequency as Frequency | null,
-            isArchived:  data.is_archived,
-          }]);
-          sfx.coin();
-          showToast('Expense added successfully.');
-          AsyncStorage.removeItem(EXPENSE_DRAFT_KEY);
           const cat = categories.find(c => c.id === vals.categoryId);
           logActivity({
             user_id:     userIdRef.current!,
             action_type: ACTION.EXPENSE_ADDED,
             entity_type: ENTITY.EXPENSE,
-            title:       `Expense Added: ${sanitizeTitle(vals.title)}`,
-            description: `₱${parseAmount(vals.amount).toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Expense'}`,
+            title:       `Expense Added: ${cleanTitle}`,
+            description: `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} · ${cat?.label ?? 'Expense'}`,
             icon:        cat?.icon ?? 'receipt-outline',
           });
-          setScreen({ name: 'detail', categoryId: screen.prefillCategoryId });
         }
+        return;
 
       } else if (screen.name === 'edit') {
         const oldExp    = expenses.find(e => e.id === screen.expenseId);
@@ -1163,6 +1176,20 @@ export default function ManageExpenseScreen() {
         const newDesc   = sanitizeDescription(vals.description);
         const catU      = categories.find(c => c.id === vals.categoryId);
         const oldCatLbl = categories.find(c => c.id === oldExp?.categoryId)?.label;
+        const updatedFields = {
+          categoryId: vals.categoryId, title: newTitle, amount: newAmount,
+          date: vals.date, description: newDesc,
+          isRecurring: vals.isRecurring,
+          frequency: vals.isRecurring ? vals.frequency : null,
+        };
+
+        // Optimistic: apply update and navigate immediately
+        setExpenses(prev => prev.map(e => e.id === screen.expenseId ? { ...e, ...updatedFields } : e));
+        sfx.success();
+        showToast('Expense updated successfully.');
+        setScreen({ name: 'categories' });
+        loadingBar.finish();
+        setSaving(false);
 
         const { error } = await supabase
           .from('expenses')
@@ -1178,28 +1205,11 @@ export default function ManageExpenseScreen() {
           .eq('id', screen.expenseId);
 
         if (error) {
+          if (oldExp) setExpenses(prev => prev.map(e => e.id === screen.expenseId ? oldExp : e));
           showError('Failed to Update Expense', error.message);
-          setSaving(false);
         } else {
           DataCache.invalidateExpenses(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setExpenses(prev => prev.map(e =>
-            e.id === screen.expenseId
-              ? {
-                  ...e,
-                  categoryId:  vals.categoryId,
-                  title:       newTitle,
-                  amount:      newAmount,
-                  date:        vals.date,
-                  description: newDesc,
-                  isRecurring: vals.isRecurring,
-                  frequency:   vals.isRecurring ? vals.frequency : null,
-                }
-              : e,
-          ));
-          sfx.success();
-          showToast('Expense updated successfully.');
-
           const changes: string[] = [];
           if (oldExp) {
             if (oldExp.title !== newTitle)
@@ -1215,7 +1225,6 @@ export default function ManageExpenseScreen() {
             else if (oldExp.isRecurring && oldExp.frequency !== vals.frequency)
               changes.push(`Frequency: ${oldExp.frequency} → ${vals.frequency}`);
           }
-
           logActivity({
             user_id:     userIdRef.current!,
             action_type: ACTION.EXPENSE_UPDATED,
@@ -1224,8 +1233,8 @@ export default function ManageExpenseScreen() {
             description: changes.length > 0 ? changes.join(' · ') : `${fmtAmt(newAmount)} · ${catU?.label ?? 'Expense'}`,
             icon:        catU?.icon ?? 'receipt-outline',
           });
-          setScreen({ name: 'categories' });
         }
+        return;
       }
 
       loadingBar.finish();
@@ -1237,20 +1246,22 @@ export default function ManageExpenseScreen() {
   const handleSaveCategory = async (id: string, label: string, icon: IoniconName) => {
     const cleanLabel = sanitizeCategoryLabel(label);
     const oldCat = categories.find(c => c.id === id);
-    loadingBar.start();
+
+    // Optimistic
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, label: cleanLabel, icon } : c));
+    sfx.success();
+    showToast('Category updated successfully.');
+
     const { error } = await supabase.from('expense_categories').update({ label: cleanLabel, icon }).eq('id', id);
-    loadingBar.finish();
     if (error) {
+      if (oldCat) setCategories(prev => prev.map(c => c.id === id ? oldCat : c));
       showError('Failed to Update Category', error.message);
     } else {
       DataCache.invalidateExpenseCategories(userIdRef.current!);
       DataCache.invalidateDashboard(userIdRef.current!);
-      setCategories(prev => prev.map(c => c.id === id ? { ...c, label: cleanLabel, icon } : c));
-      sfx.success();
-      showToast('Category updated successfully.');
       const changes: string[] = [];
       if (oldCat?.label !== cleanLabel) changes.push(`Name: "${oldCat?.label}" → "${cleanLabel}"`);
-      if (oldCat?.icon  !== icon)  changes.push('Icon changed');
+      if (oldCat?.icon  !== icon)       changes.push('Icon changed');
       logActivity({
         user_id:     userIdRef.current!,
         action_type: ACTION.EXPENSE_CATEGORY_UPDATED,
@@ -1269,17 +1280,17 @@ export default function ManageExpenseScreen() {
       icon: 'archive-outline', confirmLabel: 'Archive', confirmColor: '#F59E0B',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
+        sfx.warning();
+        showToast('Expense category archived.');
+
         const { error } = await supabase.from('expense_categories').update({ is_archived: true }).eq('id', categoryId);
-        loadingBar.finish();
         if (error) {
+          setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
           showError('Failed to Archive Category', error.message);
         } else {
           DataCache.invalidateExpenseCategories(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
-          sfx.warning();
-          showToast('Expense category archived.');
           logActivity({
             user_id: userIdRef.current!, action_type: ACTION.EXPENSE_CATEGORY_ARCHIVED,
             entity_type: ENTITY.EXPENSE_CATEGORY,
@@ -1299,17 +1310,17 @@ export default function ManageExpenseScreen() {
       icon: 'refresh-outline', confirmLabel: 'Restore', confirmColor: '#3ECBA8',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
+        sfx.success();
+        showToast('Expense category restored.');
+
         const { error } = await supabase.from('expense_categories').update({ is_archived: false }).eq('id', categoryId);
-        loadingBar.finish();
         if (error) {
+          setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: true } : c));
           showError('Failed to Restore Category', error.message);
         } else {
           DataCache.invalidateExpenseCategories(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
-          sfx.success();
-          showToast('Expense category restored.');
           logActivity({
             user_id: userIdRef.current!, action_type: ACTION.EXPENSE_CATEGORY_RESTORED,
             entity_type: ENTITY.EXPENSE_CATEGORY,
@@ -1324,25 +1335,27 @@ export default function ManageExpenseScreen() {
 
   const handleDeleteCategory = (categoryId: string) => {
     const cat = categories.find(c => c.id === categoryId);
+    const removedExpenses = expenses.filter(e => e.categoryId === categoryId);
     showConfirm({
       title: 'Delete Permanently?',
       message: `This will permanently delete "${cat?.label ?? 'this category'}" and all its expenses. This cannot be undone.`,
       icon: 'trash-outline', confirmLabel: 'Delete', confirmColor: '#E05858',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setCategories(prev => prev.filter(c => c.id !== categoryId));
+        setExpenses(prev => prev.filter(e => e.categoryId !== categoryId));
+        sfx.error();
+        showToast('Category permanently deleted.');
+
         const { error } = await supabase.from('expense_categories').delete().eq('id', categoryId);
-        loadingBar.finish();
         if (error) {
+          if (cat) setCategories(prev => [...prev, cat]);
+          setExpenses(prev => [...prev, ...removedExpenses]);
           showError('Failed to Delete Category', error.message);
         } else {
           DataCache.invalidateExpenseCategories(userIdRef.current!);
           DataCache.invalidateExpenses(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setCategories(prev => prev.filter(c => c.id !== categoryId));
-          setExpenses(prev => prev.filter(e => e.categoryId !== categoryId));
-          sfx.error();
-          showToast('Category permanently deleted.');
           logActivity({
             user_id: userIdRef.current!, action_type: ACTION.EXPENSE_CATEGORY_DELETED,
             entity_type: ENTITY.EXPENSE_CATEGORY,
@@ -1362,17 +1375,17 @@ export default function ManageExpenseScreen() {
       icon: 'archive-outline', confirmLabel: 'Archive', confirmColor: '#F59E0B',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: true } : e));
+        sfx.warning();
+        showToast('Expense archived.');
+
         const { error } = await supabase.from('expenses').update({ is_archived: true }).eq('id', expenseId);
-        loadingBar.finish();
         if (error) {
+          setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: false } : e));
           showError('Failed to Archive Expense', error.message);
         } else {
           DataCache.invalidateExpenses(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: true } : e));
-          sfx.warning();
-          showToast('Expense archived.');
           const cat = categories.find(c => c.id === exp?.categoryId);
           logActivity({
             user_id: userIdRef.current!, action_type: ACTION.EXPENSE_ARCHIVED,
@@ -1393,17 +1406,17 @@ export default function ManageExpenseScreen() {
       icon: 'refresh-outline', confirmLabel: 'Restore', confirmColor: '#3ECBA8',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: false } : e));
+        sfx.success();
+        showToast('Expense restored.');
+
         const { error } = await supabase.from('expenses').update({ is_archived: false }).eq('id', expenseId);
-        loadingBar.finish();
         if (error) {
+          setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: true } : e));
           showError('Failed to Restore Expense', error.message);
         } else {
           DataCache.invalidateExpenses(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: false } : e));
-          sfx.success();
-          showToast('Expense restored.');
           const cat = categories.find(c => c.id === exp?.categoryId);
           logActivity({
             user_id: userIdRef.current!, action_type: ACTION.EXPENSE_RESTORED,
@@ -1425,17 +1438,17 @@ export default function ManageExpenseScreen() {
       icon: 'trash-outline', confirmLabel: 'Delete', confirmColor: '#E05858',
       onYes: async () => {
         hideConfirm();
-        loadingBar.start();
+        setExpenses(prev => prev.filter(e => e.id !== expenseId));
+        sfx.error();
+        showToast('Expense permanently deleted.');
+
         const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
-        loadingBar.finish();
         if (error) {
+          if (exp) setExpenses(prev => [...prev, exp]);
           showError('Failed to Delete Expense', error.message);
         } else {
           DataCache.invalidateExpenses(userIdRef.current!);
           DataCache.invalidateDashboard(userIdRef.current!);
-          setExpenses(prev => prev.filter(e => e.id !== expenseId));
-          sfx.error();
-          showToast('Expense permanently deleted.');
           const cat = categories.find(c => c.id === exp?.categoryId);
           logActivity({
             user_id: userIdRef.current!, action_type: ACTION.EXPENSE_DELETED,
@@ -1451,32 +1464,38 @@ export default function ManageExpenseScreen() {
 
   const handleNewCategory = async (label: string, icon: IoniconName) => {
     const cleanLabel = sanitizeCategoryLabel(label);
-    loadingBar.start();
+    const tempId = `temp-${Date.now()}`;
+
+    // Optimistic: add temp category and navigate immediately
+    setCategories(prev => [...prev, { id: tempId, label: cleanLabel, icon, isArchived: false }]);
+    sfx.success();
+    showToast(`Category "${cleanLabel}" created.`);
+    setScreen({ name: 'categories' });
+
     const { data, error } = await supabase
       .from('expense_categories')
       .insert({ user_id: userIdRef.current, label: cleanLabel, icon })
       .select()
       .single();
-    loadingBar.finish();
 
     if (error) {
+      setCategories(prev => prev.filter(c => c.id !== tempId));
       showError('Failed to Create Category', error.message);
     } else if (data) {
+      setCategories(prev => prev.map(c => c.id === tempId
+        ? { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false }
+        : c,
+      ));
       DataCache.invalidateExpenseCategories(userIdRef.current!);
       DataCache.invalidateDashboard(userIdRef.current!);
-      const newCat: Category = { id: data.id, label: data.label, icon: data.icon as IoniconName, isArchived: false };
-      setCategories(prev => [...prev, newCat]);
-      sfx.success();
-      showToast(`Category "${cleanLabel}" created.`);
       logActivity({
         user_id:     userIdRef.current!,
         action_type: ACTION.EXPENSE_CATEGORY_CREATED,
         entity_type: ENTITY.EXPENSE_CATEGORY,
         title:       `New Expense Category: ${label}`,
         description: 'Expense category created.',
-        icon:        icon,
+        icon,
       });
-      setScreen({ name: 'categories' });
     }
   };
 
