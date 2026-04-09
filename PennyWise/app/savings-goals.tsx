@@ -183,9 +183,16 @@ export default function SavingsGoalsScreen() {
   // ── Edit Goal modal state ──────────────────────────────────────────────────
   const [showEditModal, setShowEditModal]   = useState(false);
   const [editingGoal, setEditingGoal]       = useState<Goal | null>(null);
-  const [editTitle, setEditTitle]           = useState('');
-  const [editTarget, setEditTarget]         = useState('');
-  const [editIcon, setEditIcon]             = useState('wallet-outline');
+  const {
+    draft:         editDraft,
+    setDraftField: setEditField,
+    setDraftFields: setEditFields,
+    clearDraft:    clearEditDraft,
+    saveStatus:    editSaveStatus,
+  } = useFormDraft('draft:edit-goal', { editTitle: '', editTarget: '', editIcon: 'wallet-outline' });
+  const editTitle  = editDraft.editTitle  as string;
+  const editTarget = editDraft.editTarget as string;
+  const editIcon   = editDraft.editIcon   as string;
   const [editSaving, setEditSaving]         = useState(false);
 
   // ── Add Funds modal state ──────────────────────────────────────────────────
@@ -257,9 +264,7 @@ export default function SavingsGoalsScreen() {
   /* Open edit modal pre-filled */
   const openEditModal = (goal: Goal) => {
     setEditingGoal(goal);
-    setEditTitle(goal.title);
-    setEditTarget(String(goal.target_amount));
-    setEditIcon(goal.icon);
+    setEditFields({ editTitle: goal.title, editTarget: String(goal.target_amount), editIcon: goal.icon });
     setShowEditModal(true);
   };
 
@@ -298,6 +303,7 @@ export default function SavingsGoalsScreen() {
     if (error) { Alert.alert('Error', error.message); return; }
 
     sfx.success();
+    await clearEditDraft();
     // Build change description
     const changes: string[] = [];
     if (cleanTitle !== editingGoal.title)               changes.push(`Name → "${cleanTitle}"`);
@@ -770,13 +776,15 @@ export default function SavingsGoalsScreen() {
                 )}
               </View>
 
+              <DraftSaveIndicator status={editSaveStatus} />
+
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Goal Name</Text>
               <View style={[styles.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
                 <Ionicons name="flag-outline" size={16} color="#aaa" style={{ marginRight: 8 }} />
                 <TextInput
                   style={[styles.inputInner, { color: theme.textPrimary }]}
                   placeholder="e.g. Buy a Car, Emergency Fund" placeholderTextColor={theme.textMuted}
-                  value={editTitle} onChangeText={setEditTitle}
+                  value={editTitle} onChangeText={v => setEditField('editTitle', v)}
                 />
               </View>
 
@@ -786,12 +794,12 @@ export default function SavingsGoalsScreen() {
                 <TextInput
                   style={[styles.inputInner, { color: theme.textPrimary }]}
                   placeholder="e.g. 50,000.00" placeholderTextColor={theme.textMuted}
-                  value={editTarget} onChangeText={v => setEditTarget(fmtMoney(v))} keyboardType="decimal-pad"
+                  value={editTarget} onChangeText={v => setEditField('editTarget', fmtMoney(v))} keyboardType="decimal-pad"
                 />
               </View>
 
               <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Choose Icon (optional)</Text>
-              <IconPicker selected={editIcon} onSelect={setEditIcon} theme={theme} />
+              <IconPicker selected={editIcon} onSelect={v => setEditField('editIcon', v)} theme={theme} />
 
               <TouchableOpacity
                 style={[styles.primaryBtn, editSaving && { opacity: 0.6 }]}

@@ -4,6 +4,8 @@
  * Used from both the Home screen and the Settings page.
  */
 import { useEffect, useState } from 'react';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -39,21 +41,27 @@ function formatWithCommas(raw: string): string {
 
 export default function BudgetLimitModal({ visible, current, onClose, onSave }: Props) {
   const { theme } = useAppTheme();
-  const [value, setValue]       = useState('');
+  const {
+    draft:         budgetDraft,
+    setDraftField: setBudgetField,
+    clearDraft:    clearBudgetDraft,
+    saveStatus:    budgetSaveStatus,
+  } = useFormDraft('draft:budget-limit', { value: '' });
+  const value = budgetDraft.value as string;
   const [saving, setSaving]     = useState(false);
   const [errMsg, setErrMsg]     = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
 
   // Pre-fill with formatted current value each time the modal opens
   useEffect(() => {
-    if (visible) { setValue(formatWithCommas(String(current))); setErrMsg(''); }
+    if (visible) { setBudgetField('value', formatWithCommas(String(current))); setErrMsg(''); }
   }, [visible, current]);
 
   const parsed  = parseFloat(value.replace(/,/g, ''));
   const isValid = !isNaN(parsed) && parsed > 0;
 
   function handleChangeText(text: string) {
-    setValue(formatWithCommas(text));
+    setBudgetField('value', formatWithCommas(text));
     if (errMsg) setErrMsg('');
   }
 
@@ -66,6 +74,7 @@ export default function BudgetLimitModal({ visible, current, onClose, onSave }: 
       await onSave(parsed);
       loadingBar.finish();
       sfx.coin();
+      await clearBudgetDraft();
       onClose();
     } catch (err: any) {
       loadingBar.finish();
@@ -111,6 +120,8 @@ export default function BudgetLimitModal({ visible, current, onClose, onSave }: 
               Set your total spending limit for the month
             </Text>
           </View>
+
+          <DraftSaveIndicator status={budgetSaveStatus} />
 
           {/* ₱ Input */}
           <View style={[

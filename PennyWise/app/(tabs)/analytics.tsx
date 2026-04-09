@@ -33,6 +33,8 @@ import type { Theme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { DataCache } from '@/lib/dataCache';
 import { sanitizeCategoryLabel, sanitizeTitle, sanitizeDescription, parseAmount } from '@/lib/sanitize';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
 import Animated, {
   useSharedValue,
   withSpring,
@@ -763,7 +765,13 @@ function IncomeFormScreen({
   isEdit?: boolean; saving?: boolean;
   onBack: () => void; onSave: (vals: IncomeFormValues) => void; theme: Theme;
 }) {
-  const [vals, setVals]           = useState<IncomeFormValues>(initial);
+  const {
+    draft: formDraft,
+    setDraftField,
+    clearDraft,
+    saveStatus,
+  } = useFormDraft(isEdit ? null : 'draft:add-income', initial);
+  const vals = formDraft as unknown as IncomeFormValues;
   const [showCatPicker, setCat]   = useState(false);
   const [showFreqPicker, setFreq] = useState(false);
   const [showDatePicker, setDatePicker] = useState(false);
@@ -772,7 +780,7 @@ function IncomeFormScreen({
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: btnScale.value }] }));
 
   const set = <K extends keyof IncomeFormValues>(key: K, value: IncomeFormValues[K]) =>
-    setVals(prev => ({ ...prev, [key]: value }));
+    setDraftField(key as string, value);
 
   const activeCategories = categories.filter(c => !c.isArchived);
   const selectedCat      = activeCategories.find(c => c.id === vals.categoryId);
@@ -783,6 +791,7 @@ function IncomeFormScreen({
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView style={[s.formScroll, { backgroundColor: theme.cardBg }]} contentContainerStyle={s.formContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {!isEdit && <DraftSaveIndicator status={saveStatus} />}
             <Text style={[s.label, { color: theme.textPrimary }]}>Date</Text>
             <TouchableOpacity
               style={[s.fieldRow, { backgroundColor: theme.inputBg }]}
@@ -843,7 +852,7 @@ function IncomeFormScreen({
                 style={[s.saveBtn, saving && { opacity: 0.7 }]}
                 onPressIn={() => { btnScale.value = withSpring(0.96, { damping: 15, stiffness: 300 }); }}
                 onPressOut={() => { btnScale.value = withSpring(1, { damping: 15, stiffness: 300 }); }}
-                onPress={() => onSave(vals)}
+                onPress={() => { if (!isEdit) clearDraft(); onSave(vals); }}
                 activeOpacity={1}
                 disabled={saving}
               >

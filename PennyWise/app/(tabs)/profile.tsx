@@ -44,6 +44,8 @@ import { supabase } from "@/lib/supabase";
 import { DataCache } from "@/lib/dataCache";
 import { Cache } from "@/lib/cache";
 import { sanitizeName, sanitizeEmail, sanitizePhone, filterName, filterEmail, filterPhone } from "@/lib/sanitize";
+import { useFormDraft } from "@/hooks/useFormDraft";
+import { DraftSaveIndicator } from "@/components/DraftSaveIndicator";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Screen = "profile" | "edit" | "terms" | "privacy" | "settings" | "notif-settings" | "change-password";
@@ -422,9 +424,19 @@ function EditProfileView({
 }) {
   const { theme } = useAppTheme();
 
-  const [username, setUsername] = useState(profile.full_name);
-  const [phone, setPhone]       = useState(profile.phone ?? "");
-  const [email, setEmail]       = useState(profile.email);
+  const {
+    draft:         profileDraft,
+    setDraftField: setProfileField,
+    clearDraft:    clearProfileDraft,
+    saveStatus:    profileSaveStatus,
+  } = useFormDraft('draft:edit-profile', {
+    username: profile.full_name,
+    phone:    profile.phone ?? '',
+    email:    profile.email,
+  });
+  const username = profileDraft.username as string;
+  const phone    = profileDraft.phone    as string;
+  const email    = profileDraft.email    as string;
   const [saving, setSaving]     = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [errModal, setErrModal] = useState({
@@ -573,6 +585,7 @@ function EditProfileView({
       DataCache.invalidateProfile(user.id);
       DataCache.invalidateDashboard(user.id);
       sfx.success();
+      await clearProfileDraft();
       onSaved({
         full_name: cleanName,
         phone:     cleanPhone,
@@ -746,6 +759,8 @@ function EditProfileView({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <DraftSaveIndicator status={profileSaveStatus} />
+
         {/* Personal info section */}
         <Text style={[styles.formSectionTitle, { color: theme.textMuted }]}>
           PERSONAL INFO
@@ -767,7 +782,7 @@ function EditProfileView({
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={username}
-                onChangeText={(v) => setUsername(filterName(v))}
+                onChangeText={(v) => setProfileField('username', filterName(v))}
                 placeholderTextColor={theme.textMuted}
                 placeholder="e.g. John Smith"
               />
@@ -790,7 +805,7 @@ function EditProfileView({
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={phone}
-                onChangeText={(v) => setPhone(filterPhone(v))}
+                onChangeText={(v) => setProfileField('phone', filterPhone(v))}
                 keyboardType="phone-pad"
                 placeholderTextColor={theme.textMuted}
                 placeholder="e.g. +63 912 345 6789"
@@ -809,7 +824,7 @@ function EditProfileView({
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={email}
-                onChangeText={(v) => setEmail(filterEmail(v))}
+                onChangeText={(v) => setProfileField('email', filterEmail(v))}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 placeholderTextColor={theme.textMuted}
