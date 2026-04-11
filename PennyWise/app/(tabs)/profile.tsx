@@ -35,6 +35,7 @@ import {
   ProfileInfoSkeleton,
 } from "@/components/SkeletonLoader";
 import { Font } from "@/constants/fonts";
+import { ABOUT_SECTIONS } from "@/constants/about";
 import { PRIVACY_SECTIONS } from "@/constants/privacy";
 import { TERMS_SECTIONS } from "@/constants/terms";
 import { useAppTheme } from "@/contexts/AppTheme";
@@ -48,7 +49,7 @@ import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftSaveIndicator } from "@/components/DraftSaveIndicator";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Screen = "profile" | "edit" | "terms" | "privacy" | "settings" | "notif-settings" | "change-password";
+type Screen = "profile" | "edit" | "terms" | "privacy" | "about" | "settings" | "notif-settings" | "change-password";
 type IoniconName = keyof typeof Ionicons.glyphMap;
 type ProfileData = {
   full_name: string;
@@ -349,6 +350,12 @@ function ProfileView({
                 iconBg="#1B6B3A"
                 label="Privacy Policy"
                 onPress={() => navigate("privacy")}
+              />
+              <MenuItem
+                icon="information-circle-outline"
+                iconBg="#3ECBA8"
+                label="About Us"
+                onPress={() => navigate("about")}
                 last
               />
             </MenuGroup>
@@ -1007,6 +1014,233 @@ function PrivacyView({ onBack }: { onBack: () => void }) {
     </SafeAreaView>
   );
 }
+
+// ── About Us view ─────────────────────────────────────────────────────────────
+function AboutView({ onBack }: { onBack: () => void }) {
+  const { theme } = useAppTheme();
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+
+  const headerSection = ABOUT_SECTIONS.find((s) => s.type === "header")!;
+  const contentSections = ABOUT_SECTIONS.filter((s) => s.type === "section");
+  const faqHeader = ABOUT_SECTIONS.find(
+    (s) => s.type === "faq" && s.body === ""
+  )!;
+  const faqs = ABOUT_SECTIONS.filter(
+    (s) => s.type === "faq" && s.body !== ""
+  );
+
+  return (
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: theme.headerBg }]}
+      edges={["top", "left", "right"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
+    >
+      <StatusBar style={theme.statusBar} />
+      <View
+        style={[
+          styles.greenSection,
+          styles.termsHeader,
+          { backgroundColor: theme.headerBg },
+        ]}
+      >
+        <NavHeader title="About Us" onBack={onBack} />
+      </View>
+
+      <ScrollView
+        style={[styles.termsScroll, { backgroundColor: theme.cardBg }]}
+        contentContainerStyle={styles.termsContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero block */}
+        <View style={aboutStyles.hero}>
+          <View style={aboutStyles.logoMark}>
+            <PennyWiseLogo size="sm" color="#fff" />
+          </View>
+          <Text style={[aboutStyles.heroTitle, { color: theme.textPrimary }]}>
+            {headerSection.title}
+          </Text>
+          {headerSection.subtitle ? (
+            <Text style={[aboutStyles.heroSub, { color: theme.textSecondary }]}>
+              {headerSection.subtitle}
+            </Text>
+          ) : null}
+        </View>
+
+        {/* Content sections */}
+        {contentSections.map((section, i) => (
+          <View key={i} style={aboutStyles.contentBlock}>
+            <Text
+              style={[aboutStyles.sectionTitle, { color: theme.textPrimary }]}
+            >
+              {section.title}
+            </Text>
+            <Text
+              style={[aboutStyles.sectionBody, { color: theme.textSecondary }]}
+            >
+              {section.body}
+            </Text>
+          </View>
+        ))}
+
+        {/* FAQ heading */}
+        <View style={aboutStyles.faqHeader}>
+          <View style={aboutStyles.faqHeaderLine} />
+          <Text
+            style={[aboutStyles.faqHeaderText, { color: theme.textSecondary }]}
+          >
+            {faqHeader.title}
+          </Text>
+          <View style={aboutStyles.faqHeaderLine} />
+        </View>
+
+        {/* FAQ accordion */}
+        {faqs.map((faq, i) => {
+          const open = expandedFaq === i;
+          return (
+            <TouchableOpacity
+              key={i}
+              style={[
+                aboutStyles.faqItem,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: open ? "#3ECBA8" : theme.divider,
+                },
+              ]}
+              activeOpacity={0.75}
+              onPress={() => setExpandedFaq(open ? null : i)}
+            >
+              <View style={aboutStyles.faqRow}>
+                <Text
+                  style={[aboutStyles.faqQ, { color: theme.textPrimary }]}
+                >
+                  {faq.title}
+                </Text>
+                <Ionicons
+                  name={open ? "chevron-up" : "chevron-down"}
+                  size={16}
+                  color={open ? "#3ECBA8" : theme.textMuted}
+                />
+              </View>
+              {open && (
+                <Text
+                  style={[aboutStyles.faqA, { color: theme.textSecondary }]}
+                >
+                  {faq.body}
+                </Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* Footer */}
+        <View style={aboutStyles.footer}>
+          <Text style={[aboutStyles.footerText, { color: theme.textMuted }]}>
+            PennyWise © 2026 · Made with care in the Philippines
+          </Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const aboutStyles = StyleSheet.create({
+  hero: {
+    alignItems: "center",
+    paddingVertical: 28,
+    paddingHorizontal: 8,
+    marginBottom: 8,
+  },
+  logoMark: {
+    width: 72,
+    height: 72,
+    borderRadius: 22,
+    backgroundColor: "#3ECBA8",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  heroTitle: {
+    fontFamily: Font.headerBold,
+    fontSize: 22,
+    letterSpacing: 0.3,
+    marginBottom: 6,
+    textAlign: "center",
+  },
+  heroSub: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 19,
+  },
+  contentBlock: {
+    marginBottom: 22,
+    paddingBottom: 22,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(0,0,0,0.06)",
+  },
+  sectionTitle: {
+    fontFamily: Font.headerBold,
+    fontSize: 15,
+    marginBottom: 8,
+    letterSpacing: 0.2,
+  },
+  sectionBody: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13.5,
+    lineHeight: 21,
+  },
+  faqHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    marginBottom: 14,
+    gap: 10,
+  },
+  faqHeaderLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "rgba(0,0,0,0.1)",
+  },
+  faqHeaderText: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  faqItem: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 10,
+  },
+  faqRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  faqQ: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 13.5,
+    flex: 1,
+    lineHeight: 19,
+  },
+  faqA: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 10,
+  },
+  footer: {
+    alignItems: "center",
+    paddingVertical: 24,
+    marginTop: 8,
+  },
+  footerText: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 12,
+  },
+});
 
 // ── Delete account modal ───────────────────────────────────────────────────────
 function DeleteAccountModal({
@@ -2116,6 +2350,8 @@ export default function ProfileScreen() {
     return <TermsView onBack={() => setScreen("profile")} />;
   if (screen === "privacy")
     return <PrivacyView onBack={() => setScreen("profile")} />;
+  if (screen === "about")
+    return <AboutView onBack={() => setScreen("profile")} />;
   if (screen === "notif-settings")
     return <NotificationSettingsView onBack={() => setScreen("settings")} />;
   if (screen === "change-password")
