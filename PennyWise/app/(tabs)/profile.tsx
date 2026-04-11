@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -49,7 +50,7 @@ import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftSaveIndicator } from "@/components/DraftSaveIndicator";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Screen = "profile" | "edit" | "terms" | "privacy" | "about" | "settings" | "notif-settings" | "change-password";
+type Screen = "profile" | "edit" | "terms" | "privacy" | "about" | "developers" | "settings" | "notif-settings" | "change-password";
 type IoniconName = keyof typeof Ionicons.glyphMap;
 type ProfileData = {
   full_name: string;
@@ -1016,7 +1017,7 @@ function PrivacyView({ onBack }: { onBack: () => void }) {
 }
 
 // ── About Us view ─────────────────────────────────────────────────────────────
-function AboutView({ onBack }: { onBack: () => void }) {
+function AboutView({ onBack, onMeetDevs }: { onBack: () => void; onMeetDevs: () => void }) {
   const { theme } = useAppTheme();
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
@@ -1132,6 +1133,17 @@ function AboutView({ onBack }: { onBack: () => void }) {
           );
         })}
 
+        {/* Meet the Developers button */}
+        <TouchableOpacity
+          style={[aboutStyles.meetBtn, { backgroundColor: "#3ECBA8" }]}
+          activeOpacity={0.85}
+          onPress={onMeetDevs}
+        >
+          <Ionicons name="people-outline" size={18} color="#fff" />
+          <Text style={aboutStyles.meetBtnText}>Meet the Developers</Text>
+          <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
+        </TouchableOpacity>
+
         {/* Footer */}
         <View style={aboutStyles.footer}>
           <Text style={[aboutStyles.footerText, { color: theme.textMuted }]}>
@@ -1231,6 +1243,24 @@ const aboutStyles = StyleSheet.create({
     lineHeight: 20,
     marginTop: 10,
   },
+  meetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  meetBtnText: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 15,
+    color: "#fff",
+    flex: 1,
+    textAlign: "center",
+  },
   footer: {
     alignItems: "center",
     paddingVertical: 24,
@@ -1239,6 +1269,201 @@ const aboutStyles = StyleSheet.create({
   footerText: {
     fontFamily: Font.bodyRegular,
     fontSize: 12,
+  },
+});
+
+// ── Meet the Developers view ──────────────────────────────────────────────────
+const DEVELOPERS = [
+  {
+    name: "Brian Dijamco",
+    nickname: "Loki",
+    role: "Full Stack Developer",
+    photo: require("@/assets/images/1x1.jpg"),
+    bio: "Goal-oriented and detail-driven Front-End Developer with a strong experience background in project management, development, and technical documentation. Successfully led several software and web-based projects, handling team coordination, timeline management, and client communication. Specializes in building responsive, user-friendly interfaces using HTML, CSS, JavaScript, ReactJS, and VueJS. Experienced in integrating REST APIs and transforming business requirements into clean, functional, and visually polished solutions. For this project, serving as Full Stack Developer — first time managing database creation, backend, and frontend end-to-end.",
+    socials: [
+      { icon: "mail-outline" as const, label: "Email", url: "mailto:dijamco.brian.abrenica@gmail.com" },
+      { icon: "logo-instagram" as const, label: "Instagram", url: "https://www.instagram.com/defnotloki1/" },
+      { icon: "logo-github" as const, label: "GitHub", url: "https://github.com/Lokibot1" },
+    ],
+  },
+  {
+    name: "Sarah Pedillaga",
+    nickname: "",
+    role: "Frontend Developer",
+    photo: require("@/assets/images/sarah1.jpg"),
+    bio: "BSIT student with practical experience in front-end development, creating user-friendly websites and interfaces. Currently expanding skills in database management to build a stronger technical foundation. Highly motivated, research-oriented, and adept at solving complex problems. Eager to learn new technologies and contribute in a dynamic environment while continuing to grow as a developer.",
+    socials: [
+      { icon: "mail-outline" as const, label: "Email", url: "mailto:pedillaga.sarah.sunio@gmail.com" },
+      { icon: "logo-github" as const, label: "GitHub", url: "https://github.com/sachiishimi" },
+    ],
+  },
+];
+
+function DevelopersView({ onBack }: { onBack: () => void }) {
+  const { theme } = useAppTheme();
+
+  return (
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: theme.headerBg }]}
+      edges={["top", "left", "right"]}
+      {...({ filterTouchesWhenObscured: true } as any)}
+    >
+      <StatusBar style={theme.statusBar} />
+      <View
+        style={[
+          styles.greenSection,
+          styles.termsHeader,
+          { backgroundColor: theme.headerBg },
+        ]}
+      >
+        <NavHeader title="Meet the Developers" onBack={onBack} />
+      </View>
+
+      <ScrollView
+        style={[styles.termsScroll, { backgroundColor: theme.cardBg }]}
+        contentContainerStyle={[styles.termsContent, { paddingTop: 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Intro blurb */}
+        <Text style={[devStyles.intro, { color: theme.textSecondary }]}>
+          PennyWise was built by a small team of passionate students. Here's the
+          people behind it.
+        </Text>
+
+        {DEVELOPERS.map((dev, i) => (
+          <View
+            key={i}
+            style={[devStyles.card, { backgroundColor: theme.surface, borderColor: theme.divider }]}
+          >
+            {/* Photo + name */}
+            <View style={devStyles.cardTop}>
+              <Image
+                source={dev.photo}
+                style={devStyles.photo}
+                resizeMode="cover"
+              />
+              <View style={devStyles.cardTopInfo}>
+                <Text style={[devStyles.devName, { color: theme.textPrimary }]}>
+                  {dev.name}
+                  {dev.nickname ? (
+                    <Text style={[devStyles.devNick, { color: theme.textMuted }]}>
+                      {" "}({dev.nickname})
+                    </Text>
+                  ) : null}
+                </Text>
+                <View style={devStyles.rolePill}>
+                  <Text style={devStyles.roleText}>{dev.role}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Bio */}
+            <Text style={[devStyles.bio, { color: theme.textSecondary }]}>
+              {dev.bio}
+            </Text>
+
+            {/* Socials */}
+            <View style={devStyles.socialsRow}>
+              {dev.socials.map((s, j) => (
+                <TouchableOpacity
+                  key={j}
+                  style={[devStyles.socialBtn, { backgroundColor: theme.cardBg, borderColor: theme.divider }]}
+                  activeOpacity={0.75}
+                  onPress={() => Linking.openURL(s.url)}
+                >
+                  <Ionicons name={s.icon} size={16} color="#3ECBA8" />
+                  <Text style={[devStyles.socialLabel, { color: theme.textPrimary }]}>
+                    {s.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ))}
+
+        <View style={{ height: 32 }} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const devStyles = StyleSheet.create({
+  intro: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13.5,
+    lineHeight: 20,
+    textAlign: "center",
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  card: {
+    borderRadius: 18,
+    borderWidth: 1.5,
+    padding: 18,
+    marginBottom: 20,
+  },
+  cardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    gap: 14,
+  },
+  photo: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2.5,
+    borderColor: "#3ECBA8",
+  },
+  cardTopInfo: {
+    flex: 1,
+    gap: 6,
+  },
+  devName: {
+    fontFamily: Font.headerBold,
+    fontSize: 17,
+    letterSpacing: 0.2,
+  },
+  devNick: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 14,
+  },
+  rolePill: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(62,203,168,0.15)",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  roleText: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 11.5,
+    color: "#1E9C70",
+    letterSpacing: 0.3,
+  },
+  bio: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  socialsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  socialBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  socialLabel: {
+    fontFamily: Font.bodyMedium,
+    fontSize: 12.5,
   },
 });
 
@@ -2351,7 +2576,9 @@ export default function ProfileScreen() {
   if (screen === "privacy")
     return <PrivacyView onBack={() => setScreen("profile")} />;
   if (screen === "about")
-    return <AboutView onBack={() => setScreen("profile")} />;
+    return <AboutView onBack={() => setScreen("profile")} onMeetDevs={() => setScreen("developers")} />;
+  if (screen === "developers")
+    return <DevelopersView onBack={() => setScreen("about")} />;
   if (screen === "notif-settings")
     return <NotificationSettingsView onBack={() => setScreen("settings")} />;
   if (screen === "change-password")
