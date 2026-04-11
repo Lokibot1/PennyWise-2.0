@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Animated,
   ActivityIndicator,
+  Dimensions,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -22,7 +23,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BudgetLimitModal from "@/components/BudgetLimitModal";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -1273,34 +1274,254 @@ const aboutStyles = StyleSheet.create({
 });
 
 // ── Meet the Developers view ──────────────────────────────────────────────────
+// ── Developer data ────────────────────────────────────────────────────────────
+const { width: DEV_SCREEN_W } = Dimensions.get("window");
+
 const DEVELOPERS = [
   {
     name: "Brian Dijamco",
     nickname: "Loki",
     role: "Full Stack Developer",
-    photo: require("@/assets/images/1x1.jpg"),
-    bio: "Goal-oriented and detail-driven Front-End Developer with a strong experience background in project management, development, and technical documentation. Successfully led several software and web-based projects, handling team coordination, timeline management, and client communication. Specializes in building responsive, user-friendly interfaces using HTML, CSS, JavaScript, ReactJS, and VueJS. Experienced in integrating REST APIs and transforming business requirements into clean, functional, and visually polished solutions. For this project, serving as Full Stack Developer — first time managing database creation, backend, and frontend end-to-end.",
+    photo: require("@/assets/images/hi1.jpg"),
+    photoOffset: 60,
+    cardHeight: 460,
+    bio: "Goal-oriented developer with a background in project management and frontend engineering. Skilled in HTML, CSS, JavaScript, ReactJS, and VueJS. Led multiple software projects end-to-end. On PennyWise, stepping up as Full Stack Developer — handling database design, backend, and frontend for the first time.",
     socials: [
-      { icon: "mail-outline" as const, label: "Email", url: "mailto:dijamco.brian.abrenica@gmail.com" },
-      { icon: "logo-instagram" as const, label: "Instagram", url: "https://www.instagram.com/defnotloki1/" },
-      { icon: "logo-github" as const, label: "GitHub", url: "https://github.com/Lokibot1" },
+      { icon: "mail-outline" as const,    label: "Email",     url: "mailto:dijamco.brian.abrenica@gmail.com" },
+      { icon: "logo-instagram" as const,  label: "Instagram", url: "https://www.instagram.com/defnotloki1/" },
+      { icon: "logo-github" as const,     label: "GitHub",    url: "https://github.com/Lokibot1" },
     ],
   },
   {
     name: "Sarah Pedillaga",
     nickname: "",
     role: "Frontend Developer",
-    photo: require("@/assets/images/sarah1.jpg"),
-    bio: "BSIT student with practical experience in front-end development, creating user-friendly websites and interfaces. Currently expanding skills in database management to build a stronger technical foundation. Highly motivated, research-oriented, and adept at solving complex problems. Eager to learn new technologies and contribute in a dynamic environment while continuing to grow as a developer.",
+    photo: require("@/assets/images/sarahd.jpg"),
+    photoOffset: 60,
+    cardHeight: 460,  // portrait photo — taller card
+    bio: "BSIT student with hands-on experience building user-friendly websites and interfaces. Expanding into database management to strengthen her technical foundation. Motivated, research-driven, and eager to grow in a fast-paced development environment.",
     socials: [
-      { icon: "mail-outline" as const, label: "Email", url: "mailto:pedillaga.sarah.sunio@gmail.com" },
-      { icon: "logo-github" as const, label: "GitHub", url: "https://github.com/sachiishimi" },
+      { icon: "mail-outline" as const,  label: "Email",  url: "mailto:pedillaga.sarah.sunio@gmail.com" },
+      { icon: "logo-github" as const,   label: "GitHub", url: "https://github.com/sachiishimi" },
     ],
   },
 ];
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+const CARD_H       = 460;
+const PARALLAX     = 60;
+const CARD_GAP     = 20;
+const CARD_HPAD    = 18;
+
+// ── Social button ─────────────────────────────────────────────────────────────
+function SocialButton({
+  icon,
+  label,
+  url,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  url: string;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  function onPressIn() {
+    Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, speed: 40, bounciness: 6 }).start();
+  }
+  function onPressOut() {
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 14 }).start();
+  }
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity
+        style={devStyles.socialBtn}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={() => Linking.openURL(url)}
+        activeOpacity={1}
+      >
+        <Ionicons name={icon} size={15} color="#3ECBA8" />
+        <Text style={devStyles.socialLabel}>{label}</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+
+
+// ── Parallax developer card (with flip) ──────────────────────────────────────
+const TOP_PADDING = 24; // matches contentContainerStyle paddingTop
+
+function ParallaxDevCard({
+  dev,
+  index,
+  scrollY,
+  theme,
+}: {
+  dev: (typeof DEVELOPERS)[number];
+  index: number;
+  scrollY: Animated.Value;
+  theme: ReturnType<typeof useAppTheme>["theme"];
+}) {
+  const entryAnim = useRef(new Animated.Value(0)).current;
+  const flipAnim  = useRef(new Animated.Value(0)).current;
+  const [flipped, setFlipped] = useState(false);
+
+  useEffect(() => {
+    Animated.spring(entryAnim, {
+      toValue: 1,
+      delay: index * 180,
+      useNativeDriver: true,
+      tension: 48,
+      friction: 9,
+    }).start();
+  }, []);
+
+  function handleFlip() {
+    const next = flipped ? 0 : 1;
+    Animated.spring(flipAnim, {
+      toValue: next,
+      useNativeDriver: true,
+      tension: 55,
+      friction: 9,
+    }).start();
+    setFlipped(!flipped);
+  }
+
+  const cardH = dev.cardHeight ?? CARD_H;
+  const cardW = DEV_SCREEN_W - CARD_HPAD * 2;
+
+  // ── Parallax ────────────────────────────────────────────────────────────────
+  const cardTop  = TOP_PADDING + index * (cardH + CARD_GAP);
+  const parallaxY = scrollY.interpolate({
+    inputRange: [cardTop - 500, cardTop + cardH],
+    outputRange: [PARALLAX, -PARALLAX],
+    extrapolate: "clamp",
+  });
+
+  // ── Flip rotations ──────────────────────────────────────────────────────────
+  const frontRotateY = flipAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg",   "180deg"] });
+  const backRotateY  = flipAnim.interpolate({ inputRange: [0, 1], outputRange: ["180deg", "360deg"] });
+  // Opacity swap at midpoint for Android backfaceVisibility fallback
+  const frontOpacity = flipAnim.interpolate({ inputRange: [0, 0.49, 0.5, 1], outputRange: [1, 1, 0, 0] });
+  const backOpacity  = flipAnim.interpolate({ inputRange: [0, 0.49, 0.5, 1], outputRange: [0, 0, 1, 1] });
+
+  const entryTransY = entryAnim.interpolate({ inputRange: [0, 1], outputRange: [72, 0] });
+
+  return (
+    <Animated.View
+      style={{
+        opacity: entryAnim,
+        transform: [{ translateY: entryTransY }],
+        marginBottom: CARD_GAP,
+        width: cardW,
+        height: cardH,
+      }}
+    >
+      {/* ── FRONT FACE ── */}
+      <Animated.View
+        style={{
+          position: "absolute", width: cardW, height: cardH,
+          opacity: frontOpacity,
+          transform: [{ perspective: 1200 }, { rotateY: frontRotateY }],
+          backfaceVisibility: "hidden",
+        }}
+      >
+        <TouchableOpacity
+          style={{ width: cardW, height: cardH, borderRadius: 22, overflow: "hidden" }}
+          activeOpacity={0.92}
+          onPress={handleFlip}
+        >
+          {/* Parallax photo */}
+          <Animated.Image
+            source={dev.photo}
+            style={{
+              position: "absolute",
+              top: -PARALLAX + dev.photoOffset,
+              left: 0,
+              width: cardW,
+              height: cardH + PARALLAX * 2,
+              transform: [{ translateY: parallaxY }],
+            }}
+            resizeMode="cover"
+          />
+
+          {/* Name + role overlay at bottom */}
+          <View style={devStyles.cardContent}>
+            <Text style={devStyles.devName}>
+              {dev.name}
+              {dev.nickname ? <Text style={devStyles.devNick}> ({dev.nickname})</Text> : null}
+            </Text>
+            <View style={[devStyles.rolePill, { marginTop: 8 }]}>
+              <Text style={devStyles.roleText}>{dev.role}</Text>
+            </View>
+            <View style={devStyles.readMoreRow}>
+              <Ionicons name="sync-outline" size={13} color="rgba(255,255,255,0.7)" />
+              <Text style={devStyles.readMoreText}>Tap to flip</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* ── BACK FACE ── */}
+      <Animated.View
+        style={{
+          position: "absolute", width: cardW, height: cardH,
+          opacity: backOpacity,
+          transform: [{ perspective: 1200 }, { rotateY: backRotateY }],
+          backfaceVisibility: "hidden",
+        }}
+      >
+        <TouchableOpacity
+          style={[devStyles.backFace, { width: cardW, height: cardH, backgroundColor: theme.surface }]}
+          activeOpacity={1}
+          onPress={handleFlip}
+        >
+          {/* ── Fixed header ── */}
+          <View style={{ alignItems: "center", paddingTop: 20, paddingHorizontal: 22 }}>
+            <Image source={dev.photo} style={devStyles.backPhoto} resizeMode="cover" />
+            <Text style={[devStyles.backName, { color: theme.textPrimary, marginTop: 10 }]}>
+              {dev.name}
+              {dev.nickname ? <Text style={[devStyles.devNick, { color: theme.textMuted, textShadowColor: "transparent" }]}> ({dev.nickname})</Text> : null}
+            </Text>
+            <View style={[devStyles.rolePill, { alignSelf: "center", marginTop: 7 }]}>
+              <Text style={devStyles.roleText}>{dev.role}</Text>
+            </View>
+            <View style={[devStyles.backSep, { backgroundColor: theme.divider }]} />
+          </View>
+
+          {/* ── Bio ── */}
+          <ScrollView
+            style={{ flex: 1, paddingHorizontal: 22 }}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={false}
+          >
+            <Text style={[devStyles.backBio, { color: theme.textSecondary }]}>
+              {dev.bio}
+            </Text>
+          </ScrollView>
+
+          {/* ── Fixed footer ── */}
+          <View style={{ alignItems: "center", paddingHorizontal: 22, paddingBottom: 18 }}>
+            <View style={[devStyles.socialsRow, { justifyContent: "center", flexWrap: "nowrap", marginBottom: 10 }]}>
+              {dev.socials.map((s, j) => (
+                <SocialButton key={j} icon={s.icon} label={s.label} url={s.url} />
+              ))}
+            </View>
+            <View style={[devStyles.readMoreRow, { justifyContent: "center" }]}>
+              <Ionicons name="sync-outline" size={13} color={theme.textMuted} />
+              <Text style={[devStyles.readMoreText, { color: theme.textMuted, textShadowColor: "transparent" }]}>Tap to flip back</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+// ── Meet the Developers view ───────────────────────────────────────────────────
 function DevelopersView({ onBack }: { onBack: () => void }) {
   const { theme } = useAppTheme();
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   return (
     <SafeAreaView
@@ -1309,161 +1530,166 @@ function DevelopersView({ onBack }: { onBack: () => void }) {
       {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
-      <View
-        style={[
-          styles.greenSection,
-          styles.termsHeader,
-          { backgroundColor: theme.headerBg },
-        ]}
-      >
+      <View style={[styles.greenSection, styles.termsHeader, { backgroundColor: theme.headerBg }]}>
         <NavHeader title="Meet the Developers" onBack={onBack} />
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
         style={[styles.termsScroll, { backgroundColor: theme.cardBg }]}
-        contentContainerStyle={[styles.termsContent, { paddingTop: 24 }]}
+        contentContainerStyle={{
+          paddingHorizontal: CARD_HPAD,
+          paddingTop: TOP_PADDING,
+          paddingBottom: 48,
+        }}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
       >
-        {/* Intro blurb */}
-        <Text style={[devStyles.intro, { color: theme.textSecondary }]}>
-          PennyWise was built by a small team of passionate students. Here's the
-          people behind it.
-        </Text>
-
         {DEVELOPERS.map((dev, i) => (
-          <View
+          <ParallaxDevCard
             key={i}
-            style={[devStyles.card, { backgroundColor: theme.surface, borderColor: theme.divider }]}
-          >
-            {/* Photo + name */}
-            <View style={devStyles.cardTop}>
-              <Image
-                source={dev.photo}
-                style={devStyles.photo}
-                resizeMode="cover"
-              />
-              <View style={devStyles.cardTopInfo}>
-                <Text style={[devStyles.devName, { color: theme.textPrimary }]}>
-                  {dev.name}
-                  {dev.nickname ? (
-                    <Text style={[devStyles.devNick, { color: theme.textMuted }]}>
-                      {" "}({dev.nickname})
-                    </Text>
-                  ) : null}
-                </Text>
-                <View style={devStyles.rolePill}>
-                  <Text style={devStyles.roleText}>{dev.role}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Bio */}
-            <Text style={[devStyles.bio, { color: theme.textSecondary }]}>
-              {dev.bio}
-            </Text>
-
-            {/* Socials */}
-            <View style={devStyles.socialsRow}>
-              {dev.socials.map((s, j) => (
-                <TouchableOpacity
-                  key={j}
-                  style={[devStyles.socialBtn, { backgroundColor: theme.cardBg, borderColor: theme.divider }]}
-                  activeOpacity={0.75}
-                  onPress={() => Linking.openURL(s.url)}
-                >
-                  <Ionicons name={s.icon} size={16} color="#3ECBA8" />
-                  <Text style={[devStyles.socialLabel, { color: theme.textPrimary }]}>
-                    {s.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+            dev={dev}
+            index={i}
+            scrollY={scrollY}
+            theme={theme}
+          />
         ))}
-
-        <View style={{ height: 32 }} />
-      </ScrollView>
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 }
 
 const devStyles = StyleSheet.create({
-  intro: {
-    fontFamily: Font.bodyRegular,
-    fontSize: 13.5,
-    lineHeight: 20,
-    textAlign: "center",
-    marginBottom: 24,
-    paddingHorizontal: 8,
-  },
+  // ── Card ───────────────────────────────────────────────────────────────────
   card: {
-    borderRadius: 18,
-    borderWidth: 1.5,
-    padding: 18,
-    marginBottom: 20,
+    height: CARD_H,
+    borderRadius: 22,
+    overflow: "hidden",
   },
-  cardTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 14,
-    gap: 14,
+  cardContent: {
+    position: "absolute",
+    bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 22,
+    paddingTop: 20,
   },
-  photo: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2.5,
-    borderColor: "#3ECBA8",
-  },
-  cardTopInfo: {
-    flex: 1,
-    gap: 6,
-  },
+  // ── Typography ─────────────────────────────────────────────────────────────
   devName: {
     fontFamily: Font.headerBold,
-    fontSize: 17,
+    fontSize: 24,
+    color: "#fff",
     letterSpacing: 0.2,
+    textShadowColor: "rgba(0,0,0,0.75)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
   },
   devNick: {
     fontFamily: Font.bodyRegular,
-    fontSize: 14,
+    fontSize: 16,
+    color: "rgba(255,255,255,0.75)",
+    textShadowColor: "rgba(0,0,0,0.75)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   rolePill: {
     alignSelf: "flex-start",
-    backgroundColor: "rgba(62,203,168,0.15)",
+    backgroundColor: "rgba(62,203,168,0.22)",
+    borderWidth: 1,
+    borderColor: "rgba(62,203,168,0.5)",
     borderRadius: 20,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     paddingVertical: 3,
   },
   roleText: {
     fontFamily: Font.bodySemiBold,
     fontSize: 11.5,
-    color: "#1E9C70",
-    letterSpacing: 0.3,
+    color: "#3ECBA8",
+    letterSpacing: 0.4,
+  },
+  sep: {
+    height: 1,
+    backgroundColor: "rgba(255,255,255,0.14)",
+    marginVertical: 11,
   },
   bio: {
     fontFamily: Font.bodyRegular,
-    fontSize: 13,
-    lineHeight: 20,
-    marginBottom: 16,
+    fontSize: 12.5,
+    lineHeight: 19,
+    color: "#fff",
+    marginBottom: 14,
+    textShadowColor: "rgba(0,0,0,0.8)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 5,
   },
+  // ── Socials ────────────────────────────────────────────────────────────────
   socialsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 7,
   },
   socialBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    borderRadius: 10,
+    gap: 4,
+    borderRadius: 9,
     borderWidth: 1,
-    paddingHorizontal: 12,
+    borderColor: "rgba(62,203,168,0.38)",
+    backgroundColor: "rgba(0,0,0,0.32)",
+    paddingHorizontal: 9,
     paddingVertical: 7,
   },
   socialLabel: {
     fontFamily: Font.bodyMedium,
-    fontSize: 12.5,
+    fontSize: 12,
+    color: "#fff",
+  },
+  // ── Read-more hint ─────────────────────────────────────────────────────────
+  readMoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 8,
+  },
+  readMoreText: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 11.5,
+    color: "rgba(255,255,255,0.8)",
+    textShadowColor: "rgba(0,0,0,0.7)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  // ── Back face ──────────────────────────────────────────────────────────────
+  backFace: {
+    borderRadius: 22,
+    overflow: "hidden",
+    flexDirection: "column",
+  },
+  backPhoto: {
+    width: 76, height: 76,
+    borderRadius: 38,
+    borderWidth: 2.5,
+    borderColor: "#3ECBA8",
+  },
+  backName: {
+    fontFamily: Font.headerBold,
+    fontSize: 20,
+    textAlign: "center",
+    letterSpacing: 0.2,
+  },
+  backSep: {
+    height: 1,
+    width: "100%",
+    marginVertical: 14,
+  },
+  backBio: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
+    width: "100%",
   },
 });
 
