@@ -25,6 +25,8 @@ import SlideTabBar from '@/components/SlideTabBar';
 import BudgetLimitModal from '@/components/BudgetLimitModal';
 import CircularRing from '@/components/CircularRing';
 import ErrorModal from '@/components/ErrorModal';
+import PennyMascot, { PENNY_TIPS } from '@/components/PennyMascot';
+import MascotChatbot from '@/components/MascotChatbot';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Period = 'Daily' | 'Weekly' | 'Monthly';
@@ -106,6 +108,7 @@ export default function HomeScreen() {
   const [loading, setLoading]                   = useState(true);
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
   const [errModal, setErrModal]                 = useState({ visible: false, title: '', message: '' });
+  const [chatOpen, setChatOpen]                 = useState(false);
   const userIdRef = useRef<string | null>(null);
 
   // ── Goal carousel ───────────────────────────────────────────────────────────
@@ -249,6 +252,17 @@ export default function HomeScreen() {
     : budgetPercent <= 70 ? `${budgetPercent.toFixed(0)}% Of Your Expenses, Be Careful.`
     : `${budgetPercent.toFixed(0)}% Of Your Expenses, Over Budget!`;
 
+  // Penny's context-aware tip based on current financial state
+  const pennyTip = !loading
+    ? budgetPercent >= 80
+      ? `You've used ${budgetPercent.toFixed(0)}% of your budget! Slow down on spending before the month ends. 🛑`
+      : budgetPercent >= 50
+      ? `You're halfway through your budget. Stay mindful of the next few days! 📊`
+      : goalsCount === 0
+      ? "You have no savings goals yet — set one and start building your future! 🎯"
+      : PENNY_TIPS[new Date().getDate() % PENNY_TIPS.length]
+    : PENNY_TIPS[0];
+
   // Savings goals aggregate
   const goalsCount   = savingsGoals.length;
   const totalSaved   = savingsGoals.reduce((s, g) => s + g.current_amount, 0);
@@ -313,6 +327,19 @@ export default function HomeScreen() {
             </View>
             <NotificationBell style={[styles.bellButton, { backgroundColor: theme.iconBtnBg }]} iconColor={theme.iconBtnColor} />
           </View>
+
+          {/* ── Penny mascot with financial tip ──────────────────────── */}
+          {!loading && (
+            <View style={styles.mascotRow}>
+              <PennyMascot
+                tip={pennyTip}
+                onPress={() => setChatOpen(true)}
+                size={56}
+                variant="bubble"
+                dark={theme.isDark}
+              />
+            </View>
+          )}
 
           {loading ? (
             <HomeDashboardSkeleton />
@@ -583,6 +610,8 @@ export default function HomeScreen() {
         message={errModal.message}
         onClose={() => setErrModal(p => ({ ...p, visible: false }))}
       />
+
+      <MascotChatbot visible={chatOpen} onClose={() => setChatOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -602,6 +631,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 28,
+  },
+  mascotRow: {
+    alignItems: 'flex-end',
+    marginBottom: 16,
+    paddingRight: 4,
   },
   greetingRow: {
     flexDirection: 'row',

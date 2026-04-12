@@ -22,6 +22,8 @@ import { DataCache } from '@/lib/dataCache';
 import { useNetwork } from '@/contexts/NetworkContext';
 import { sanitizeTitle, parseAmount } from '@/lib/sanitize';
 import { MutationQueue } from '@/lib/mutationQueue';
+import PennyMascot from '@/components/PennyMascot';
+import MascotChatbot from '@/components/MascotChatbot';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { sfx } from '@/lib/sfx';
 import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
@@ -156,6 +158,7 @@ export default function SavingsGoalsScreen() {
   const [goals, setGoals]         = useState<Goal[]>([]);
   const [loading, setLoading]     = useState(true);
   const [userId, setUserId]       = useState<string | null>(null);
+  const [chatOpen, setChatOpen]   = useState(false);
 
   // Skeleton shimmer sweep
   const sweep = useSharedValue(0);
@@ -579,6 +582,19 @@ export default function SavingsGoalsScreen() {
           <Ionicons name="add" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {/* Penny mascot — shown only when there are active goals */}
+      {!loading && activeGoals.length > 0 && (
+        <View style={styles.mascotRow}>
+          <PennyMascot
+            tip={`You have ${activeGoals.length} active goal${activeGoals.length > 1 ? 's' : ''}! Keep saving — every peso counts! 💚`}
+            onPress={() => setChatOpen(true)}
+            size={50}
+            variant="bubble"
+            dark={theme.isDark}
+          />
+        </View>
+      )}
 
       {/* Tab Pills */}
       <SlideTabBar
@@ -1012,6 +1028,8 @@ export default function SavingsGoalsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <MascotChatbot visible={chatOpen} onClose={() => setChatOpen(false)} />
     </SafeAreaView>
   );
 }
@@ -1024,6 +1042,12 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14,
+  },
+  mascotRow: {
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    marginTop: -4,
   },
   headerTitle: { fontFamily: Font.headerBold, fontSize: 20, color: '#fff', letterSpacing: 0.2 },
   iconBtn: {
