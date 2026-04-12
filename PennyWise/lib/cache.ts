@@ -76,6 +76,29 @@ export const Cache = {
     }
   },
 
+  /**
+   * Read from cache regardless of TTL (use when offline).
+   * Returns the stored data even if it has expired.
+   * Returns null only if no data was ever cached.
+   */
+  async getStale<T>(key: string): Promise<T | null> {
+    // 1. In-memory (ignore expiry)
+    const mem = memStore.get(key) as CacheEntry<T> | undefined;
+    if (mem) return mem.data;
+
+    // 2. AsyncStorage (ignore expiry)
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_PREFIX + key);
+      if (!raw) return null;
+      const entry: CacheEntry<T> = JSON.parse(raw);
+      // Promote back to memory for subsequent reads
+      memStore.set(key, entry);
+      return entry.data;
+    } catch {
+      return null;
+    }
+  },
+
   /** Remove a single cache entry from both layers. */
   invalidate(key: string): void {
     memStore.delete(key);

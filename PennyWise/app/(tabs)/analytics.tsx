@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
+import { useNetwork } from '@/contexts/NetworkContext';
 import DatePickerModal from '@/components/DatePickerModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import ErrorModal from '@/components/ErrorModal';
@@ -33,6 +34,7 @@ import type { Theme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { DataCache } from '@/lib/dataCache';
 import { sanitizeCategoryLabel, sanitizeTitle, sanitizeDescription, parseAmount } from '@/lib/sanitize';
+import { MutationQueue } from '@/lib/mutationQueue';
 import { useFormDraft } from '@/hooks/useFormDraft';
 import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
 import Animated, {
@@ -892,6 +894,7 @@ function IncomeFormScreen({
 // ── Root Screen ───────────────────────────────────────────────────────────────
 export default function IncomeSourcesScreen() {
   const { theme } = useAppTheme();
+  const { isOnline } = useNetwork();
   const userIdRef = useRef('');
 
   const [screen,     setScreen]     = useState<Screen>({ name: 'categories' });
@@ -926,31 +929,31 @@ export default function IncomeSourcesScreen() {
   );
 
   // ── Load from Supabase ──────────────────────────────────────────────────────
-  useEffect(() => {
-    async function loadData(userId: string) {
-      try {
-        const [cats, sources] = await Promise.all([
-          DataCache.fetchIncomeCategories(userId),
-          DataCache.fetchIncomeSources(userId),
-        ]);
+  const loadData = useCallback(async (userId: string) => {
+    try {
+      const [cats, sources] = await Promise.all([
+        DataCache.fetchIncomeCategories(userId),
+        DataCache.fetchIncomeSources(userId),
+      ]);
 
-        setCategories(cats.map(c => ({
-          id: c.id, label: c.label, icon: c.icon as IoniconName, isArchived: c.is_archived,
-        })));
+      setCategories(cats.map(c => ({
+        id: c.id, label: c.label, icon: c.icon as IoniconName, isArchived: c.is_archived,
+      })));
 
-        setIncome(sources.map(i => ({
-          id: i.id, categoryId: i.category_id, title: i.title,
-          amount: Number(i.amount), date: i.date, time: i.time,
-          description: i.description, isRecurring: i.is_recurring,
-          frequency: i.frequency as Frequency | null, isArchived: i.is_archived,
-        })));
-      } catch (err: any) {
-        showError('Failed to Load', err?.message ?? 'Could not load income data. Please try again.');
-      } finally {
-        setLoading(false);
-      }
+      setIncome(sources.map(i => ({
+        id: i.id, categoryId: i.category_id, title: i.title,
+        amount: Number(i.amount), date: i.date, time: i.time,
+        description: i.description, isRecurring: i.is_recurring,
+        frequency: i.frequency as Frequency | null, isArchived: i.is_archived,
+      })));
+    } catch (err: any) {
+      setErrModal({ visible: true, title: 'Failed to Load', message: err?.message ?? 'Could not load income data. Please try again.' });
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
+  useEffect(() => {
     // Use onAuthStateChange to avoid the AsyncStorage race condition.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
@@ -962,7 +965,20 @@ export default function IncomeSourcesScreen() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadData]);
+
+  // Reconnect: invalidate stale cache and reload when coming back online
+  const wasOfflineRef = useRef(false);
+  useEffect(() => {
+    if (!isOnline) {
+      wasOfflineRef.current = true;
+    } else if (wasOfflineRef.current && userIdRef.current) {
+      wasOfflineRef.current = false;
+      DataCache.invalidateIncomeCategories(userIdRef.current);
+      DataCache.invalidateIncomeSources(userIdRef.current);
+      loadData(userIdRef.current);
+    }
+  }, [isOnline, loadData]);
 
   // ── Computed ─────────────────────────────────────────────────────────────────
   const totalIncome = income.filter(i => !i.isArchived).reduce((sum, i) => sum + i.amount, 0);
@@ -1013,6 +1029,24 @@ export default function IncomeSourcesScreen() {
         );
         loadingBar.finish();
         setSaving(false);
+
+        if (!isOnline) {
+          await MutationQueue.add({
+            op: 'insert', table: 'income_sources', tempId,
+            payload: {
+              user_id:      userIdRef.current,
+              category_id:  vals.categoryId,
+              title:        cleanTitle,
+              amount,
+              date:         vals.date,
+              time:         now,
+              description:  cleanDesc,
+              is_recurring: vals.isRecurring,
+              frequency:    vals.isRecurring ? vals.frequency : null,
+            },
+          });
+          return;
+        }
 
         const { data, error } = await supabase
           .from('income_sources')
@@ -1075,6 +1109,23 @@ export default function IncomeSourcesScreen() {
         setScreen({ name: 'categories' });
         loadingBar.finish();
         setSaving(false);
+
+        if (!isOnline) {
+          await MutationQueue.add({
+            op: 'update', table: 'income_sources',
+            payload: {
+              category_id:  vals.categoryId,
+              title:        newTitle,
+              amount:       newAmount,
+              date:         vals.date,
+              description:  newDesc,
+              is_recurring: vals.isRecurring,
+              frequency:    vals.isRecurring ? vals.frequency : null,
+            },
+            match: { id: screen.incomeId },
+          });
+          return;
+        }
 
         const { error } = await supabase
           .from('income_sources')
@@ -1142,6 +1193,11 @@ export default function IncomeSourcesScreen() {
         showToast('Income category archived successfully.');
         setScreen({ name: 'categories' });
 
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'update', table: 'income_categories', payload: { is_archived: true }, match: { id: categoryId } });
+          return;
+        }
+
         const { error } = await supabase.from('income_categories').update({ is_archived: true }).eq('id', categoryId);
         if (error) {
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
@@ -1171,6 +1227,11 @@ export default function IncomeSourcesScreen() {
         setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
         sfx.success();
         showToast('Income category restored successfully.');
+
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'update', table: 'income_categories', payload: { is_archived: false }, match: { id: categoryId } });
+          return;
+        }
 
         const { error } = await supabase.from('income_categories').update({ is_archived: false }).eq('id', categoryId);
         if (error) {
@@ -1205,6 +1266,11 @@ export default function IncomeSourcesScreen() {
         sfx.error();
         showToast('Category permanently deleted.');
 
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'delete', table: 'income_categories', match: { id: categoryId } });
+          return;
+        }
+
         const { error } = await supabase.from('income_categories').delete().eq('id', categoryId);
         if (error) {
           if (cat) setCategories(prev => [...prev, cat]);
@@ -1237,6 +1303,11 @@ export default function IncomeSourcesScreen() {
         sfx.warning();
         showToast('Income source archived.');
 
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'update', table: 'income_sources', payload: { is_archived: true }, match: { id: incomeId } });
+          return;
+        }
+
         const { error } = await supabase.from('income_sources').update({ is_archived: true }).eq('id', incomeId);
         if (error) {
           setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: false } : i));
@@ -1267,6 +1338,11 @@ export default function IncomeSourcesScreen() {
         setIncome(prev => prev.map(i => i.id === incomeId ? { ...i, isArchived: false } : i));
         sfx.success();
         showToast('Income source restored.');
+
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'update', table: 'income_sources', payload: { is_archived: false }, match: { id: incomeId } });
+          return;
+        }
 
         const { error } = await supabase.from('income_sources').update({ is_archived: false }).eq('id', incomeId);
         if (error) {
@@ -1300,6 +1376,11 @@ export default function IncomeSourcesScreen() {
         sfx.error();
         showToast('Income source permanently deleted.');
 
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'delete', table: 'income_sources', match: { id: incomeId } });
+          return;
+        }
+
         const { error } = await supabase.from('income_sources').delete().eq('id', incomeId);
         if (error) {
           if (inc) setIncome(prev => [...prev, inc]);
@@ -1329,6 +1410,11 @@ export default function IncomeSourcesScreen() {
     sfx.success();
     showToast('Category updated successfully.');
 
+    if (!isOnline) {
+      await MutationQueue.add({ op: 'update', table: 'income_categories', payload: { label: cleanLabel, icon }, match: { id } });
+      return;
+    }
+
     const { error } = await supabase.from('income_categories').update({ label: cleanLabel, icon }).eq('id', id);
     if (error) {
       if (oldCat) setCategories(prev => prev.map(c => c.id === id ? oldCat : c));
@@ -1357,6 +1443,14 @@ export default function IncomeSourcesScreen() {
     setCategories(prev => [...prev, { id: tempId, label: cleanLabel, icon, isArchived: false }]);
     sfx.success();
     showToast(`Category "${cleanLabel}" created.`);
+
+    if (!isOnline) {
+      await MutationQueue.add({
+        op: 'insert', table: 'income_categories', tempId,
+        payload: { user_id: userIdRef.current, label: cleanLabel, icon },
+      });
+      return;
+    }
 
     const { data, error } = await supabase
       .from('income_categories')

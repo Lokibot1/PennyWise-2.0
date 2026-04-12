@@ -15,8 +15,10 @@ import { useCallback } from 'react';
 
 import { Font } from '@/constants/fonts';
 import { useAppTheme } from '@/contexts/AppTheme';
+import { useNetwork } from '@/contexts/NetworkContext';
 import { supabase } from '@/lib/supabase';
 import { DataCache } from '@/lib/dataCache';
+import { MutationQueue } from '@/lib/mutationQueue';
 import { HomeDashboardSkeleton, TransactionRowSkeleton } from '@/components/SkeletonLoader';
 import NotificationBell from '@/components/NotificationBell';
 import SlideTabBar from '@/components/SlideTabBar';
@@ -89,6 +91,7 @@ function getGreeting(): string {
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
   const { theme } = useAppTheme();
+  const { isOnline } = useNetwork();
   const [activePeriod, setActivePeriod] = useState<Period>('Monthly');
 
   // Dashboard state
@@ -116,6 +119,16 @@ export default function HomeScreen() {
     if (!userIdRef.current) return;
     const prev = budgetLimit;
     setBudgetLimit(newLimit); // optimistic
+
+    if (!isOnline) {
+      await MutationQueue.add({
+        op: 'update', table: 'profiles',
+        payload: { budget_limit: newLimit },
+        match: { id: userIdRef.current },
+      });
+      return;
+    }
+
     const { error } = await supabase.from('profiles').update({ budget_limit: newLimit }).eq('id', userIdRef.current);
     if (error) {
       setBudgetLimit(prev); // rollback
@@ -198,6 +211,18 @@ export default function HomeScreen() {
     });
     return () => subscription.unsubscribe();
   }, [loadDashboard]);
+
+  // Reconnect: invalidate stale cache and reload when coming back online
+  const wasOfflineRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (!isOnline) {
+      wasOfflineRef.current = true;
+    } else if (wasOfflineRef.current && userIdRef.current) {
+      wasOfflineRef.current = false;
+      DataCache.invalidateDashboard(userIdRef.current);
+      loadDashboard(userIdRef.current);
+    }
+  }, [isOnline, loadDashboard]);
 
   // Refresh when screen comes back into focus (e.g. returning from savings-goals)
   useFocusEffect(

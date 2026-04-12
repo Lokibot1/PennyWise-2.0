@@ -27,8 +27,10 @@ import { useColorScheme } from "@/hooks/use-color-scheme";
 import { supabase } from "@/lib/supabase";
 import { AppThemeProvider } from "@/contexts/AppTheme";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { NetworkProvider } from "@/contexts/NetworkContext";
 import NotificationPanel from "@/components/NotificationPanel";
 import GlobalLoadingBar from "@/components/GlobalLoadingBar";
+import OfflineBanner from "@/components/OfflineBanner";
 import { Font } from "@/constants/fonts";
 import { TERMS_SECTIONS, TERMS_VERSION } from "@/constants/terms";
 
@@ -184,6 +186,7 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
+    <NetworkProvider>
     <AppThemeProvider>
       <NotificationProvider>
       <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
@@ -223,6 +226,8 @@ export default function RootLayout() {
       </ThemeProvider>
       </NotificationProvider>
     </AppThemeProvider>
+    <OfflineBanner />
+    </NetworkProvider>
   );
 }
 

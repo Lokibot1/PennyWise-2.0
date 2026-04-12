@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
+import { useNetwork } from '@/contexts/NetworkContext';
 import DatePickerModal from '@/components/DatePickerModal';
 import ConfirmModal from '@/components/ConfirmModal';
 import ErrorModal from '@/components/ErrorModal';
@@ -36,6 +37,7 @@ import { useFormDraft } from '@/hooks/useFormDraft';
 import { supabase } from '@/lib/supabase';
 import { DataCache } from '@/lib/dataCache';
 import { sanitizeCategoryLabel, sanitizeTitle, sanitizeDescription, parseAmount } from '@/lib/sanitize';
+import { MutationQueue } from '@/lib/mutationQueue';
 import Animated, {
   useSharedValue,
   withSpring,
@@ -997,6 +999,7 @@ function ExpenseFormScreen({
 // ── Root Screen ───────────────────────────────────────────────────────────────
 export default function ManageExpenseScreen() {
   const { theme } = useAppTheme();
+  const { isOnline } = useNetwork();
   const userIdRef = useRef('');
 
   const [screen,      setScreen]      = useState<Screen>({ name: 'categories' });
@@ -1032,37 +1035,37 @@ export default function ManageExpenseScreen() {
   );
 
   // ── Load from Supabase ──────────────────────────────────────────────────────
-  useEffect(() => {
-    async function loadData(userId: string) {
-      try {
-        const [sources, cats, exps] = await Promise.all([
-          DataCache.fetchIncomeSources(userId),
-          DataCache.fetchExpenseCategories(userId),
-          DataCache.fetchExpenses(userId),
-        ]);
+  const loadData = useCallback(async (userId: string) => {
+    try {
+      const [sources, cats, exps] = await Promise.all([
+        DataCache.fetchIncomeSources(userId),
+        DataCache.fetchExpenseCategories(userId),
+        DataCache.fetchExpenses(userId),
+      ]);
 
-        const totalIncome = sources
-          .filter(r => !r.is_archived)
-          .reduce((sum, r) => sum + Number(r.amount), 0);
-        setBudgetLimit(totalIncome);
+      const totalIncome = sources
+        .filter(r => !r.is_archived)
+        .reduce((sum, r) => sum + Number(r.amount), 0);
+      setBudgetLimit(totalIncome);
 
-        setCategories(cats.map(c => ({
-          id: c.id, label: c.label, icon: c.icon as IoniconName, isArchived: c.is_archived,
-        })));
+      setCategories(cats.map(c => ({
+        id: c.id, label: c.label, icon: c.icon as IoniconName, isArchived: c.is_archived,
+      })));
 
-        setExpenses(exps.map(e => ({
-          id: e.id, categoryId: e.category_id, title: e.title,
-          amount: Number(e.amount), date: e.date, time: e.time,
-          description: e.description, isRecurring: e.is_recurring,
-          frequency: e.frequency as Frequency | null, isArchived: e.is_archived,
-        })));
-      } catch (err: any) {
-        showError('Failed to Load', err?.message ?? 'Could not load expenses. Please try again.');
-      } finally {
-        setLoading(false);
-      }
+      setExpenses(exps.map(e => ({
+        id: e.id, categoryId: e.category_id, title: e.title,
+        amount: Number(e.amount), date: e.date, time: e.time,
+        description: e.description, isRecurring: e.is_recurring,
+        frequency: e.frequency as Frequency | null, isArchived: e.is_archived,
+      })));
+    } catch (err: any) {
+      setErrModal({ visible: true, title: 'Failed to Load', message: err?.message ?? 'Could not load expenses. Please try again.' });
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
+  useEffect(() => {
     // Use onAuthStateChange to avoid the AsyncStorage race condition.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
@@ -1074,7 +1077,21 @@ export default function ManageExpenseScreen() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadData]);
+
+  // Reconnect: invalidate stale cache and reload when coming back online
+  const wasOfflineRef = useRef(false);
+  useEffect(() => {
+    if (!isOnline) {
+      wasOfflineRef.current = true;
+    } else if (wasOfflineRef.current && userIdRef.current) {
+      wasOfflineRef.current = false;
+      DataCache.invalidateExpenseCategories(userIdRef.current);
+      DataCache.invalidateExpenses(userIdRef.current);
+      DataCache.invalidateIncomeSources(userIdRef.current);
+      loadData(userIdRef.current);
+    }
+  }, [isOnline, loadData]);
 
   // ── Computed ─────────────────────────────────────────────────────────────────
   const totalExpenses = expenses
@@ -1128,6 +1145,24 @@ export default function ManageExpenseScreen() {
         setScreen({ name: 'detail', categoryId: screen.prefillCategoryId });
         loadingBar.finish();
         setSaving(false);
+
+        if (!isOnline) {
+          await MutationQueue.add({
+            op: 'insert', table: 'expenses', tempId,
+            payload: {
+              user_id:      userIdRef.current,
+              category_id:  vals.categoryId,
+              title:        cleanTitle,
+              amount,
+              date:         vals.date,
+              time:         now,
+              description:  cleanDesc,
+              is_recurring: vals.isRecurring,
+              frequency:    vals.isRecurring ? vals.frequency : null,
+            },
+          });
+          return;
+        }
 
         const { data, error } = await supabase
           .from('expenses')
@@ -1191,6 +1226,23 @@ export default function ManageExpenseScreen() {
         loadingBar.finish();
         setSaving(false);
 
+        if (!isOnline) {
+          await MutationQueue.add({
+            op: 'update', table: 'expenses',
+            payload: {
+              category_id:  vals.categoryId,
+              title:        newTitle,
+              amount:       newAmount,
+              date:         vals.date,
+              description:  newDesc,
+              is_recurring: vals.isRecurring,
+              frequency:    vals.isRecurring ? vals.frequency : null,
+            },
+            match: { id: screen.expenseId },
+          });
+          return;
+        }
+
         const { error } = await supabase
           .from('expenses')
           .update({
@@ -1252,6 +1304,11 @@ export default function ManageExpenseScreen() {
     sfx.success();
     showToast('Category updated successfully.');
 
+    if (!isOnline) {
+      await MutationQueue.add({ op: 'update', table: 'expense_categories', payload: { label: cleanLabel, icon }, match: { id } });
+      return;
+    }
+
     const { error } = await supabase.from('expense_categories').update({ label: cleanLabel, icon }).eq('id', id);
     if (error) {
       if (oldCat) setCategories(prev => prev.map(c => c.id === id ? oldCat : c));
@@ -1284,6 +1341,11 @@ export default function ManageExpenseScreen() {
         sfx.warning();
         showToast('Expense category archived.');
 
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'update', table: 'expense_categories', payload: { is_archived: true }, match: { id: categoryId } });
+          return;
+        }
+
         const { error } = await supabase.from('expense_categories').update({ is_archived: true }).eq('id', categoryId);
         if (error) {
           setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
@@ -1313,6 +1375,11 @@ export default function ManageExpenseScreen() {
         setCategories(prev => prev.map(c => c.id === categoryId ? { ...c, isArchived: false } : c));
         sfx.success();
         showToast('Expense category restored.');
+
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'update', table: 'expense_categories', payload: { is_archived: false }, match: { id: categoryId } });
+          return;
+        }
 
         const { error } = await supabase.from('expense_categories').update({ is_archived: false }).eq('id', categoryId);
         if (error) {
@@ -1347,6 +1414,11 @@ export default function ManageExpenseScreen() {
         sfx.error();
         showToast('Category permanently deleted.');
 
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'delete', table: 'expense_categories', match: { id: categoryId } });
+          return;
+        }
+
         const { error } = await supabase.from('expense_categories').delete().eq('id', categoryId);
         if (error) {
           if (cat) setCategories(prev => [...prev, cat]);
@@ -1379,6 +1451,11 @@ export default function ManageExpenseScreen() {
         sfx.warning();
         showToast('Expense archived.');
 
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'update', table: 'expenses', payload: { is_archived: true }, match: { id: expenseId } });
+          return;
+        }
+
         const { error } = await supabase.from('expenses').update({ is_archived: true }).eq('id', expenseId);
         if (error) {
           setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: false } : e));
@@ -1409,6 +1486,11 @@ export default function ManageExpenseScreen() {
         setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, isArchived: false } : e));
         sfx.success();
         showToast('Expense restored.');
+
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'update', table: 'expenses', payload: { is_archived: false }, match: { id: expenseId } });
+          return;
+        }
 
         const { error } = await supabase.from('expenses').update({ is_archived: false }).eq('id', expenseId);
         if (error) {
@@ -1442,6 +1524,11 @@ export default function ManageExpenseScreen() {
         sfx.error();
         showToast('Expense permanently deleted.');
 
+        if (!isOnline) {
+          await MutationQueue.add({ op: 'delete', table: 'expenses', match: { id: expenseId } });
+          return;
+        }
+
         const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
         if (error) {
           if (exp) setExpenses(prev => [...prev, exp]);
@@ -1471,6 +1558,14 @@ export default function ManageExpenseScreen() {
     sfx.success();
     showToast(`Category "${cleanLabel}" created.`);
     setScreen({ name: 'categories' });
+
+    if (!isOnline) {
+      await MutationQueue.add({
+        op: 'insert', table: 'expense_categories', tempId,
+        payload: { user_id: userIdRef.current, label: cleanLabel, icon },
+      });
+      return;
+    }
 
     const { data, error } = await supabase
       .from('expense_categories')

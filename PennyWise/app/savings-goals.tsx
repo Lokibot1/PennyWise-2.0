@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal,
   TextInput, KeyboardAvoidingView, Platform, Alert,
@@ -19,7 +19,9 @@ import { StatusBar } from 'expo-status-bar';
 
 import { supabase } from '@/lib/supabase';
 import { DataCache } from '@/lib/dataCache';
+import { useNetwork } from '@/contexts/NetworkContext';
 import { sanitizeTitle, parseAmount } from '@/lib/sanitize';
+import { MutationQueue } from '@/lib/mutationQueue';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { sfx } from '@/lib/sfx';
 import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
@@ -139,6 +141,7 @@ function GoalCardSkeleton({ sweep }: { sweep: Animated.SharedValue<number> }) {
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function SavingsGoalsScreen() {
   const { theme } = useAppTheme();
+  const { isOnline } = useNetwork();
   const [activeTab, setActiveTab] = useState<'Active' | 'Completed' | 'Archived'>('Active');
 
   useFocusEffect(
@@ -222,6 +225,18 @@ export default function SavingsGoalsScreen() {
     return () => subscription.unsubscribe();
   }, [fetchGoals]);
 
+  // Reconnect: invalidate stale cache and reload when coming back online
+  const wasOfflineRef = useRef(false);
+  useEffect(() => {
+    if (!isOnline) {
+      wasOfflineRef.current = true;
+    } else if (wasOfflineRef.current && userId) {
+      wasOfflineRef.current = false;
+      DataCache.invalidateSavingsGoals(userId);
+      fetchGoals(userId, true);
+    }
+  }, [isOnline, userId, fetchGoals]);
+
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   /* Create */
@@ -246,6 +261,18 @@ export default function SavingsGoalsScreen() {
     setShowGoalResumeBanner(true);
     sfx.coin();
 
+    if (!isOnline) {
+      await MutationQueue.add({
+        op: 'insert', table: 'savings_goals', tempId,
+        payload: {
+          user_id: userId, title: cleanTitle, icon: newIcon,
+          target_amount: target, current_amount: 0,
+          is_completed: false, is_archived: false,
+        },
+      });
+      return;
+    }
+
     const { data, error } = await supabase.from('savings_goals').insert({
       user_id: userId, title: cleanTitle, icon: newIcon,
       target_amount: target, current_amount: 0,
@@ -260,6 +287,7 @@ export default function SavingsGoalsScreen() {
 
     // Swap temp item for the real one returned by the server
     setGoals(prev => prev.map(g => g.id === tempId ? (data as Goal) : g));
+    DataCache.invalidateSavingsGoals(userId);
     DataCache.invalidateDashboard(userId);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_CREATED, entity_type: ENTITY.SAVINGS_GOAL,
@@ -310,6 +338,19 @@ export default function SavingsGoalsScreen() {
     if (target     !== original.target_amount) changes.push(`Target → ${formatCurrency(target)}`);
     if (editIcon   !== original.icon)          changes.push('Icon changed');
 
+    if (!isOnline) {
+      await MutationQueue.add({
+        op: 'update', table: 'savings_goals',
+        payload: {
+          title: cleanTitle, icon: editIcon,
+          target_amount: target, is_completed: isNowComplete,
+          is_archived: isNowComplete, completed_at: completedAt,
+        },
+        match: { id: original.id },
+      });
+      return;
+    }
+
     const { error } = await supabase
       .from('savings_goals')
       .update({
@@ -325,6 +366,7 @@ export default function SavingsGoalsScreen() {
       return;
     }
 
+    DataCache.invalidateSavingsGoals(userId);
     DataCache.invalidateDashboard(userId);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_UPDATED, entity_type: ENTITY.SAVINGS_GOAL,
@@ -363,6 +405,15 @@ export default function SavingsGoalsScreen() {
     setSelectedGoal(null);
     if (isComplete) { sfx.complete(); } else { sfx.coin(); }
 
+    if (!isOnline) {
+      await MutationQueue.add({
+        op: 'update', table: 'savings_goals',
+        payload: { current_amount: newCurrent, is_completed: isComplete, is_archived: isComplete, completed_at: completedAt },
+        match: { id: goal.id },
+      });
+      return;
+    }
+
     const { error } = await supabase
       .from('savings_goals')
       .update({ current_amount: newCurrent, is_completed: isComplete, is_archived: isComplete, completed_at: completedAt })
@@ -374,6 +425,7 @@ export default function SavingsGoalsScreen() {
       return;
     }
 
+    DataCache.invalidateSavingsGoals(userId);
     DataCache.invalidateDashboard(userId);
 
     if (isComplete) {
@@ -419,6 +471,11 @@ export default function SavingsGoalsScreen() {
     // Optimistic: mark archived immediately
     setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, is_archived: true } : g));
 
+    if (!isOnline) {
+      await MutationQueue.add({ op: 'update', table: 'savings_goals', payload: { is_archived: true }, match: { id: goal.id } });
+      return;
+    }
+
     const { error } = await supabase.from('savings_goals').update({ is_archived: true }).eq('id', goal.id);
     if (error) {
       setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, is_archived: false } : g));
@@ -426,6 +483,7 @@ export default function SavingsGoalsScreen() {
       return;
     }
 
+    DataCache.invalidateSavingsGoals(userId);
     DataCache.invalidateDashboard(userId);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_ARCHIVED, entity_type: ENTITY.SAVINGS_GOAL,
@@ -447,6 +505,11 @@ export default function SavingsGoalsScreen() {
     // Optimistic: remove immediately
     setGoals(prev => prev.filter(g => g.id !== goal.id));
 
+    if (!isOnline) {
+      await MutationQueue.add({ op: 'delete', table: 'savings_goals', match: { id: goal.id } });
+      return;
+    }
+
     const { error } = await supabase.from('savings_goals').delete().eq('id', goal.id);
     if (error) {
       setGoals(prev => [...prev, goal]);
@@ -454,6 +517,7 @@ export default function SavingsGoalsScreen() {
       return;
     }
 
+    DataCache.invalidateSavingsGoals(userId);
     DataCache.invalidateDashboard(userId);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_DELETED, entity_type: ENTITY.SAVINGS_GOAL,
@@ -470,6 +534,11 @@ export default function SavingsGoalsScreen() {
     // Optimistic: un-archive immediately
     setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, is_archived: false } : g));
 
+    if (!isOnline) {
+      await MutationQueue.add({ op: 'update', table: 'savings_goals', payload: { is_archived: false }, match: { id: goal.id } });
+      return;
+    }
+
     const { error } = await supabase.from('savings_goals').update({ is_archived: false }).eq('id', goal.id);
     if (error) {
       setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, is_archived: true } : g));
@@ -477,6 +546,7 @@ export default function SavingsGoalsScreen() {
       return;
     }
 
+    DataCache.invalidateSavingsGoals(userId);
     DataCache.invalidateDashboard(userId);
     logActivity({
       user_id: userId, action_type: ACTION.SAVINGS_GOAL_RESTORED, entity_type: ENTITY.SAVINGS_GOAL,

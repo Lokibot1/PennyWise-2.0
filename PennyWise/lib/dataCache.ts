@@ -26,6 +26,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { Cache } from '@/lib/cache';
+import { isOnline } from '@/lib/network';
 
 // ── TTL constants (seconds) ────────────────────────────────────────────────────
 const TTL_STATIC   = 5 * 60;   // 5 min — profile, categories
@@ -106,6 +107,8 @@ export const DataCache = {
     const hit = await Cache.get<CachedProfile>(key);
     if (hit) return hit;
 
+    if (!isOnline()) return Cache.getStale<CachedProfile>(key);
+
     const { data, error } = await supabase
       .from('profiles')
       .select('full_name, budget_limit, email, phone, avatar_url')
@@ -134,6 +137,8 @@ export const DataCache = {
     const hit = await Cache.get<CachedCategory[]>(key);
     if (hit) return hit;
 
+    if (!isOnline()) return (await Cache.getStale<CachedCategory[]>(key)) ?? [];
+
     const { data, error } = await supabase
       .from('income_categories')
       .select('id, label, icon, is_archived')
@@ -153,6 +158,8 @@ export const DataCache = {
     const key = keys.expenseCategories(userId);
     const hit = await Cache.get<CachedCategory[]>(key);
     if (hit) return hit;
+
+    if (!isOnline()) return (await Cache.getStale<CachedCategory[]>(key)) ?? [];
 
     const { data, error } = await supabase
       .from('expense_categories')
@@ -174,6 +181,8 @@ export const DataCache = {
     const hit = await Cache.get<CachedIncomeSource[]>(key);
     if (hit) return hit;
 
+    if (!isOnline()) return (await Cache.getStale<CachedIncomeSource[]>(key)) ?? [];
+
     const { data, error } = await supabase
       .from('income_sources')
       .select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived, created_at')
@@ -194,6 +203,8 @@ export const DataCache = {
     const hit = await Cache.get<CachedExpense[]>(key);
     if (hit) return hit;
 
+    if (!isOnline()) return (await Cache.getStale<CachedExpense[]>(key)) ?? [];
+
     const { data, error } = await supabase
       .from('expenses')
       .select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived, created_at')
@@ -213,6 +224,8 @@ export const DataCache = {
     const key = keys.savingsGoals(userId);
     const hit = await Cache.get<CachedSavingsGoal[]>(key);
     if (hit) return hit;
+
+    if (!isOnline()) return (await Cache.getStale<CachedSavingsGoal[]>(key)) ?? [];
 
     const { data, error } = await supabase
       .from('savings_goals')
@@ -240,6 +253,10 @@ export const DataCache = {
     const key = `dashboard:${userId}`;
     const hit = await Cache.get<ReturnType<typeof this.fetchDashboard> extends Promise<infer T> ? T : never>(key);
     if (hit) return hit;
+
+    if (!isOnline()) {
+      return Cache.getStale<ReturnType<typeof this.fetchDashboard> extends Promise<infer T> ? T : never>(key);
+    }
 
     const [profileRes, incomeRes, expenseRes, goalsRes] = await Promise.all([
       supabase.from('profiles').select('full_name, budget_limit').eq('id', userId).single(),

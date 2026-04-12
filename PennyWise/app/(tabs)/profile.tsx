@@ -4,7 +4,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   ActivityIndicator,
@@ -42,11 +42,13 @@ import { PRIVACY_SECTIONS } from "@/constants/privacy";
 import { TERMS_SECTIONS } from "@/constants/terms";
 import { useAppTheme } from "@/contexts/AppTheme";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { useNetwork } from "@/contexts/NetworkContext";
 import { sfx } from "@/lib/sfx";
 import { supabase } from "@/lib/supabase";
 import { DataCache } from "@/lib/dataCache";
 import { Cache } from "@/lib/cache";
 import { sanitizeName, sanitizeEmail, sanitizePhone, filterName, filterEmail, filterPhone } from "@/lib/sanitize";
+import { MutationQueue } from '@/lib/mutationQueue';
 import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftSaveIndicator } from "@/components/DraftSaveIndicator";
 
@@ -432,6 +434,7 @@ function EditProfileView({
   onSaved: (u: ProfileData) => void;
 }) {
   const { theme } = useAppTheme();
+  const { isOnline } = useNetwork();
 
   const {
     draft:         profileDraft,
@@ -515,6 +518,31 @@ function EditProfileView({
 
   async function handleSave() {
     setConfirm(false);
+
+    // Photo uploads require network (binary data can't be queued in AsyncStorage)
+    if (!isOnline && previewUri) {
+      setErrModal({ visible: true, title: 'No Internet Connection', message: 'You\'re offline. Connect to the internet to upload a profile photo.' });
+      return;
+    }
+
+    // Text-only edit while offline — queue and apply optimistically
+    if (!isOnline) {
+      const cleanName  = sanitizeName(username);
+      const cleanPhone = sanitizePhone(phone);
+      const cleanEmail = sanitizeEmail(email);
+      const uid = (await supabase.auth.getUser()).data.user?.id;
+      if (!uid) return;
+      onSaved({ full_name: cleanName, phone: cleanPhone, email: cleanEmail, avatar_url: profile.avatar_url ?? undefined });
+      await MutationQueue.add({
+        op: 'update', table: 'profiles',
+        payload: { full_name: cleanName, phone: cleanPhone, email: cleanEmail },
+        match: { id: uid },
+      });
+      await clearProfileDraft();
+      onBack();
+      return;
+    }
+
     setSaving(true);
     loadingBar.start();
     const {
@@ -1894,6 +1922,7 @@ function DeleteAccountModal({
 // ── Change password view ──────────────────────────────────────────────────────
 function ChangePasswordView({ onBack }: { onBack: () => void }) {
   const { theme } = useAppTheme();
+  const { isOnline } = useNetwork();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -1947,6 +1976,10 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
 
 
   async function handleChangePassword() {
+    if (!isOnline) {
+      setErrModal({ visible: true, title: 'No Internet Connection', message: 'You\'re offline. Connect to the internet to change your password.' });
+      return;
+    }
     if (!currentPassword || !newPassword || !confirmPassword) {
       setErrModal({
         visible: true,
@@ -2294,6 +2327,7 @@ function SettingsView({
   navigate: (s: Screen) => void;
 }) {
   const { theme, darkMode, toggleDark } = useAppTheme();
+  const { isOnline } = useNetwork();
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [budgetVisible, setBudgetVisible] = useState(false);
   const [budgetLimit, setBudgetLimit] = useState(20000);
@@ -2318,6 +2352,19 @@ function SettingsView({
   }, []);
 
   async function saveBudgetLimit(newLimit: number) {
+    setBudgetLimit(newLimit); // optimistic
+
+    if (!isOnline) {
+      const uid = (await supabase.auth.getUser()).data.user?.id;
+      if (!uid) return;
+      await MutationQueue.add({
+        op: 'update', table: 'profiles',
+        payload: { budget_limit: newLimit },
+        match: { id: uid },
+      });
+      return;
+    }
+
     const {
       data: { user },
       error: uErr,
@@ -2331,10 +2378,13 @@ function SettingsView({
     if (error) throw error;
     DataCache.invalidateProfile(user.id);
     DataCache.invalidateDashboard(user.id);
-    setBudgetLimit(newLimit);
   }
 
   async function confirmDelete() {
+    if (!isOnline) {
+      setErrModal({ visible: true, title: 'No Internet Connection', message: 'You\'re offline. Connect to the internet to delete your account.' });
+      return;
+    }
     loadingBar.start();
     try {
       const {
@@ -2746,48 +2796,55 @@ export default function ProfileScreen() {
     avatar_url: undefined,
   });
   const [loading, setLoading] = useState(true);
+  const profileUserIdRef = useRef<string | null>(null);
+  const { isOnline } = useNetwork();
+
+  const loadProfile = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setLoading(false); return; }
+    profileUserIdRef.current = user.id;
+    const meta = (user.user_metadata ?? {}) as Record<string, string>;
+    const cached = await DataCache.fetchProfile(user.id);
+    if (cached) {
+      setProfile({
+        full_name:  cached.full_name  || meta.full_name || "",
+        email:      cached.email      || meta.email     || "",
+        phone:      cached.phone      || meta.phone     || "",
+        avatar_url: cached.avatar_url ?? undefined,
+      });
+    } else {
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, budget_limit, email, phone, avatar_url")
+        .eq("id", user.id)
+        .single();
+      setProfile({
+        full_name:  data?.full_name  || meta.full_name || "",
+        email:      data?.email      || meta.email     || "",
+        phone:      data?.phone      || meta.phone     || "",
+        avatar_url: data?.avatar_url ?? undefined,
+      });
+    }
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (cancelled || !user) {
-        if (!cancelled) setLoading(false);
-        return;
+    loadProfile();
+  }, [loadProfile]);
+
+  // Reconnect: invalidate stale cache and reload when coming back online
+  const wasOfflineRef = useRef(false);
+  useEffect(() => {
+    if (!isOnline) {
+      wasOfflineRef.current = true;
+    } else if (wasOfflineRef.current) {
+      wasOfflineRef.current = false;
+      if (profileUserIdRef.current) {
+        DataCache.invalidateProfile(profileUserIdRef.current);
       }
-      const meta = (user.user_metadata ?? {}) as Record<string, string>;
-      DataCache.fetchProfile(user.id).then((cached) => {
-        if (cancelled) return;
-        if (cached) {
-          setProfile({
-            full_name:  cached.full_name  || meta.full_name || "",
-            email:      cached.email      || meta.email     || "",
-            phone:      cached.phone      || meta.phone     || "",
-            avatar_url: cached.avatar_url ?? undefined,
-          });
-          setLoading(false);
-        } else {
-          supabase
-            .from("profiles")
-            .select("full_name, budget_limit, email, phone, avatar_url")
-            .eq("id", user.id)
-            .single()
-            .then(({ data }) => {
-              if (cancelled) return;
-              setProfile({
-                full_name:  data?.full_name  || meta.full_name || "",
-                email:      data?.email      || meta.email     || "",
-                phone:      data?.phone      || meta.phone     || "",
-                avatar_url: data?.avatar_url ?? undefined,
-              });
-              setLoading(false);
-            });
-        }
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+      loadProfile();
+    }
+  }, [isOnline, loadProfile]);
 
   if (screen === "edit")
     return (
