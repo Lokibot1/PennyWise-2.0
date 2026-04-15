@@ -12,9 +12,12 @@ import { sfx } from '@/lib/sfx';
 import { loadingBar } from '@/components/GlobalLoadingBar';
 import { PennyWiseLogo } from '@/components/penny-wise-logo';
 import NotificationBell from '@/components/NotificationBell';
+import AnimatedOwl from '@/components/AnimatedOwl';
+import MascotChatbot from '@/components/MascotChatbot';
 import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
 import {
   ActivityIndicator,
+  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -186,14 +189,33 @@ function AnimCard({
 function BalanceHeader({
   title,
   totalExpenses,
+  totalIncome,
   onBack,
   theme,
 }: {
   title: string;
   totalExpenses: number;
+  totalIncome: number;
   onBack?: () => void;
   theme: Theme;
 }) {
+  const [chatOpen, setChatOpen] = useState(false);
+
+  // Pick dialogue based on expense-to-income ratio
+  const ratio = totalIncome > 0 ? totalExpenses / totalIncome : 0;
+  let owlDialogue: string;
+  if (totalIncome === 0 || totalExpenses === 0) {
+    owlDialogue = "Track every peso! 📊\nAsk me anything!";
+  } else if (ratio < 0.5) {
+    owlDialogue = "Amazing discipline! 🎉\nYou're crushing it!";
+  } else if (ratio < 0.7) {
+    owlDialogue = "Looking good! 👍\nStay on budget!";
+  } else if (ratio < 0.9) {
+    owlDialogue = "Careful! ⚠️ Spending\nis getting high!";
+  } else {
+    owlDialogue = "Overspending! 🚨\nTap me, let's fix it!";
+  }
+
   return (
     <View style={[bh.wrap, { backgroundColor: theme.headerBg }]}>
       <View style={bh.nav}>
@@ -210,7 +232,18 @@ function BalanceHeader({
         <NotificationBell style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} iconColor={theme.iconBtnColor} />
       </View>
 
-      <View style={[bh.card, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
+      {/* Owl + speech bubble — left-aligned, owl faces right */}
+      <TouchableOpacity style={bh.owlRow} onPress={() => setChatOpen(true)} activeOpacity={0.8}>
+        <AnimatedOwl width={BH_OWL_W} height={BH_OWL_H} />
+        {/* Bubble on the right, tail points left toward the owl */}
+        <View style={bh.owlBubble}>
+          <Text style={bh.owlBubbleName}>Penny 🦉</Text>
+          <Text style={bh.owlBubbleText}>{owlDialogue}</Text>
+          <View style={bh.owlBubbleTail} />
+        </View>
+      </TouchableOpacity>
+
+      <View style={[bh.card, { marginTop: -BH_OWL_OVL, paddingTop: 12, backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
         <View style={bh.balRow}>
           <View style={{ flex: 1 }}>
             <View style={bh.lblRow}>
@@ -229,21 +262,34 @@ function BalanceHeader({
           </View>
         </View>
       </View>
+
+      <MascotChatbot visible={chatOpen} onClose={() => setChatOpen(false)} />
     </View>
   );
 }
 
+const BH_SCREEN_W = Dimensions.get('window').width;
+const BH_OWL_W   = Math.min(90, Math.round((BH_SCREEN_W - 40) * 0.24));
+const BH_OWL_H   = Math.round(BH_OWL_W * 1.40);
+const BH_OWL_OVL = Math.round(BH_OWL_H * 0.15);
+
 const bh = StyleSheet.create({
-  wrap:    { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
-  nav:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
-  title:   { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A' },
-  card:    { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
-  balRow:  { flexDirection: 'row', alignItems: 'center' },
-  lblRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
-  lbl:     { fontFamily: Font.bodyRegular, fontSize: 11, color: '#666' },
-  amt:     { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A', letterSpacing: -0.3 },
-  divider: { width: 1, height: 40, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 12 },
+  wrap:         { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
+  nav:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  iconBtn:      { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
+  title:        { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A' },
+  card:         { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
+  balRow:       { flexDirection: 'row', alignItems: 'center' },
+  lblRow:       { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
+  lbl:          { fontFamily: Font.bodyRegular, fontSize: 11, color: '#666' },
+  amt:          { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A', letterSpacing: -0.3 },
+  divider:      { width: 1, height: 40, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 12 },
+  // ── Owl ──────────────────────────────────────────────────────────────────────
+  owlRow:       { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'flex-end', marginLeft: 12, zIndex: 2, elevation: 2 },
+  owlBubble:    { backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 13, maxWidth: 155, marginBottom: Math.round(BH_OWL_H * 0.28), marginLeft: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 4, position: 'relative' },
+  owlBubbleName:{ fontFamily: Font.bodySemiBold, fontSize: 11, color: '#3ECBA8', marginBottom: 3, letterSpacing: 0.3 },
+  owlBubbleText:{ fontFamily: Font.bodyRegular, fontSize: 11.5, color: '#2D4A3A', lineHeight: 17 },
+  owlBubbleTail:{ position: 'absolute', left: -8, bottom: 18, width: 0, height: 0, borderTopWidth: 6, borderBottomWidth: 6, borderRightWidth: 9, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderRightColor: '#FFFFFF' },
 });
 
 // ── FormHeader ────────────────────────────────────────────────────────────────
@@ -470,14 +516,14 @@ function EditCategoryModal({
 
 // ── CategoriesScreen ──────────────────────────────────────────────────────────
 function CategoriesScreen({
-  categories, expenses, totalExpenses,
+  categories, expenses, totalExpenses, totalIncome,
   initialTab,
   onSelectCategory, onAddCategory,
   onEditCategory, onArchiveCategory, onRestoreCategory, onDeleteCategory,
   theme,
 }: {
   categories: Category[]; expenses: ExpenseEntry[];
-  totalExpenses: number;
+  totalExpenses: number; totalIncome: number;
   initialTab?: 'Active' | 'Archived';
   onSelectCategory: (id: string) => void; onAddCategory: () => void;
   onEditCategory: (id: string) => void; onArchiveCategory: (id: string) => void;
@@ -493,7 +539,7 @@ function CategoriesScreen({
 
   return (
     <>
-      <BalanceHeader title="Expense Categories" totalExpenses={totalExpenses} theme={theme} />
+      <BalanceHeader title="Expense Categories" totalExpenses={totalExpenses} totalIncome={totalIncome} theme={theme} />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
         <SlideTabBar
           tabs={['Active', 'Archived']}
@@ -612,12 +658,12 @@ function CategoriesScreen({
 
 // ── CategoryDetailScreen ──────────────────────────────────────────────────────
 function CategoryDetailScreen({
-  category, expenses, totalExpenses,
+  category, expenses, totalExpenses, totalIncome,
   initialTab,
   onBack, onAdd, onEditExpense, onArchiveExpense, onRestoreExpense, onDeleteExpense, theme,
 }: {
   category: Category; expenses: ExpenseEntry[];
-  totalExpenses: number;
+  totalExpenses: number; totalIncome: number;
   initialTab?: 'Active' | 'Archived';
   onBack: () => void; onAdd: () => void; onEditExpense: (id: string) => void;
   onArchiveExpense: (id: string) => void; onRestoreExpense: (id: string) => void;
@@ -665,7 +711,7 @@ function CategoryDetailScreen({
 
   return (
     <>
-      <BalanceHeader title={category.label} totalExpenses={totalExpenses} onBack={onBack} theme={theme} />
+      <BalanceHeader title={category.label} totalExpenses={totalExpenses} totalIncome={totalIncome} onBack={onBack} theme={theme} />
       <Animated.View style={[s.white, { flex: 1, backgroundColor: theme.cardBg }, bodyAnim]}>
         <SlideTabBar
           tabs={['Active', 'Archived']}
@@ -1643,6 +1689,7 @@ export default function ManageExpenseScreen() {
             categories={categories}
             expenses={expenses}
             totalExpenses={totalExpenses}
+            totalIncome={budgetLimit}
             initialTab={catNavTab}
             onSelectCategory={id => setScreen({ name: 'detail', categoryId: id })}
             onAddCategory={() => setShowNewCat(true)}
@@ -1662,6 +1709,7 @@ export default function ManageExpenseScreen() {
             category={cat}
             expenses={expenses}
             totalExpenses={totalExpenses}
+            totalIncome={budgetLimit}
             initialTab={detailNavTab}
             onBack={() => setScreen({ name: 'categories' })}
             onAdd={() => setScreen({ name: 'add', prefillCategoryId: cat.id })}
