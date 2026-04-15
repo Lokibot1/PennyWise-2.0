@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import AnimatedOwl from '@/components/AnimatedOwl';
 import Animated, {
   Easing,
   runOnJS,
@@ -322,11 +323,7 @@ export default function HomeScreen() {
             <>
               {/* Owl + speech bubble — normal flow, centered row. zIndex:2 keeps it in front of the card */}
               <TouchableOpacity style={styles.owlPerch} onPress={() => setChatOpen(true)} activeOpacity={0.8}>
-                <Image
-                  source={require('@/assets/images/owlpennywise.png')}
-                  style={styles.owlPerchImage}
-                  resizeMode="contain"
-                />
+                <AnimatedOwl width={OWL_W} height={OWL_H} />
 
                 {/* Speech bubble to the right of the owl */}
                 <View style={styles.owlBubble}>
@@ -668,10 +665,6 @@ const styles = StyleSheet.create({
     zIndex: 2,
     elevation: 2,
     marginLeft: 12,
-  },
-  owlPerchImage: {
-    width: OWL_W,
-    height: OWL_H,
   },
   owlBubble: {
     backgroundColor: '#FFFFFF',
