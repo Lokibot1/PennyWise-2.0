@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -25,7 +25,6 @@ import SlideTabBar from '@/components/SlideTabBar';
 import BudgetLimitModal from '@/components/BudgetLimitModal';
 import CircularRing from '@/components/CircularRing';
 import ErrorModal from '@/components/ErrorModal';
-import PennyMascot, { PENNY_TIPS } from '@/components/PennyMascot';
 import MascotChatbot from '@/components/MascotChatbot';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -252,17 +251,6 @@ export default function HomeScreen() {
     : budgetPercent <= 70 ? `${budgetPercent.toFixed(0)}% Of Your Expenses, Be Careful.`
     : `${budgetPercent.toFixed(0)}% Of Your Expenses, Over Budget!`;
 
-  // Penny's context-aware tip based on current financial state
-  const pennyTip = !loading
-    ? budgetPercent >= 80
-      ? `You've used ${budgetPercent.toFixed(0)}% of your budget! Slow down on spending before the month ends. 🛑`
-      : budgetPercent >= 50
-      ? `You're halfway through your budget. Stay mindful of the next few days! 📊`
-      : goalsCount === 0
-      ? "You have no savings goals yet — set one and start building your future! 🎯"
-      : PENNY_TIPS[new Date().getDate() % PENNY_TIPS.length]
-    : PENNY_TIPS[0];
-
   // Savings goals aggregate
   const goalsCount   = savingsGoals.length;
   const totalSaved   = savingsGoals.reduce((s, g) => s + g.current_amount, 0);
@@ -328,24 +316,28 @@ export default function HomeScreen() {
             <NotificationBell style={[styles.bellButton, { backgroundColor: theme.iconBtnBg }]} iconColor={theme.iconBtnColor} />
           </View>
 
-          {/* ── Penny mascot with financial tip ──────────────────────── */}
-          {!loading && (
-            <View style={styles.mascotRow}>
-              <PennyMascot
-                tip={pennyTip}
-                onPress={() => setChatOpen(true)}
-                size={56}
-                variant="bubble"
-                dark={theme.isDark}
-              />
-            </View>
-          )}
-
           {loading ? (
             <HomeDashboardSkeleton />
           ) : (
             <>
-              {/* Balance Card */}
+              {/* Owl + speech bubble — normal flow, centered row. zIndex:2 keeps it in front of the card */}
+              <TouchableOpacity style={styles.owlPerch} onPress={() => setChatOpen(true)} activeOpacity={0.8}>
+                <Image
+                  source={require('@/assets/images/owlpennywise.png')}
+                  style={styles.owlPerchImage}
+                  resizeMode="contain"
+                />
+
+                {/* Speech bubble to the right of the owl */}
+                <View style={styles.owlBubble}>
+                  <Text style={styles.owlBubbleName}>Penny 🦉</Text>
+                  <Text style={styles.owlBubbleText}>{"Hi there! 👋\nTap me to chat!"}</Text>
+                  {/* Tail pointing left toward the owl */}
+                  <View style={styles.owlBubbleTail} />
+                </View>
+              </TouchableOpacity>
+
+              {/* Balance Card — marginTop:-OWL_OVERLAP pulls it up under the owl */}
               <View style={[styles.balanceCard, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
                 <View style={[styles.balanceRow, { borderBottomColor: theme.divider }]}>
                   <View style={styles.balanceItem}>
@@ -616,6 +608,14 @@ export default function HomeScreen() {
   );
 }
 
+// ── Owl sizing constants ───────────────────────────────────────────────────────
+// Card width = screen width minus greenSection's 20px horizontal padding on each side
+const SCREEN_W    = Dimensions.get('window').width;
+const CARD_W      = SCREEN_W - 40;
+const OWL_W       = Math.min(105, Math.round(CARD_W * 0.28)); // 28% of card ≈ 95-100px
+const OWL_H       = Math.round(OWL_W * 1.40);                 // real crop ratio 220x307 ≈ 1:1.4
+const OWL_OVERLAP = Math.round(OWL_H * 0.15);                 // 15% — feet just on card border
+
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safeArea: {
@@ -631,11 +631,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 28,
-  },
-  mascotRow: {
-    alignItems: 'flex-end',
-    marginBottom: 16,
-    paddingRight: 4,
   },
   greetingRow: {
     flexDirection: 'row',
@@ -663,13 +658,73 @@ const styles = StyleSheet.create({
   },
 
   // ── Balance Card ──────────────────────────────────────────────────────────────
+  // Owl is in normal flow (centered). Card has marginTop: -OWL_OVERLAP which
+  // physically pulls the card up so it slides under the owl's feet.
+  // zIndex:2 on the owl ensures it paints in front of the card's white background.
+  owlPerch: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    zIndex: 2,
+    elevation: 2,
+    marginLeft: 12,
+  },
+  owlPerchImage: {
+    width: OWL_W,
+    height: OWL_H,
+  },
+  owlBubble: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 13,
+    maxWidth: 160,
+    marginBottom: Math.round(OWL_H * 0.28),  // align bubble roughly to owl body
+    marginLeft: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    position: 'relative',
+  },
+  owlBubbleName: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 11,
+    color: '#3ECBA8',
+    marginBottom: 3,
+    letterSpacing: 0.3,
+  },
+  owlBubbleText: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 11.5,
+    color: '#2D4A3A',
+    lineHeight: 17,
+  },
+  owlBubbleTail: {
+    position: 'absolute',
+    left: -8,
+    bottom: 18,
+    width: 0,
+    height: 0,
+    borderTopWidth: 6,
+    borderBottomWidth: 6,
+    borderRightWidth: 9,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderRightColor: '#FFFFFF',
+  },
   balanceCard: {
     backgroundColor: 'rgba(255,255,255,0.88)',
     borderRadius: 16,
-    padding: 16,
+    marginTop: -OWL_OVERLAP,           // slides card up under owl feet
+    paddingTop: 12,                    // labels sit near the top; owl may overlap
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.6)',
+    zIndex: 1,
   },
   balanceRow: {
     flexDirection: 'row',
