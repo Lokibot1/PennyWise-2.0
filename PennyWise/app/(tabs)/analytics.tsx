@@ -14,6 +14,7 @@ import { CategoryPageSkeleton } from '@/components/SkeletonLoader';
 import NotificationBell from '@/components/NotificationBell';
 import {
   ActivityIndicator,
+  Dimensions,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -37,6 +38,8 @@ import { sanitizeCategoryLabel, sanitizeTitle, sanitizeDescription, parseAmount 
 import { MutationQueue } from '@/lib/mutationQueue';
 import { useFormDraft } from '@/hooks/useFormDraft';
 import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
+import MascotChatbot from '@/components/MascotChatbot';
+import AnimatedOwl from '@/components/AnimatedOwl';
 import Animated, {
   useSharedValue,
   withSpring,
@@ -193,6 +196,8 @@ function BalanceHeader({
   onBack?: () => void;
   theme: Theme;
 }) {
+  const [chatOpen, setChatOpen] = useState(false);
+
   return (
     <View style={[bh.wrap, { backgroundColor: theme.headerBg }]}>
       <View style={bh.nav}>
@@ -209,7 +214,18 @@ function BalanceHeader({
         <NotificationBell style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]} iconColor={theme.iconBtnColor} />
       </View>
 
-      <View style={[bh.card, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
+      {/* Owl + speech bubble — right-aligned, sits above the card */}
+      <TouchableOpacity style={bh.owlRow} onPress={() => setChatOpen(true)} activeOpacity={0.8}>
+        {/* Bubble on the left, tail points right toward the owl */}
+        <View style={bh.owlBubble}>
+          <Text style={bh.owlBubbleName}>Penny 🦉</Text>
+          <Text style={bh.owlBubbleText}>{"Great earnings! 🌟\nKeep it up!"}</Text>
+          <View style={bh.owlBubbleTail} />
+        </View>
+        <AnimatedOwl width={BH_OWL_W} height={BH_OWL_H} flipX />
+      </TouchableOpacity>
+
+      <View style={[bh.card, { marginTop: -BH_OWL_OVL, paddingTop: 12, backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
         <View style={bh.balRow}>
           <View style={{ flex: 1 }}>
             <View style={bh.lblRow}>
@@ -228,9 +244,16 @@ function BalanceHeader({
           </View>
         </View>
       </View>
+
+      <MascotChatbot visible={chatOpen} onClose={() => setChatOpen(false)} />
     </View>
   );
 }
+
+const BH_SCREEN_W  = Dimensions.get('window').width;
+const BH_OWL_W     = Math.min(90, Math.round((BH_SCREEN_W - 40) * 0.24));
+const BH_OWL_H     = Math.round(BH_OWL_W * 1.40);
+const BH_OWL_OVL   = Math.round(BH_OWL_H * 0.15);
 
 const bh = StyleSheet.create({
   wrap:    { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
@@ -243,6 +266,12 @@ const bh = StyleSheet.create({
   lbl:     { fontFamily: Font.bodyRegular, fontSize: 11, color: '#666' },
   amt:     { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A', letterSpacing: -0.3 },
   divider: { width: 1, height: 40, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 12 },
+  // ── Owl perch ────────────────────────────────────────────────────────────────
+  owlRow:       { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', marginRight: 12, zIndex: 2, elevation: 2 },
+  owlBubble:    { backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 13, maxWidth: 150, marginBottom: Math.round(BH_OWL_H * 0.28), marginRight: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 4, position: 'relative' },
+  owlBubbleName:{ fontFamily: Font.bodySemiBold, fontSize: 11, color: '#3ECBA8', marginBottom: 3, letterSpacing: 0.3 },
+  owlBubbleText:{ fontFamily: Font.bodyRegular, fontSize: 11.5, color: '#2D4A3A', lineHeight: 17 },
+  owlBubbleTail:{ position: 'absolute', right: -8, bottom: 18, width: 0, height: 0, borderTopWidth: 6, borderBottomWidth: 6, borderLeftWidth: 9, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#FFFFFF' },
 });
 
 // ── FormHeader ────────────────────────────────────────────────────────────────
