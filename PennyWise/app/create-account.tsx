@@ -9,6 +9,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -208,6 +209,7 @@ export default function CreateAccountScreen() {
   const [error, setError] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+
 
   function onDobConfirm(date: Date) {
     setDob(date);
@@ -502,6 +504,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     alignItems: "center",
   },
+
   headerTitle: {
     fontFamily: Font.headerBlack,
     fontSize: 36,

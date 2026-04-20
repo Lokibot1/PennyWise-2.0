@@ -635,6 +635,98 @@ function handleTips(d: FinancialData): string {
   return `💡 Personalized tips:\n\n` + tips.join('\n\n');
 }
 
+function handleSavingAdvice(d: FinancialData): string {
+  const savingsRate = d.monthIncome > 0
+    ? Math.max(0, ((d.monthIncome - d.monthExpenses) / d.monthIncome) * 100)
+    : 0;
+
+  const strategies: string[] = [];
+
+  // 1. Pay-yourself-first rule
+  strategies.push(
+    `💰 Pay yourself first\nAs soon as you receive your income, set aside your savings before spending anything else. Even ₱500–₱1,000/month adds up significantly over time.`
+  );
+
+  // 2. 50/30/20 rule — contextualized to actual data
+  if (d.monthIncome > 0) {
+    const needs   = fmt(d.monthIncome * 0.5);
+    const wants   = fmt(d.monthIncome * 0.3);
+    const savings = fmt(d.monthIncome * 0.2);
+    strategies.push(
+      `📐 Use the 50/30/20 rule\nSplit your ₱${fmt(d.monthIncome).replace('₱', '')} income as:\n• 50% (${needs}) → Needs (rent, food, transport)\n• 30% (${wants}) → Wants (dining out, leisure)\n• 20% (${savings}) → Savings & goals`
+    );
+  } else {
+    strategies.push(
+      `📐 Use the 50/30/20 rule\nSplit income as:\n• 50% → Needs (rent, food, transport)\n• 30% → Wants (dining out, leisure)\n• 20% → Savings & investment goals`
+    );
+  }
+
+  // 3. Emergency fund
+  if (d.budgetLimit > 0) {
+    strategies.push(
+      `🛡️ Build an emergency fund\nAim for ${fmt(d.budgetLimit * 3)}–${fmt(d.budgetLimit * 6)} (3–6 months of expenses) in a separate savings account. This keeps you from going into debt when unexpected costs hit.`
+    );
+  } else {
+    strategies.push(
+      `🛡️ Build an emergency fund\nAim for 3–6 months of living expenses set aside in a dedicated account. This is your financial safety net.`
+    );
+  }
+
+  // 4. Automate savings
+  strategies.push(
+    `🤖 Automate your savings\nSet up an auto-transfer to a separate account on payday. What you don't see in your main account, you won't spend. Even ₱300/week = ₱15,600/year.`
+  );
+
+  // 5. Avoid impulse buying
+  strategies.push(
+    `🛍️ Beat impulse buying\nApply the 24-hour rule: wait a full day before buying anything over ₱500. Most impulse urges fade within hours. Remove saved card details from shopping apps to add friction.`
+  );
+
+  // 6. Track every peso
+  strategies.push(
+    `📝 Track every expense\nYou're already using PennyWise — log every transaction, no matter how small. Studies show people who track spending save 15–20% more than those who don't. The Budget tab is your best tool here.`
+  );
+
+  // 7. Cook at home / meal prep
+  strategies.push(
+    `🍱 Meal-prep to slash food costs\nCooking at home instead of buying outside 4–5×/week can cut food expenses by 30–50%. Batch-cook ulam on weekends and bring packed lunch to work/school.`
+  );
+
+  // 8. Review & cancel subscriptions
+  if (d.recurringExpenses.length > 0) {
+    const recurTotal = d.recurringExpenses.reduce((s, r) => s + r.amount, 0);
+    strategies.push(
+      `📺 Audit your ₱${fmt(recurTotal).replace('₱', '')} in recurring bills\nYou have ${d.recurringExpenses.length} recurring expense${d.recurringExpenses.length > 1 ? 's' : ''}. Cancel anything you haven't used in 30 days. Share streaming accounts with family or friends where allowed.`
+    );
+  } else {
+    strategies.push(
+      `📺 Cancel unused subscriptions\nReview all recurring charges every 3 months. Streaming services, apps, and gym memberships you rarely use are silent budget drains.`
+    );
+  }
+
+  // 9. Low savings rate nudge
+  if (d.monthIncome > 0 && savingsRate < 15) {
+    strategies.push(
+      `📈 Boost your ${pct(savingsRate)} savings rate\nFinancial experts recommend saving at least 20% of income. Start small — try cutting your top expense category by just 10% this month and redirect those pesos to savings.`
+    );
+  } else if (d.monthIncome > 0 && savingsRate >= 20) {
+    strategies.push(
+      `🌱 You're saving ${pct(savingsRate)} — now grow it\nGreat savings rate! Consider moving idle savings into a UITF, time deposit, or MP2 (Pag-IBIG) fund to earn higher returns than a regular savings account.`
+    );
+  }
+
+  // 10. Debt-free strategy
+  strategies.push(
+    `🚫 Stay away from high-interest debt\nAvoid "buy now, pay later" schemes and credit card revolving balances — interest rates of 2–3%/month mean you pay 24–36% extra per year. If you have existing debt, pay it off before aggressively growing savings.`
+  );
+
+  return (
+    `💡 How to Save Money — Penny's Guide:\n\n` +
+    strategies.join('\n\n') +
+    `\n\n🦉 Start with just one habit this month — small consistent actions beat big one-time changes.`
+  );
+}
+
 function handleHelp(_d: FinancialData): string {
   return (
     `🦉 Here's what you can ask me:\n\n` +
@@ -642,7 +734,8 @@ function handleHelp(_d: FinancialData): string {
     `💸 "Show my expenses" — this month's category breakdown\n` +
     `💸 "Show my expenses all time" — all-time spending history\n` +
     `💰 "Show my income" — income sources this month\n` +
-    `✂️ "How can I save more?" — specific cut-expense advice\n` +
+    `✂️ "How can I save more?" — cut-expense advice from your data\n` +
+    `💡 "Money saving tips" — general strategies to save money\n` +
     `🔝 "What's my biggest expense?" — top spending categories\n` +
     `🔄 "Show recurring bills" — subscriptions & fixed bills\n` +
     `⚖️ "Income vs expenses" — net & savings rate\n` +
@@ -783,6 +876,16 @@ const INTENTS: Intent[] = [
       'what should i do', 'financial advice', 'money advice',
     ],
     handler: handleTips,
+  },
+  {
+    keywords: [
+      'money saving tips', 'saving tips', 'saving advice', 'how to save money',
+      'ways to save', 'saving strategies', 'saving guide', 'teach me to save',
+      'paano mag-ipon', 'ipon tips', 'ipon advice', 'magkano dapat itabi',
+      'money habits', 'financial habits', 'good money habits', 'saving habits',
+      'how do i save', 'how can i start saving',
+    ],
+    handler: handleSavingAdvice,
   },
   {
     keywords: [

@@ -47,6 +47,7 @@ interface Props {
 const SUGGESTIONS = [
   "How's my budget?",
   "Show my expenses",
+  "Money saving tips",
   "How can I save more?",
   "What's my biggest expense?",
   "Income vs expenses",

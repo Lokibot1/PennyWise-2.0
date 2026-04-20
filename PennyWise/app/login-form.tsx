@@ -32,6 +32,7 @@ export default function LoginFormScreen() {
   const btnScale = useSharedValue(1);
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: btnScale.value }] }));
 
+
   async function handleLogin() {
     const cleanEmail = sanitizeEmail(email);
     if (!cleanEmail || !password) return;
@@ -180,6 +181,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     alignItems: 'center',
   },
+
   headerTitle: {
     fontFamily: Font.headerBlack,
     fontSize: 40,
