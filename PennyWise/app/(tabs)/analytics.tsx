@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
 import { useNetwork } from '@/contexts/NetworkContext';
@@ -39,6 +39,7 @@ import { MutationQueue } from '@/lib/mutationQueue';
 import { useFormDraft } from '@/hooks/useFormDraft';
 import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
 import MascotChatbot from '@/components/MascotChatbot';
+import CategoryDonutChart from '@/components/CategoryDonutChart';
 import AnimatedOwl from '@/components/AnimatedOwl';
 import Animated, {
   useSharedValue,
@@ -118,6 +119,8 @@ const fmtDateShort = (iso: string) => { const [,m,d] = iso.split('-').map(Number
 const fmt12h = (hhmm: string) => { const [h, m] = hhmm.split(':').map(Number); const ampm = h >= 12 ? 'PM' : 'AM'; return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${ampm}`; };
 const monthLabel   = (iso: string) => MONTHS[+iso.split('-')[1] - 1];
 const monthYearKey = (iso: string) => iso.slice(0, 7);  // YYYY-MM — used as unique React key
+
+const CHART_COLORS = ['#3ECBA8','#22C55E','#4895EF','#7CB898','#F59E0B','#EC4899','#8B5CF6','#EF4444','#06B6D4','#84CC16'];
 
 function groupByMonth(items: IncomeSource[]) {
   const map = new Map<string, { key: string; label: string; items: IncomeSource[] }>();
@@ -473,6 +476,20 @@ function CategoriesScreen({
   const bodyAnim                = useEntranceAnim();
   const kebabCat                = kebabCatId ? categories.find(c => c.id === kebabCatId) : null;
 
+  const categoryTotals = useMemo(() =>
+    active
+      .map((cat, i) => ({
+        label: cat.label,
+        value: income.filter(inc => inc.categoryId === cat.id && !inc.isArchived)
+                     .reduce((s, inc) => s + inc.amount, 0),
+        color: CHART_COLORS[i % CHART_COLORS.length],
+      }))
+      .filter(c => c.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6),
+  [active, income]);
+  const chartTotal = categoryTotals.reduce((s, c) => s + c.value, 0);
+
   return (
     <>
       <BalanceHeader title="Income Sources" totalIncome={totalIncome} theme={theme} />
@@ -488,7 +505,11 @@ function CategoriesScreen({
         />
         <ScrollView style={[s.white, { backgroundColor: theme.cardBg }]} contentContainerStyle={s.whiteContent} showsVerticalScrollIndicator={false}>
           {tab === 'Active' ? (
-            <View style={s.grid}>
+            <>
+              {categoryTotals.length > 0 && (
+                <CategoryDonutChart slices={categoryTotals} total={chartTotal} theme={theme} />
+              )}
+              <View style={s.grid}>
               {active.map(cat => {
                 const count = income.filter(i => i.categoryId === cat.id && !i.isArchived).length;
                 return (
@@ -518,6 +539,7 @@ function CategoriesScreen({
                 <Text style={[s.catLabel, { color: theme.textPrimary }]}>More</Text>
               </TouchableOpacity>
             </View>
+            </>
           ) : (
             <>
               {archived.length === 0 && (

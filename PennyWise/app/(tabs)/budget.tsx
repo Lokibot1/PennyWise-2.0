@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { router, useFocusEffect } from "expo-router";
 import { getNavTarget, clearNavTarget } from "@/lib/activityNavTarget";
 import { useNetwork } from "@/contexts/NetworkContext";
@@ -14,6 +14,7 @@ import { PennyWiseLogo } from "@/components/penny-wise-logo";
 import NotificationBell from "@/components/NotificationBell";
 import AnimatedOwl from "@/components/AnimatedOwl";
 import MascotChatbot from "@/components/MascotChatbot";
+import CategoryDonutChart from "@/components/CategoryDonutChart";
 import { CategoryPageSkeleton } from "@/components/SkeletonLoader";
 import {
   ActivityIndicator,
@@ -141,6 +142,8 @@ const fmt12h = (hhmm: string) => {
 };
 const monthLabel = (iso: string) => MONTHS[+iso.split("-")[1] - 1];
 const monthYearKey = (iso: string) => iso.slice(0, 7);
+
+const CHART_COLORS = ['#3ECBA8','#22C55E','#4895EF','#7CB898','#F59E0B','#EC4899','#8B5CF6','#EF4444','#06B6D4','#84CC16'];
 
 function groupByMonth(items: ExpenseEntry[]) {
   const map = new Map<
@@ -886,6 +889,20 @@ function CategoriesScreen({
     ? categories.find((c) => c.id === kebabCatId)
     : null;
 
+  const categoryTotals = useMemo(() =>
+    active
+      .map((cat, i) => ({
+        label: cat.label,
+        value: expenses.filter(e => e.categoryId === cat.id && !e.isArchived)
+                       .reduce((s, e) => s + e.amount, 0),
+        color: CHART_COLORS[i % CHART_COLORS.length],
+      }))
+      .filter(c => c.value > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6),
+  [active, expenses]);
+  const chartTotal = categoryTotals.reduce((s, c) => s + c.value, 0);
+
   return (
     <>
       <BalanceHeader
@@ -911,6 +928,9 @@ function CategoriesScreen({
         >
           {tab === "Active" ? (
             <>
+              {categoryTotals.length > 0 && (
+                <CategoryDonutChart slices={categoryTotals} total={chartTotal} theme={theme} />
+              )}
               <View style={s.grid}>
                 {active.map((cat) => {
                   const count = expenses.filter(

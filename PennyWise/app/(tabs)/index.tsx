@@ -27,6 +27,7 @@ import BudgetLimitModal from '@/components/BudgetLimitModal';
 import CircularRing from '@/components/CircularRing';
 import ErrorModal from '@/components/ErrorModal';
 import MascotChatbot from '@/components/MascotChatbot';
+import SpendingBarChart from '@/components/SpendingBarChart';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Period = 'Daily' | 'Weekly' | 'Monthly';
@@ -245,6 +246,21 @@ export default function HomeScreen() {
   // Period-scoped income / expense for stats
   const periodIncome  = useMemo(() => displayedTransactions.filter(t => t.value > 0).reduce((s, t) => s + t.value, 0), [displayedTransactions]);
   const periodExpense = useMemo(() => displayedTransactions.filter(t => t.value < 0).reduce((s, t) => s + Math.abs(t.value), 0), [displayedTransactions]);
+
+  const last6Months = useMemo(() => {
+    const months: { label: string; income: number; expense: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(1);
+      d.setMonth(d.getMonth() - i);
+      const key   = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleString('en-US', { month: 'short' });
+      const income  = allTransactions.filter(t => t.date.startsWith(key) && t.value > 0).reduce((s, t) => s + t.value, 0);
+      const expense = allTransactions.filter(t => t.date.startsWith(key) && t.value < 0).reduce((s, t) => s + Math.abs(t.value), 0);
+      months.push({ label, income, expense });
+    }
+    return months;
+  }, [allTransactions]);
 
   const budgetPercent = budgetLimit > 0 ? Math.min(100, (totalExpense / budgetLimit) * 100) : 0;
   const budgetMsg =
@@ -524,6 +540,14 @@ export default function HomeScreen() {
                   {formatCurrency(periodIncome - periodExpense)}
                 </Text>
               </View>
+            </View>
+          )}
+
+          {/* 6-Month Trend */}
+          {!loading && (
+            <View style={styles.chartSection}>
+              <Text style={[styles.chartTitle, { color: theme.textPrimary as string }]}>6-Month Overview</Text>
+              <SpendingBarChart data={last6Months} theme={theme} />
             </View>
           )}
 
@@ -869,6 +893,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     flex: 1,
     minHeight: 480,
+  },
+
+  // ── Chart Section ─────────────────────────────────────────────────────────────
+  chartSection: {
+    marginBottom: 20,
+  },
+  chartTitle: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 14,
+    marginBottom: 12,
   },
 
   // ── Period Summary Strip ──────────────────────────────────────────────────────
