@@ -52,10 +52,11 @@ export type CachedProfile = {
 };
 
 export type CachedCategory = {
-  id:          string;
-  label:       string;
-  icon:        string;
-  is_archived: boolean;
+  id:           string;
+  label:        string;
+  icon:         string;
+  is_archived:  boolean;
+  budget_limit: number | null;
 };
 
 export type CachedIncomeSource = {
@@ -163,7 +164,7 @@ export const DataCache = {
 
     const { data, error } = await supabase
       .from('expense_categories')
-      .select('id, label, icon, is_archived')
+      .select('id, label, icon, is_archived, budget_limit')
       .eq('user_id', userId);
 
     if (error || !data) return [];

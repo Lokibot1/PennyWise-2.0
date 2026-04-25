@@ -64,6 +64,7 @@ type Category = {
   label: string;
   icon: IoniconName;
   isArchived: boolean;
+  budgetLimit: number | null;
 };
 
 type ExpenseEntry = {
@@ -639,21 +640,25 @@ function NewCategoryModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  onCreate: (label: string, icon: IoniconName) => void;
+  onCreate: (label: string, icon: IoniconName, budgetLimit: number | null) => void;
   theme: Theme;
 }) {
   const [label, setLabel] = useState("");
   const [icon, setIcon] = useState<IoniconName>("home-outline");
   const [nameError, setNameError] = useState(false);
+  const [budgetStr, setBudgetStr] = useState("");
 
   const handleCreate = () => {
     if (!label.trim()) {
       setNameError(true);
       return;
     }
-    onCreate(label.trim(), icon);
+    const raw = parseFloat(budgetStr.replace(/,/g, ""));
+    const limit = budgetStr.trim() && !isNaN(raw) && raw > 0 ? raw : null;
+    onCreate(label.trim(), icon, limit);
     setLabel("");
     setIcon("home-outline");
+    setBudgetStr("");
     setNameError(false);
     onClose();
   };
@@ -734,6 +739,30 @@ function NewCategoryModal({
                 ))}
               </View>
 
+              <Text style={[s.label, { marginTop: 16 }]}>Monthly Budget Limit</Text>
+              <Text style={[s.hint, { marginBottom: 6 }]}>
+                Optional — track spending against a monthly cap
+              </Text>
+              <View style={s.fieldRow}>
+                <Text style={[s.fieldTxt, { color: "#aaa", marginRight: 4 }]}>₱</Text>
+                <TextInput
+                  style={[s.fieldTxt, { flex: 1 }]}
+                  value={budgetStr}
+                  onChangeText={setBudgetStr}
+                  placeholder="e.g. 5000 (leave blank for no limit)"
+                  placeholderTextColor="#aaa"
+                  keyboardType="numeric"
+                />
+                {budgetStr.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setBudgetStr("")}
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#aaa" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <TouchableOpacity
                 style={[s.saveBtn, { marginTop: 20, marginBottom: 8 }]}
                 onPress={handleCreate}
@@ -760,22 +789,26 @@ function EditCategoryModal({
   visible: boolean;
   category: Category | null;
   onClose: () => void;
-  onSave: (id: string, label: string, icon: IoniconName) => void;
+  onSave: (id: string, label: string, icon: IoniconName, budgetLimit: number | null) => void;
   theme: Theme;
 }) {
   const [label, setLabel] = useState("");
   const [icon, setIcon] = useState<IoniconName>("star-outline");
+  const [budgetStr, setBudgetStr] = useState("");
 
   useEffect(() => {
     if (category) {
       setLabel(category.label);
       setIcon(category.icon);
+      setBudgetStr(category.budgetLimit != null ? String(category.budgetLimit) : "");
     }
   }, [category?.id]);
 
   const handleSave = () => {
     if (!label.trim() || !category) return;
-    onSave(category.id, label.trim(), icon);
+    const raw = parseFloat(budgetStr.replace(/,/g, ""));
+    const limit = budgetStr.trim() && !isNaN(raw) && raw > 0 ? raw : null;
+    onSave(category.id, label.trim(), icon, limit);
     onClose();
   };
 
@@ -837,6 +870,32 @@ function EditCategoryModal({
                   </TouchableOpacity>
                 ))}
               </View>
+              <Text style={[s.label, { color: theme.textPrimary, marginTop: 16 }]}>
+                Monthly Budget Limit
+              </Text>
+              <Text style={[s.hint, { marginBottom: 6 }]}>
+                Optional — track spending against a monthly cap
+              </Text>
+              <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
+                <Text style={[s.fieldTxt, { color: theme.textMuted, marginRight: 4 }]}>₱</Text>
+                <TextInput
+                  style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
+                  value={budgetStr}
+                  onChangeText={setBudgetStr}
+                  placeholder="e.g. 5000 (leave blank for no limit)"
+                  placeholderTextColor="#aaa"
+                  keyboardType="numeric"
+                />
+                {budgetStr.length > 0 && (
+                  <TouchableOpacity
+                    onPress={() => setBudgetStr("")}
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                  >
+                    <Ionicons name="close-circle" size={18} color="#aaa" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <TouchableOpacity
                 style={[s.saveBtn, { marginTop: 20, marginBottom: 8 }]}
                 onPress={handleSave}
@@ -967,6 +1026,23 @@ function CategoriesScreen({
                           {count} item{count !== 1 ? "s" : ""}
                         </Text>
                       )}
+                      {cat.budgetLimit != null && cat.budgetLimit > 0 && (() => {
+                        const now = new Date();
+                        const mKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                        const spent = expenses
+                          .filter(e => e.categoryId === cat.id && !e.isArchived && e.date.startsWith(mKey))
+                          .reduce((sum, e) => sum + e.amount, 0);
+                        const pct = Math.min(100, (spent / cat.budgetLimit!) * 100);
+                        const bc = pct > 70 ? '#E85D5D' : pct > 30 ? '#F59E0B' : '#22C55E';
+                        return (
+                          <View style={s.catBudgetWrap}>
+                            <View style={[s.catBudgetTrack, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.12)' : '#E0E0E0' }]}>
+                              <View style={[s.catBudgetFill, { width: `${pct}%` as any, backgroundColor: bc }]} />
+                            </View>
+                            <Text style={[s.catBudgetPct, { color: bc }]}>{pct.toFixed(0)}%</Text>
+                          </View>
+                        );
+                      })()}
                     </View>
                   );
                 })}
@@ -1250,6 +1326,41 @@ function CategoryDetailScreen({
         >
           {tab === "Active" ? (
             <>
+              {category.budgetLimit != null && category.budgetLimit > 0 && (() => {
+                const now = new Date();
+                const mKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                const spent = activeExpenses.filter(e => e.date.startsWith(mKey)).reduce((sum, e) => sum + e.amount, 0);
+                const pct = Math.min(100, (spent / category.budgetLimit!) * 100);
+                const bc = pct > 70 ? '#E85D5D' : pct > 30 ? '#F59E0B' : '#22C55E';
+                return (
+                  <View style={[s.budgetCard, { backgroundColor: theme.surface as string }]}>
+                    <View style={s.budgetCardRow}>
+                      <View>
+                        <Text style={[s.budgetCardLabel, { color: theme.textMuted as string }]}>Spent This Month</Text>
+                        <Text style={[s.budgetCardAmt, { color: theme.textPrimary as string }]}>{fmtAmt(spent)}</Text>
+                      </View>
+                      <View style={[s.budgetBadge, { backgroundColor: bc }]}>
+                        <Text style={s.budgetBadgeTxt}>{pct.toFixed(0)}%</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[s.budgetCardLabel, { color: theme.textMuted as string }]}>Monthly Budget</Text>
+                        <Text style={[s.budgetCardAmt, { color: theme.textPrimary as string }]}>{fmtAmt(category.budgetLimit!)}</Text>
+                      </View>
+                    </View>
+                    <View style={[s.budgetTrack, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.12)' : '#E5E5E5' }]}>
+                      <View style={[s.budgetFill, { width: `${pct}%` as any, backgroundColor: bc }]} />
+                    </View>
+                    {pct >= 70 && (
+                      <View style={s.budgetWarnRow}>
+                        <Ionicons name={pct >= 100 ? 'warning' : 'warning-outline'} size={13} color={bc} />
+                        <Text style={[s.budgetWarnTxt, { color: bc }]}>
+                          {pct >= 100 ? ' Over monthly budget!' : ` ${(100 - pct).toFixed(0)}% of budget remaining`}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
               {activeGrouped.length === 0 && (
                 <View style={s.empty}>
                   <Ionicons
@@ -1846,6 +1957,7 @@ export default function ManageExpenseScreen() {
           label: c.label,
           icon: c.icon as IoniconName,
           isArchived: c.is_archived,
+          budgetLimit: c.budget_limit ?? null,
         })),
       );
 
@@ -2160,13 +2272,14 @@ export default function ManageExpenseScreen() {
     id: string,
     label: string,
     icon: IoniconName,
+    budgetLimit: number | null,
   ) => {
     const cleanLabel = sanitizeCategoryLabel(label);
     const oldCat = categories.find((c) => c.id === id);
 
     // Optimistic
     setCategories((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, label: cleanLabel, icon } : c)),
+      prev.map((c) => (c.id === id ? { ...c, label: cleanLabel, icon, budgetLimit } : c)),
     );
     sfx.success();
     showToast("Category updated successfully.");
@@ -2175,7 +2288,7 @@ export default function ManageExpenseScreen() {
       await MutationQueue.add({
         op: "update",
         table: "expense_categories",
-        payload: { label: cleanLabel, icon },
+        payload: { label: cleanLabel, icon, budget_limit: budgetLimit },
         match: { id },
       });
       return;
@@ -2183,7 +2296,7 @@ export default function ManageExpenseScreen() {
 
     const { error } = await supabase
       .from("expense_categories")
-      .update({ label: cleanLabel, icon })
+      .update({ label: cleanLabel, icon, budget_limit: budgetLimit })
       .eq("id", id);
     if (error) {
       if (oldCat)
@@ -2196,6 +2309,8 @@ export default function ManageExpenseScreen() {
       if (oldCat?.label !== cleanLabel)
         changes.push(`Name: "${oldCat?.label}" → "${cleanLabel}"`);
       if (oldCat?.icon !== icon) changes.push("Icon changed");
+      if (oldCat?.budgetLimit !== budgetLimit)
+        changes.push(budgetLimit != null ? `Budget: ${fmtAmt(budgetLimit)}/mo` : "Budget removed");
       logActivity({
         user_id: userIdRef.current!,
         action_type: ACTION.EXPENSE_CATEGORY_UPDATED,
@@ -2528,14 +2643,14 @@ export default function ManageExpenseScreen() {
     });
   };
 
-  const handleNewCategory = async (label: string, icon: IoniconName) => {
+  const handleNewCategory = async (label: string, icon: IoniconName, budgetLimit: number | null) => {
     const cleanLabel = sanitizeCategoryLabel(label);
     const tempId = `temp-${Date.now()}`;
 
     // Optimistic: add temp category and navigate immediately
     setCategories((prev) => [
       ...prev,
-      { id: tempId, label: cleanLabel, icon, isArchived: false },
+      { id: tempId, label: cleanLabel, icon, isArchived: false, budgetLimit },
     ]);
     sfx.success();
     showToast(`Category "${cleanLabel}" created.`);
@@ -2546,14 +2661,14 @@ export default function ManageExpenseScreen() {
         op: "insert",
         table: "expense_categories",
         tempId,
-        payload: { user_id: userIdRef.current, label: cleanLabel, icon },
+        payload: { user_id: userIdRef.current, label: cleanLabel, icon, budget_limit: budgetLimit },
       });
       return;
     }
 
     const { data, error } = await supabase
       .from("expense_categories")
-      .insert({ user_id: userIdRef.current, label: cleanLabel, icon })
+      .insert({ user_id: userIdRef.current, label: cleanLabel, icon, budget_limit: budgetLimit })
       .select()
       .single();
 
@@ -2569,6 +2684,7 @@ export default function ManageExpenseScreen() {
                 label: data.label,
                 icon: data.icon as IoniconName,
                 isArchived: false,
+                budgetLimit: (data as any).budget_limit ?? null,
               }
             : c,
         ),
@@ -2821,6 +2937,24 @@ const s = StyleSheet.create({
     color: "#888",
     marginTop: 2,
   },
+
+  // ── Per-category mini budget bar (on card) ─────────────────────────────────
+  catBudgetWrap:  { width: '100%', flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5, paddingHorizontal: 2 },
+  catBudgetTrack: { flex: 1, height: 4, borderRadius: 2, overflow: 'hidden' as const },
+  catBudgetFill:  { height: '100%' as const, borderRadius: 2 },
+  catBudgetPct:   { fontFamily: Font.bodyRegular, fontSize: 9, minWidth: 26, textAlign: 'right' as const },
+
+  // ── Budget progress card (in category detail) ──────────────────────────────
+  budgetCard:      { borderRadius: 14, padding: 14, marginBottom: 16 },
+  budgetCardRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  budgetCardLabel: { fontFamily: Font.bodyRegular, fontSize: 11, marginBottom: 2 },
+  budgetCardAmt:   { fontFamily: Font.headerBold, fontSize: 17 },
+  budgetBadge:     { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  budgetBadgeTxt:  { fontFamily: Font.bodySemiBold, fontSize: 12, color: '#fff' },
+  budgetTrack:     { height: 8, borderRadius: 4, overflow: 'hidden' as const, marginBottom: 8 },
+  budgetFill:      { height: '100%' as const, borderRadius: 4 },
+  budgetWarnRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  budgetWarnTxt:   { fontFamily: Font.bodyRegular, fontSize: 12 },
 
   monthHeader: {
     flexDirection: "row",
