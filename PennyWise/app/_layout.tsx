@@ -25,6 +25,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { supabase } from "@/lib/supabase";
+import { processRecurringTransactions } from "@/lib/recurringProcessor";
 import { AppThemeProvider } from "@/contexts/AppTheme";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { NetworkProvider } from "@/contexts/NetworkContext";
@@ -151,6 +152,8 @@ export default function RootLayout() {
         if (acceptedVersion !== TERMS_VERSION) {
           setShowTermsUpdate(true);
         }
+        // Fire-and-forget: auto-generate any overdue recurring entries.
+        processRecurringTransactions(session.user.id).catch(() => {});
       }
     });
     return () => subscription.unsubscribe();

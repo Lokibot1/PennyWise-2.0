@@ -60,31 +60,33 @@ export type CachedCategory = {
 };
 
 export type CachedIncomeSource = {
-  id:           string;
-  category_id:  string;
-  title:        string;
-  amount:       number;
-  date:         string;
-  time:         string;
-  description:  string;
-  is_recurring: boolean;
-  frequency:    string | null;
-  is_archived:  boolean;
-  created_at?:  string;
+  id:                 string;
+  category_id:        string;
+  title:              string;
+  amount:             number;
+  date:               string;
+  time:               string;
+  description:        string;
+  is_recurring:       boolean;
+  frequency:          string | null;
+  is_archived:        boolean;
+  last_processed_at:  string | null;
+  created_at?:        string;
 };
 
 export type CachedExpense = {
-  id:           string;
-  category_id:  string;
-  title:        string;
-  amount:       number;
-  date:         string;
-  time:         string;
-  description:  string;
-  is_recurring: boolean;
-  frequency:    string | null;
-  is_archived:  boolean;
-  created_at?:  string;
+  id:                 string;
+  category_id:        string;
+  title:              string;
+  amount:             number;
+  date:               string;
+  time:               string;
+  description:        string;
+  is_recurring:       boolean;
+  frequency:          string | null;
+  is_archived:        boolean;
+  last_processed_at:  string | null;
+  created_at?:        string;
 };
 
 export type CachedSavingsGoal = {
@@ -186,7 +188,7 @@ export const DataCache = {
 
     const { data, error } = await supabase
       .from('income_sources')
-      .select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived, created_at')
+      .select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived, last_processed_at, created_at')
       .eq('user_id', userId);
 
     if (error || !data) return [];
@@ -208,7 +210,7 @@ export const DataCache = {
 
     const { data, error } = await supabase
       .from('expenses')
-      .select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived, created_at')
+      .select('id, category_id, title, amount, date, time, description, is_recurring, frequency, is_archived, last_processed_at, created_at')
       .eq('user_id', userId);
 
     if (error || !data) return [];
