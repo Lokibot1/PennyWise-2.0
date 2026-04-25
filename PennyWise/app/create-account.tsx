@@ -247,6 +247,7 @@ export default function CreateAccountScreen() {
           phone: phone.trim(),
           date_of_birth: dob.toISOString().split("T")[0],
           terms_accepted_version: TERMS_VERSION,
+          onboarding_completed: false,
         },
       },
     });
@@ -257,7 +258,7 @@ export default function CreateAccountScreen() {
     if (authError) {
       setError(authError.message);
     } else {
-      router.replace("/(tabs)");
+      router.replace("/onboarding");
     }
   }
 

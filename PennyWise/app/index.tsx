@@ -165,7 +165,9 @@ export default function SplashScreen() {
     const navTimer = setTimeout(async () => {
       await Promise.all(sounds.map(s => s.unloadAsync().catch(() => {})));
       const { data: { session } } = await supabase.auth.getSession();
-      router.replace(session ? '/(tabs)' : '/login-form');
+      if (!session) { router.replace('/login-form'); return; }
+      const onboarded = session.user.user_metadata?.onboarding_completed !== false;
+      router.replace(onboarded ? '/(tabs)' : '/onboarding');
     }, 4800);
 
     return () => {

@@ -226,6 +226,10 @@ export default function RootLayout() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="onboarding"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="savings-goals"
             options={{ headerShown: false }}
           />
