@@ -1,10 +1,15 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { AppNotification } from '@/lib/notifications';
 
 const PUSHED_KEY = 'pw_pushed_notif_v1';
+
+// Remote push token registration was removed from Expo Go in SDK 53.
+// Detect Expo Go so we skip anything that triggers token auto-registration.
+const IS_EXPO_GO = (Constants as any).appOwnership === 'expo';
 
 // Show banners even when the app is in the foreground.
 Notifications.setNotificationHandler({
@@ -19,10 +24,11 @@ Notifications.setNotificationHandler({
 
 /**
  * Request OS permission and configure the Android notification channel.
- * Call once on sign-in — safe to call repeatedly (no-op if already granted).
+ * Skipped in Expo Go (SDK 53+) because remote-push registration is unavailable there;
+ * local notifications still work without it.
  */
 export async function registerForPushNotifications(): Promise<void> {
-  if (!Device.isDevice) return;
+  if (!Device.isDevice || IS_EXPO_GO) return;
 
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing !== 'granted') {
@@ -32,11 +38,11 @@ export async function registerForPushNotifications(): Promise<void> {
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('pennywise', {
-      name:              'PennyWise',
-      importance:        Notifications.AndroidImportance.HIGH,
-      vibrationPattern:  [0, 200, 100, 200],
-      lightColor:        '#1B7A4A',
-      showBadge:         true,
+      name:             'PennyWise',
+      importance:       Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 200, 100, 200],
+      lightColor:       '#1B7A4A',
+      showBadge:        true,
     });
   }
 }
@@ -51,8 +57,11 @@ export async function syncPushNotifications(
 ): Promise<void> {
   if (!pushEnabled || !Device.isDevice) return;
 
-  const { status } = await Notifications.getPermissionsAsync();
-  if (status !== 'granted') return;
+  // In Expo Go, skip the permission check — local notifications fire without it.
+  if (!IS_EXPO_GO) {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return;
+  }
 
   const raw = await AsyncStorage.getItem(PUSHED_KEY);
   const pushedSet = new Set<string>(raw ? JSON.parse(raw) : []);

@@ -1,4 +1,13 @@
 import "react-native-url-polyfill/auto";
+
+// expo-notifications' push-token auto-registration fires a console error in
+// Expo Go (SDK 53+) because remote push was removed there. Local notifications
+// still work fine. Suppress the noise so the dev console stays clean.
+const _origError = console.error.bind(console);
+console.error = (...args: unknown[]) => {
+  if (typeof args[0] === 'string' && args[0].includes('expo-notifications') && args[0].includes('Expo Go')) return;
+  _origError(...args);
+};
 import {
   DarkTheme,
   DefaultTheme,
