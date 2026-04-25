@@ -110,13 +110,13 @@ export default function MascotChatbot({ visible, onClose }: Props) {
         if (cancelled) return;
 
         const snapshot = buildSnapshot({
-          name:             profile?.full_name ?? 'there',
-          budgetLimit:      profile?.budget_limit ?? 0,
-          incomeSources:    incomeSources as any,
-          incomeCategories: incomeCategories as any,
-          expenses:         expenses as any,
+          name:              profile?.full_name ?? 'there',
+          budgetLimit:       profile?.budget_limit ?? 0,
+          incomeSources:     incomeSources as any,
+          incomeCategories:  incomeCategories as any,
+          expenses:          expenses as any,
           expenseCategories: expenseCategories as any,
-          savingsGoals:     savingsGoals as any,
+          savingsGoals:      savingsGoals as any,
         });
 
         setData(snapshot);
