@@ -2667,6 +2667,27 @@ const NOTIF_CATEGORIES = [
     label: "Recurring Expense Reminder",
     desc: "A prompt during the first 7 days of the month to log your regular bills and subscriptions before you forget.",
   },
+  {
+    key: "cat_budget_70" as const,
+    icon: "alert-outline" as IoniconName,
+    bg: "#F59E0B",
+    label: "Category Budget: 70% Warning",
+    desc: "Notifies you when spending in a specific category reaches 70% of its monthly budget limit.",
+  },
+  {
+    key: "cat_budget_90" as const,
+    icon: "alert-circle-outline" as IoniconName,
+    bg: "#E05555",
+    label: "Category Budget: 90% Warning",
+    desc: "A stronger alert when a category is at 90% of its budget — only a small amount remains.",
+  },
+  {
+    key: "cat_budget_exceeded" as const,
+    icon: "warning-outline" as IoniconName,
+    bg: "#C0392B",
+    label: "Category Budget Exceeded",
+    desc: "Get notified when spending in a category goes over its monthly limit.",
+  },
 ] as const;
 
 function NotificationSettingsView({ onBack }: { onBack: () => void }) {
@@ -2723,6 +2744,44 @@ function NotificationSettingsView({ onBack }: { onBack: () => void }) {
               Toggle each type on or off to control which in-app alerts you
               receive. Changes take effect immediately.
             </Text>
+          </View>
+        </View>
+
+        {/* Push notifications master toggle */}
+        <Text
+          style={[
+            styles.formSectionTitle,
+            { color: theme.textMuted, marginTop: 24 },
+          ]}
+        >
+          PUSH NOTIFICATIONS
+        </Text>
+        <View style={[styles.formSection, { backgroundColor: theme.surface }]}>
+          <View style={styles.notifRow}>
+            <View
+              style={[
+                styles.menuIconCircle,
+                { backgroundColor: "#1B7A4A", marginRight: 14, alignSelf: "flex-start", marginTop: 2 },
+              ]}
+            >
+              <Ionicons name="phone-portrait-outline" size={18} color="#fff" />
+            </View>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={[styles.notifRowLabel, { color: theme.textPrimary }]}>
+                Device Push Notifications
+              </Text>
+              <Text style={[styles.notifRowDesc, { color: theme.textMuted }]}>
+                Show OS banner notifications when new alerts appear. Individual types below control which alerts are generated.
+              </Text>
+            </View>
+            <Switch
+              value={local.push_enabled}
+              onValueChange={() => toggle("push_enabled")}
+              disabled={saving}
+              trackColor={{ false: theme.inputBorder, true: "#1B7A4A" }}
+              thumbColor="#fff"
+              style={{ alignSelf: "flex-start", marginTop: 2 }}
+            />
           </View>
         </View>
 

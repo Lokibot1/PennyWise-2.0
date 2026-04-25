@@ -26,6 +26,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { supabase } from "@/lib/supabase";
 import { processRecurringTransactions } from "@/lib/recurringProcessor";
+import { registerForPushNotifications, clearPushedSet } from "@/lib/pushNotifications";
 import { AppThemeProvider } from "@/contexts/AppTheme";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { NetworkProvider } from "@/contexts/NetworkContext";
@@ -144,6 +145,7 @@ export default function RootLayout() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === "SIGNED_OUT") {
+        clearPushedSet().catch(() => {});
         router.replace("/login-form");
       }
       // Check T&C version whenever a session becomes active
@@ -152,7 +154,8 @@ export default function RootLayout() {
         if (acceptedVersion !== TERMS_VERSION) {
           setShowTermsUpdate(true);
         }
-        // Fire-and-forget: auto-generate any overdue recurring entries.
+        // Fire-and-forget: request OS push permission + auto-generate recurring entries.
+        registerForPushNotifications().catch(() => {});
         processRecurringTransactions(session.user.id).catch(() => {});
       }
     });

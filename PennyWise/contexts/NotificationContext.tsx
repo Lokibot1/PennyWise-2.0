@@ -11,6 +11,7 @@ import {
   loadNotifPrefs, saveNotifPrefs, filterByPrefs,
   DEFAULT_PREFS, type NotifPrefs,
 } from '@/lib/notificationPrefs';
+import { syncPushNotifications } from '@/lib/pushNotifications';
 
 const READ_KEY = 'pw_notif_read_v1';
 
@@ -82,7 +83,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         loadNotifPrefs(user.id),
       ]);
       setPrefs(currentPrefs);
-      setNotifications(filterByPrefs(notifs, currentPrefs));
+      const filtered = filterByPrefs(notifs, currentPrefs);
+      setNotifications(filtered);
+      syncPushNotifications(filtered, currentPrefs.push_enabled).catch(() => {});
     } catch {}
     finally { setLoading(false); }
   }, []);
@@ -137,7 +140,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setPrefs(next);
     try {
       const notifs = await generateNotifications(userIdRef.current);
-      setNotifications(filterByPrefs(notifs, next));
+      const filtered = filterByPrefs(notifs, next);
+      setNotifications(filtered);
+      syncPushNotifications(filtered, next.push_enabled).catch(() => {});
     } catch {}
   }, []);
 

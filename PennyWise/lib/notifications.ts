@@ -30,7 +30,7 @@ export async function generateNotifications(userId: string): Promise<AppNotifica
   const dayOfMonth = now.getDate();
   const ts         = now.toISOString();
 
-  const [profileRes, expensesRes, incomeRes, goalsRes] = await Promise.all([
+  const [profileRes, expensesRes, incomeRes, goalsRes, expenseCatsRes] = await Promise.all([
     supabase
       .from('profiles')
       .select('budget_limit, full_name')
@@ -39,7 +39,7 @@ export async function generateNotifications(userId: string): Promise<AppNotifica
 
     supabase
       .from('expenses')
-      .select('amount, date')
+      .select('amount, date, category_id')
       .eq('user_id', userId)
       .eq('is_archived', false),
 
@@ -54,6 +54,13 @@ export async function generateNotifications(userId: string): Promise<AppNotifica
       .select('id, title, icon, target_amount, current_amount, is_completed')
       .eq('user_id', userId)
       .eq('is_archived', false),
+
+    supabase
+      .from('expense_categories')
+      .select('id, label, budget_limit')
+      .eq('user_id', userId)
+      .eq('is_archived', false)
+      .not('budget_limit', 'is', null),
   ]);
 
   const notifications: AppNotification[] = [];
@@ -100,6 +107,57 @@ export async function generateNotifications(userId: string): Promise<AppNotifica
       body:      `You've used ${budgetPct.toFixed(0)}% of your monthly budget. Consider slowing down on spending.`,
       createdAt: ts,
     });
+  }
+
+  // ── Per-category budget notifications ─────────────────────────────────────
+  const cats = expenseCatsRes.data ?? [];
+  if (cats.length > 0) {
+    // Build a map of category_id → current-month spending
+    const catSpend = new Map<string, number>();
+    for (const e of (expensesRes.data ?? [])) {
+      if (e.date >= monthStart) {
+        catSpend.set(e.category_id, (catSpend.get(e.category_id) ?? 0) + Number(e.amount));
+      }
+    }
+
+    for (const cat of cats) {
+      const limit = Number(cat.budget_limit);
+      if (limit <= 0) continue;
+      const spent = catSpend.get(cat.id) ?? 0;
+      const pct   = (spent / limit) * 100;
+
+      if (pct >= 100) {
+        notifications.push({
+          id:        `cat_budget_exceeded_${cat.id}_${ym}`,
+          type:      'critical',
+          icon:      'warning-outline',
+          iconColor: '#E05555',
+          title:     `${cat.label} Budget Exceeded`,
+          body:      `You've spent ${fmtPHP(spent)} on ${cat.label} this month, exceeding your ${fmtPHP(limit)} limit.`,
+          createdAt: ts,
+        });
+      } else if (pct >= 90) {
+        notifications.push({
+          id:        `cat_budget_90_${cat.id}_${ym}`,
+          type:      'critical',
+          icon:      'alert-circle-outline',
+          iconColor: '#E05555',
+          title:     `${cat.label} Budget Almost Gone`,
+          body:      `${pct.toFixed(0)}% of your ${cat.label} budget used. Only ${fmtPHP(limit - spent)} remaining this month.`,
+          createdAt: ts,
+        });
+      } else if (pct >= 70) {
+        notifications.push({
+          id:        `cat_budget_70_${cat.id}_${ym}`,
+          type:      'warning',
+          icon:      'alert-outline',
+          iconColor: '#F59E0B',
+          title:     `${cat.label} Budget Getting Low`,
+          body:      `You've used ${pct.toFixed(0)}% of your ${cat.label} budget (${fmtPHP(spent)} / ${fmtPHP(limit)}).`,
+          createdAt: ts,
+        });
+      }
+    }
   }
 
   // ── Low balance ────────────────────────────────────────────────────────────
