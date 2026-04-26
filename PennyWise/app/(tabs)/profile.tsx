@@ -2862,12 +2862,13 @@ export default function ProfileScreen() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setLoading(false); return; }
     profileUserIdRef.current = user.id;
-    const meta = (user.user_metadata ?? {}) as Record<string, string>;
+    const meta      = (user.user_metadata ?? {}) as Record<string, string>;
+    const authEmail = user.email ?? "";
     const cached = await DataCache.fetchProfile(user.id);
     if (cached) {
       setProfile({
         full_name:  cached.full_name  || meta.full_name || "",
-        email:      cached.email      || meta.email     || "",
+        email:      cached.email      || authEmail      || "",
         phone:      cached.phone      || meta.phone     || "",
         avatar_url: cached.avatar_url ?? undefined,
       });
@@ -2879,7 +2880,7 @@ export default function ProfileScreen() {
         .single();
       setProfile({
         full_name:  data?.full_name  || meta.full_name || "",
-        email:      data?.email      || meta.email     || "",
+        email:      data?.email      || authEmail      || "",
         phone:      data?.phone      || meta.phone     || "",
         avatar_url: data?.avatar_url ?? undefined,
       });

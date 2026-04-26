@@ -62,7 +62,6 @@ export default function OnboardingScreen() {
 
   const [step,      setStep]      = useState(0);
   const [firstName, setFirstName] = useState('');
-  const [userId,    setUserId]    = useState('');
   const [budgetStr, setBudgetStr] = useState('20000');
   const [finishing, setFinishing] = useState(false);
 
@@ -103,7 +102,6 @@ export default function OnboardingScreen() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
-      setUserId(user.id);
       const name = (user.user_metadata?.full_name as string) ?? '';
       setFirstName(name.split(' ')[0] ?? '');
     });
@@ -115,6 +113,16 @@ export default function OnboardingScreen() {
   }
 
   async function skipToApp() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const meta = user.user_metadata ?? {};
+      await supabase.from('profiles').upsert({
+        id:        user.id,
+        full_name: meta.full_name ?? '',
+        email:     user.email    ?? '',
+        phone:     meta.phone    ?? '',
+      });
+    }
     supabase.auth.updateUser({ data: { onboarding_completed: true } }).catch(() => {});
     router.replace('/(tabs)');
   }
@@ -123,9 +131,17 @@ export default function OnboardingScreen() {
     if (finishing) return;
     setFinishing(true);
 
-    const budget = parseFloat(budgetStr.replace(/[^0-9.]/g, ''));
-    if (!isNaN(budget) && budget > 0 && userId) {
-      await supabase.from('profiles').update({ budget_limit: budget }).eq('id', userId);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const meta   = user.user_metadata ?? {};
+      const budget = parseFloat(budgetStr.replace(/[^0-9.]/g, ''));
+      await supabase.from('profiles').upsert({
+        id:           user.id,
+        full_name:    meta.full_name ?? '',
+        email:        user.email    ?? '',
+        phone:        meta.phone    ?? '',
+        ...((!isNaN(budget) && budget > 0) ? { budget_limit: budget } : {}),
+      });
     }
 
     await supabase.auth.updateUser({ data: { onboarding_completed: true } });
