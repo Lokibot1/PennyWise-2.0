@@ -25,7 +25,7 @@ import Animated, {
   withTiming,
   useAnimatedStyle,
 } from 'react-native-reanimated';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
 import { Font } from '@/constants/fonts';
@@ -975,7 +975,7 @@ export default function TransactionHistoryScreen() {
     const fileName = `PennyWise_Export_${today}.csv`;
     const filePath = (FileSystem.cacheDirectory ?? '') + fileName;
 
-    await FileSystem.writeAsStringAsync(filePath, csv, { encoding: FileSystem.EncodingType.UTF8 });
+    await FileSystem.writeAsStringAsync(filePath, csv, { encoding: 'utf8' });
     await Sharing.shareAsync(filePath, { mimeType: 'text/csv', UTI: 'public.comma-separated-values-text' });
   }
 
