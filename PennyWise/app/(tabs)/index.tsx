@@ -120,7 +120,7 @@ export default function HomeScreen() {
   const showError = (title: string, msg: string) => setErrModal({ visible: true, title, message: msg });
 
   const saveBudgetLimit = async (newLimit: number) => {
-    if (!userIdRef.current) return;
+    if (!userIdRef.current) throw new Error("Could not retrieve user.");
     const prev = budgetLimit;
     setBudgetLimit(newLimit); // optimistic
 

@@ -2328,6 +2328,7 @@ function SettingsView({
 }) {
   const { theme, darkMode, toggleDark } = useAppTheme();
   const { isOnline } = useNetwork();
+  const userIdRef = useRef<string | null>(null);
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [budgetVisible, setBudgetVisible] = useState(false);
   const [budgetLimit, setBudgetLimit] = useState(20000);
@@ -2340,6 +2341,7 @@ function SettingsView({
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user }, error: uErr }) => {
       if (uErr || !user) return;
+      userIdRef.current = user.id;
       supabase
         .from("profiles")
         .select("budget_limit")
@@ -2352,11 +2354,12 @@ function SettingsView({
   }, []);
 
   async function saveBudgetLimit(newLimit: number) {
+    const uid = userIdRef.current;
+    if (!uid) throw new Error("Could not retrieve user.");
+
     setBudgetLimit(newLimit); // optimistic
 
     if (!isOnline) {
-      const uid = (await supabase.auth.getUser()).data.user?.id;
-      if (!uid) return;
       await MutationQueue.add({
         op: 'update', table: 'profiles',
         payload: { budget_limit: newLimit },
@@ -2365,19 +2368,13 @@ function SettingsView({
       return;
     }
 
-    const {
-      data: { user },
-      error: uErr,
-    } = await supabase.auth.getUser();
-    if (uErr || !user)
-      throw new Error(uErr?.message ?? "Could not retrieve user.");
     const { error } = await supabase
       .from("profiles")
       .update({ budget_limit: newLimit })
-      .eq("id", user.id);
+      .eq("id", uid);
     if (error) throw error;
-    DataCache.invalidateProfile(user.id);
-    DataCache.invalidateDashboard(user.id);
+    DataCache.invalidateProfile(uid);
+    DataCache.invalidateDashboard(uid);
   }
 
   async function confirmDelete() {
