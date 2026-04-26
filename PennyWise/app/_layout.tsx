@@ -14,6 +14,7 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { Stack, router } from "expo-router";
+import * as Linking from "expo-linking";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 import { useEffect, useState } from "react";
@@ -169,6 +170,50 @@ export default function RootLayout() {
       }
     });
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Handle email-confirmation deep links (pennywise://?code=... or pennywise://#access_token=...)
+  useEffect(() => {
+    async function processAuthUrl(url: string | null) {
+      if (!url) return;
+      try {
+        // Supabase v2 PKCE: redirect contains ?code=xxx
+        const parsed = Linking.parse(url);
+        const code = parsed.queryParams?.code as string | undefined;
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) return;
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) return;
+          const onboarded = session.user.user_metadata?.onboarding_completed !== false;
+          router.replace(onboarded ? '/(tabs)' : '/onboarding');
+          return;
+        }
+
+        // Supabase implicit flow: redirect contains #access_token=xxx&refresh_token=xxx
+        const hashStart = url.indexOf('#');
+        if (hashStart !== -1) {
+          const params = new URLSearchParams(url.slice(hashStart + 1));
+          const access_token  = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+          if (access_token && refresh_token) {
+            const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+            if (error) return;
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+            const onboarded = session.user.user_metadata?.onboarding_completed !== false;
+            router.replace(onboarded ? '/(tabs)' : '/onboarding');
+          }
+        }
+      } catch {}
+    }
+
+    // App opened from a cold start via deep link
+    Linking.getInitialURL().then(processAuthUrl);
+
+    // App already running, deep link arrives
+    const sub = Linking.addEventListener('url', ({ url }) => processAuthUrl(url));
+    return () => sub.remove();
   }, []);
 
   async function handleTermsAccepted() {

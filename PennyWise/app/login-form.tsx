@@ -49,7 +49,11 @@ export default function LoginFormScreen() {
     setLoading(false);
 
     if (authError) {
-      setError(authError.message);
+      if (authError.message.toLowerCase().includes('email not confirmed')) {
+        setError('Your email address is not yet confirmed. Please check your inbox and click the confirmation link, then try logging in again.');
+      } else {
+        setError(authError.message);
+      }
     } else {
       router.replace('/(tabs)');
     }
