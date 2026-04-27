@@ -46,7 +46,8 @@
           "color": "#1B7A4A",
           "defaultChannel": "pennywise"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

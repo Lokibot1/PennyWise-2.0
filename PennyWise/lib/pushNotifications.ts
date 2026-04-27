@@ -12,15 +12,19 @@ const PUSHED_KEY = 'pw_pushed_notif_v1';
 const IS_EXPO_GO = (Constants as any).appOwnership === 'expo';
 
 // Show banners even when the app is in the foreground.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert:  true,
-    shouldPlaySound:  false,
-    shouldSetBadge:   false,
-    shouldShowBanner: true,
-    shouldShowList:   true,
-  }),
-});
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert:  true,
+      shouldPlaySound:  false,
+      shouldSetBadge:   false,
+      shouldShowBanner: true,
+      shouldShowList:   true,
+    }),
+  });
+} catch {
+  // Silently ignored in Expo Go where the handler may not be supported.
+}
 
 /**
  * Request OS permission and configure the Android notification channel.
