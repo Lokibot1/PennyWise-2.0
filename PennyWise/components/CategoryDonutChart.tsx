@@ -15,14 +15,15 @@ type Props = {
   total: number;
   theme: Theme;
   centerLabel?: string;
+  centerAmount?: number;
 };
 
-const SIZE  = 130;
-const CX    = SIZE / 2;
-const CY    = SIZE / 2;
-const R_OUT = 54;
-const R_IN  = 32;
-const SLICE_GAP = 0.025; // radians of gap between slices
+const SIZE      = 118;
+const CX        = SIZE / 2;
+const CY        = SIZE / 2;
+const R_OUT     = 48;
+const R_IN      = 30;
+const SLICE_GAP = 0.03;
 
 function polar(cx: number, cy: number, r: number, a: number) {
   return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
@@ -43,25 +44,39 @@ function donutArc(cx: number, cy: number, ro: number, ri: number, a0: number, a1
   ].join(' ');
 }
 
-export default function CategoryDonutChart({ slices, total, theme, centerLabel }: Props) {
+function fmtShort(n: number): string {
+  if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `₱${(n / 1_000).toFixed(1)}K`;
+  return `₱${n.toFixed(0)}`;
+}
+
+function fmtCenter(n: number): string {
+  if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `₱${(n / 1_000).toFixed(1)}K`;
+  return `₱${n.toFixed(0)}`;
+}
+
+export default function CategoryDonutChart({ slices, total, theme, centerLabel, centerAmount }: Props) {
   const paths = useMemo(() => {
     if (!slices.length || total === 0) return [];
-    let angle = -Math.PI / 2; // start at 12 o'clock
+    let angle = -Math.PI / 2;
     return slices.map(s => {
       const fullSweep = (s.value / total) * 2 * Math.PI;
-      const sweep = Math.max(fullSweep - SLICE_GAP * 2, 0.01);
-      const a0 = angle + SLICE_GAP;
-      const a1 = a0 + sweep;
-      angle += fullSweep;
+      const sweep     = Math.max(fullSweep - SLICE_GAP * 2, 0.01);
+      const a0        = angle + SLICE_GAP;
+      const a1        = a0 + sweep;
+      angle          += fullSweep;
       return { ...s, path: donutArc(CX, CY, R_OUT, R_IN, a0, a1) };
     });
   }, [slices, total]);
 
-  const emptyPath = donutArc(CX, CY, R_OUT, R_IN, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI - 0.01);
+  const emptyPath  = donutArc(CX, CY, R_OUT, R_IN, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI - 0.01);
+  const showCenter = centerAmount != null || !!centerLabel;
 
   return (
     <View style={styles.wrap}>
-      {/* Donut */}
+
+      {/* ── Donut — centred ───────────────────────────────────────── */}
       <View style={styles.donutWrap}>
         <Svg width={SIZE} height={SIZE}>
           {paths.length === 0 ? (
@@ -70,31 +85,54 @@ export default function CategoryDonutChart({ slices, total, theme, centerLabel }
             paths.map((p, i) => <Path key={i} d={p.path} fill={p.color} />)
           )}
         </Svg>
-        {centerLabel ? (
+
+        {showCenter && (
           <View style={styles.centerWrap}>
-            <Text style={[styles.centerTxt, { color: theme.textPrimary as string }]} numberOfLines={2}>
-              {centerLabel}
-            </Text>
+            {centerAmount != null ? (
+              <>
+                <Text style={[styles.centerAmt, { color: theme.textPrimary as string }]} numberOfLines={1}>
+                  {fmtCenter(centerAmount)}
+                </Text>
+                <Text style={[styles.centerSub, { color: theme.textMuted as string }]}>TOTAL</Text>
+              </>
+            ) : (
+              <Text style={[styles.centerLbl, { color: theme.textPrimary as string }]} numberOfLines={2}>
+                {centerLabel}
+              </Text>
+            )}
           </View>
-        ) : null}
+        )}
       </View>
 
-      {/* Legend */}
+      {/* ── Full-width legend below ───────────────────────────────── */}
       <View style={styles.legend}>
         {slices.length === 0 ? (
           <Text style={[styles.emptyTxt, { color: theme.textMuted as string }]}>No data yet</Text>
         ) : (
-          slices.map((s, i) => (
-            <View key={i} style={styles.legendRow}>
-              <View style={[styles.legendDot, { backgroundColor: s.color }]} />
-              <Text style={[styles.legendLabel, { color: theme.textPrimary as string }]} numberOfLines={1}>
-                {s.label}
-              </Text>
-              <Text style={[styles.legendPct, { color: theme.textMuted as string }]}>
-                {total > 0 ? `${((s.value / total) * 100).toFixed(0)}%` : '0%'}
-              </Text>
-            </View>
-          ))
+          slices.map((s, i) => {
+            const pct = total > 0 ? (s.value / total) * 100 : 0;
+            return (
+              <View key={i} style={styles.legendItem}>
+                <View style={styles.legendRow}>
+                  <View style={[styles.legendDot, { backgroundColor: s.color }]} />
+                  <Text style={[styles.legendLabel, { color: theme.textPrimary as string }]} numberOfLines={1}>
+                    {s.label}
+                  </Text>
+                  <Text style={[styles.legendAmt, { color: theme.textMuted as string }]}>
+                    {fmtShort(s.value)}
+                  </Text>
+                  <View style={[styles.pctBadge, { backgroundColor: s.color + '28' }]}>
+                    <Text style={[styles.pctTxt, { color: s.color }]}>
+                      {pct.toFixed(0)}%
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.barTrack, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)' }]}>
+                  <View style={[styles.barFill, { width: `${pct}%` as any, backgroundColor: s.color }]} />
+                </View>
+              </View>
+            );
+          })
         )}
       </View>
     </View>
@@ -103,12 +141,11 @@ export default function CategoryDonutChart({ slices, total, theme, centerLabel }
 
 const styles = StyleSheet.create({
   wrap: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 20,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
+    gap: 16,
   },
+
+  // ── Donut ────────────────────────────────────────────────────────
   donutWrap: {
     width: SIZE,
     height: SIZE,
@@ -117,21 +154,58 @@ const styles = StyleSheet.create({
   },
   centerWrap: {
     position: 'absolute',
-    width: R_IN * 2,
-    height: R_IN * 2,
-    borderRadius: R_IN,
+    width: R_IN * 2 - 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  centerTxt: {
+  centerAmt: {
+    fontFamily: Font.headerBold,
+    fontSize: 12,
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  centerSub: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 8,
+    textAlign: 'center',
+    marginTop: 1,
+    letterSpacing: 0.6,
+  },
+  centerLbl: {
     fontFamily: Font.headerBold,
     fontSize: 9,
     textAlign: 'center',
   },
-  legend:     { flex: 1, gap: 10 },
+
+  // ── Legend ───────────────────────────────────────────────────────
+  legend:     { width: '100%', gap: 10 },
+  legendItem: { gap: 5 },
   legendRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  legendDot:  { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
-  legendLabel: { flex: 1, fontFamily: Font.bodyMedium, fontSize: 13 },
-  legendPct:  { fontFamily: Font.bodySemiBold, fontSize: 13, minWidth: 34, textAlign: 'right' },
-  emptyTxt:   { fontFamily: Font.bodyRegular, fontSize: 13 },
+  legendDot:  { width: 9, height: 9, borderRadius: 5, flexShrink: 0 },
+  legendLabel:{ flex: 1, fontFamily: Font.bodyMedium, fontSize: 13 },
+  legendAmt:  { fontFamily: Font.bodyRegular, fontSize: 12 },
+
+  pctBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    minWidth: 36,
+    alignItems: 'center',
+  },
+  pctTxt: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 11,
+  },
+
+  barTrack: {
+    height: 3,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: 3,
+    borderRadius: 2,
+  },
+
+  emptyTxt: { fontFamily: Font.bodyRegular, fontSize: 13 },
 });

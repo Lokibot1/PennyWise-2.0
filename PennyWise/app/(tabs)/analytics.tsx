@@ -570,10 +570,24 @@ function CategoriesScreen({
             tabs={['Active', 'Archived']}
             active={tab}
             onChange={(t) => setTab(t as 'Active' | 'Archived')}
-            trackColor="rgba(255,255,255,0.12)"
-            activeColor="rgba(255,255,255,0.22)"
-            inactiveTextColor="rgba(255,255,255,0.6)"
-            style={{ marginTop: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+            trackColor="rgba(255,255,255,0.08)"
+            activeColor="rgba(255,255,255,0.90)"
+            activeTextColor="#1B3D2B"
+            inactiveTextColor="rgba(255,255,255,0.55)"
+            indicatorStyle={{
+              borderRadius: 10,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.14,
+              shadowRadius: 6,
+              elevation: 3,
+            }}
+            style={{
+              marginTop: 10,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.18)',
+            }}
           />
         }
       />
@@ -583,7 +597,15 @@ function CategoriesScreen({
             <>
               {categoryTotals.length > 0 && (
                 <View style={[s.chartCard, { backgroundColor: theme.surface, borderColor: theme.divider }]}>
-                  <CategoryDonutChart slices={categoryTotals} total={chartTotal} theme={theme} />
+                  <View style={s.chartCardHeader}>
+                    <Text style={[s.chartCardTitle, { color: theme.textPrimary }]}>Income Breakdown</Text>
+                    <View style={[s.chartCardBadge, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(27,61,43,0.10)' }]}>
+                      <Text style={[s.chartCardBadgeTxt, { color: theme.textMuted }]}>
+                        {categoryTotals.length} {categoryTotals.length === 1 ? 'category' : 'categories'}
+                      </Text>
+                    </View>
+                  </View>
+                  <CategoryDonutChart slices={categoryTotals} total={chartTotal} theme={theme} centerAmount={chartTotal} />
                 </View>
               )}
               <Text style={[s.catSectionLabel, { color: theme.textMuted }]}>Categories</Text>
@@ -1749,8 +1771,12 @@ const s = StyleSheet.create({
 
   hint: { fontFamily: Font.bodyRegular, fontSize: 13, color: '#888', marginBottom: 16 },
 
-  chartCard:       { borderRadius: 18, padding: 16, borderWidth: 1, marginBottom: 20 },
-  catSectionLabel: { fontFamily: Font.bodySemiBold, fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
+  chartCard:         { borderRadius: 18, padding: 16, borderWidth: 1, marginBottom: 20 },
+  chartCardHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  chartCardTitle:    { fontFamily: Font.bodySemiBold, fontSize: 13 },
+  chartCardBadge:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  chartCardBadgeTxt: { fontFamily: Font.bodyRegular, fontSize: 11 },
+  catSectionLabel:   { fontFamily: Font.bodySemiBold, fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
 
   grid:        { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 14, marginBottom: 24 },
   catCard:     { width: '30%', alignItems: 'center', marginBottom: 4 },

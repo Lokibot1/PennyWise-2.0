@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
-import Animated, { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { Font } from '@/constants/fonts';
 
 type Props = {
@@ -13,10 +18,19 @@ type Props = {
   trackColor?: string;
   /** Colour of the sliding indicator pill. Default: '#1B7A4A' */
   activeColor?: string;
+  /** Text colour for the active tab. Default: '#fff' */
+  activeTextColor?: string;
   /** Text colour for inactive tabs. Default: '#888' */
   inactiveTextColor?: string;
+  /** Extra styles merged onto the sliding indicator. */
+  indicatorStyle?: ViewStyle;
   /** Extra styles applied to the outer track container. */
   style?: ViewStyle;
+};
+
+const TIMING_CONFIG = {
+  duration: 190,
+  easing: Easing.out(Easing.cubic),
 };
 
 export default function SlideTabBar({
@@ -26,14 +40,16 @@ export default function SlideTabBar({
   badge,
   trackColor = '#F0F0F0',
   activeColor = '#1B7A4A',
+  activeTextColor = '#fff',
   inactiveTextColor = '#888',
+  indicatorStyle,
   style,
 }: Props) {
   const [tabWidth, setTabWidth] = useState(0);
   const tabWidthRef             = useRef(0);
   const indicatorX              = useSharedValue(0);
 
-  const indicatorStyle = useAnimatedStyle(() => ({
+  const animStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: indicatorX.value }],
   }));
 
@@ -41,25 +57,23 @@ export default function SlideTabBar({
     const w = (width - 8) / tabs.length;
     tabWidthRef.current = w;
     setTabWidth(w);
-    // Snap to the initial active position without animation
     indicatorX.value = tabs.indexOf(active) * w;
   };
 
-  // Keep the indicator in sync when `active` changes from outside
   useEffect(() => {
     if (tabWidthRef.current > 0) {
-      indicatorX.value = withSpring(tabs.indexOf(active) * tabWidthRef.current, {
-        damping: 26,
-        stiffness: 340,
-      });
+      indicatorX.value = withTiming(
+        tabs.indexOf(active) * tabWidthRef.current,
+        TIMING_CONFIG,
+      );
     }
   }, [active]);
 
   const handlePress = (tab: string) => {
-    indicatorX.value = withSpring(tabs.indexOf(tab) * tabWidthRef.current, {
-      damping: 26,
-      stiffness: 340,
-    });
+    indicatorX.value = withTiming(
+      tabs.indexOf(tab) * tabWidthRef.current,
+      TIMING_CONFIG,
+    );
     onChange(tab);
   };
 
@@ -69,24 +83,40 @@ export default function SlideTabBar({
       onLayout={(e) => handleLayout(e.nativeEvent.layout.width)}
     >
       <Animated.View
-        style={[st.indicator, { width: tabWidth, backgroundColor: activeColor }, indicatorStyle]}
+        style={[
+          st.indicator,
+          { width: tabWidth, backgroundColor: activeColor },
+          indicatorStyle,
+          animStyle,
+        ]}
       />
       {tabs.map(tab => {
-        const isActive = active === tab;
+        const isActive = tab === active;
         const count    = badge?.[tab];
         return (
           <TouchableOpacity
             key={tab}
             style={st.tab}
             onPress={() => handlePress(tab)}
-            activeOpacity={0.8}
+            activeOpacity={0.75}
           >
-            <Text style={[st.tabText, { color: isActive ? '#fff' : inactiveTextColor }, isActive && st.tabTextActive]}>
+            <Text
+              style={[
+                st.tabText,
+                { color: isActive ? activeTextColor : inactiveTextColor },
+                isActive && st.tabTextActive,
+              ]}
+            >
               {tab}
             </Text>
             {count != null && count > 0 && (
-              <View style={[st.badge, { backgroundColor: isActive ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.12)' }]}>
-                <Text style={[st.badgeTxt, { color: isActive ? '#fff' : inactiveTextColor }]}>
+              <View
+                style={[
+                  st.badge,
+                  { backgroundColor: isActive ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.12)' },
+                ]}
+              >
+                <Text style={[st.badgeTxt, { color: isActive ? activeTextColor : inactiveTextColor }]}>
                   {count}
                 </Text>
               </View>
