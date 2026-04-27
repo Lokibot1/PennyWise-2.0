@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { router, useFocusEffect } from "expo-router";
 import { getNavTarget, clearNavTarget } from "@/lib/activityNavTarget";
 import { useNetwork } from "@/contexts/NetworkContext";
@@ -226,12 +226,14 @@ function BalanceHeader({
   totalIncome,
   onBack,
   theme,
+  tabSlot,
 }: {
   title: string;
   totalExpenses: number;
   totalIncome: number;
   onBack?: () => void;
   theme: Theme;
+  tabSlot?: React.ReactNode;
 }) {
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -291,55 +293,27 @@ function BalanceHeader({
         </View>
       </TouchableOpacity>
 
-      <View
-        style={[
-          bh.card,
-          {
-            marginTop: -BH_OWL_OVL,
-            paddingTop: 12,
-            backgroundColor: theme.isDark
-              ? "rgba(255,255,255,0.06)"
-              : "rgba(255,255,255,0.88)",
-            borderColor: theme.isDark
-              ? "rgba(255,255,255,0.08)"
-              : "rgba(255,255,255,0.6)",
-          },
-        ]}
-      >
+      <View style={[bh.card, { marginTop: -BH_OWL_OVL, paddingTop: 12 }]}>
         <View style={bh.balRow}>
           <View style={{ flex: 1 }}>
             <View style={bh.lblRow}>
-              <Ionicons
-                name="trending-down-outline"
-                size={11}
-                color={theme.textSecondary}
-              />
-              <Text style={[bh.lbl, { color: theme.textSecondary }]}>
-                {" "}
-                Total Expenses
-              </Text>
+              <Ionicons name="trending-down-outline" size={11} color="rgba(255,255,255,0.65)" />
+              <Text style={[bh.lbl, { color: "rgba(255,255,255,0.65)" }]}> Total Expenses</Text>
             </View>
-            <Text style={[bh.amt, { color: "#E05858" }]}>
-              {fmtAmt(totalExpenses)}
-            </Text>
+            <Text style={[bh.amt, { color: "#FF8A8A" }]}>{fmtAmt(totalExpenses)}</Text>
           </View>
-          <View style={[bh.divider, { backgroundColor: theme.divider }]} />
+          <View style={[bh.divider, { backgroundColor: "rgba(255,255,255,0.2)" }]} />
           <View style={{ flex: 1, alignItems: "flex-end" }}>
             <View style={bh.lblRow}>
-              <Ionicons
-                name="wallet-outline"
-                size={11}
-                color={theme.textSecondary}
-              />
-              <Text style={[bh.lbl, { color: theme.textSecondary }]}>
-                {" "}
-                Categories
-              </Text>
+              <Ionicons name="wallet-outline" size={11} color="rgba(255,255,255,0.65)" />
+              <Text style={[bh.lbl, { color: "rgba(255,255,255,0.65)" }]}> Categories</Text>
             </View>
-            <Text style={[bh.amt, { color: theme.textPrimary }]}>Active</Text>
+            <Text style={[bh.amt, { color: "rgba(255,255,255,0.9)" }]}>Active</Text>
           </View>
         </View>
       </View>
+
+      {tabSlot}
 
       <MascotChatbot visible={chatOpen} onClose={() => setChatOpen(false)} />
     </View>
@@ -356,7 +330,7 @@ const bh = StyleSheet.create({
     backgroundColor: "#1B3D2B",
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 12,
+    paddingBottom: 16,
     overflow: "hidden",
   },
   nav: {
@@ -375,11 +349,16 @@ const bh = StyleSheet.create({
   },
   title: { fontFamily: Font.headerBold, fontSize: 20, color: "#1A1A1A" },
   card: {
-    backgroundColor: "rgba(255,255,255,0.88)",
+    backgroundColor: "rgba(255,255,255,0.12)",
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.6)",
+    borderColor: "rgba(255,255,255,0.25)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
   },
   balRow: { flexDirection: "row", alignItems: "center" },
   lblRow: { flexDirection: "row", alignItems: "center", marginBottom: 5 },
@@ -926,17 +905,33 @@ function CategoriesScreen({
         totalExpenses={totalExpenses}
         totalIncome={totalIncome}
         theme={theme}
+        tabSlot={
+          <SlideTabBar
+            tabs={["Active", "Archived"]}
+            active={tab}
+            onChange={(t) => setTab(t as "Active" | "Archived")}
+            trackColor="rgba(255,255,255,0.08)"
+            activeColor="rgba(255,255,255,0.90)"
+            activeTextColor="#1B3D2B"
+            inactiveTextColor="rgba(255,255,255,0.55)"
+            indicatorStyle={{
+              borderRadius: 10,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.14,
+              shadowRadius: 6,
+              elevation: 3,
+            }}
+            style={{
+              marginTop: 10,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.18)",
+            }}
+          />
+        }
       />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
-        <SlideTabBar
-          tabs={["Active", "Archived"]}
-          active={tab}
-          onChange={(t) => setTab(t as "Active" | "Archived")}
-          trackColor={theme.isDark ? "rgba(255,255,255,0.08)" : "#F0F0F0"}
-          activeColor="#1B7A4A"
-          inactiveTextColor={theme.textMuted as string}
-          style={{ marginHorizontal: 20, marginTop: 10, marginBottom: 12 }}
-        />
         <ScrollView
           style={[s.white, { backgroundColor: theme.cardBg }]}
           contentContainerStyle={s.whiteContent}
@@ -946,7 +941,15 @@ function CategoriesScreen({
             <>
               {categoryTotals.length > 0 && (
                 <View style={[s.chartCard, { backgroundColor: theme.surface, borderColor: theme.divider }]}>
-                  <CategoryDonutChart slices={categoryTotals} total={chartTotal} theme={theme} />
+                  <View style={s.chartCardHeader}>
+                    <Text style={[s.chartCardTitle, { color: theme.textPrimary }]}>Expenses Breakdown</Text>
+                    <View style={[s.chartCardBadge, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(27,61,43,0.10)' }]}>
+                      <Text style={[s.chartCardBadgeTxt, { color: theme.textMuted }]}>
+                        {categoryTotals.length} {categoryTotals.length === 1 ? 'category' : 'categories'}
+                      </Text>
+                    </View>
+                  </View>
+                  <CategoryDonutChart slices={categoryTotals} total={chartTotal} theme={theme} centerAmount={chartTotal} />
                 </View>
               )}
               <Text style={[s.catSectionLabel, { color: theme.textMuted }]}>Categories</Text>
@@ -1012,7 +1015,7 @@ function CategoriesScreen({
                   activeOpacity={0.85}
                 >
                   <View style={[s.catIcon, s.catIconMore]}>
-                    <Ionicons name="add" size={32} color="#2A7E8F" />
+                    <Ionicons name="add" size={32} color="#2952B3" />
                   </View>
                   <Text style={[s.catLabel, { color: theme.textPrimary }]}>
                     More
@@ -2875,8 +2878,12 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
 
-  chartCard:       { borderRadius: 18, padding: 16, borderWidth: 1, marginBottom: 20 },
-  catSectionLabel: { fontFamily: Font.bodySemiBold, fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
+  chartCard:         { borderRadius: 18, padding: 16, borderWidth: 1, marginBottom: 20 },
+  chartCardHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  chartCardTitle:    { fontFamily: Font.bodySemiBold, fontSize: 13 },
+  chartCardBadge:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  chartCardBadgeTxt: { fontFamily: Font.bodyRegular, fontSize: 11 },
+  catSectionLabel:   { fontFamily: Font.bodySemiBold, fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
 
   grid: {
     flexDirection: "row",
@@ -2890,12 +2897,12 @@ const s = StyleSheet.create({
     width: 76,
     height: 76,
     borderRadius: 22,
-    backgroundColor: "#2A7E8F",
+    backgroundColor: "#2952B3",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 8,
   },
-  catIconMore: { backgroundColor: "rgba(42,126,143,0.12)" },
+  catIconMore: { backgroundColor: "rgba(41,82,179,0.12)" },
   catLabel: {
     fontFamily: Font.bodyMedium,
     fontSize: 13,
