@@ -26,6 +26,7 @@ import SlideTabBar from '@/components/SlideTabBar';
 import BudgetLimitModal from '@/components/BudgetLimitModal';
 import CircularRing from '@/components/CircularRing';
 import ErrorModal from '@/components/ErrorModal';
+import HeaderDecor from '@/components/HeaderDecor';
 import MascotChatbot from '@/components/MascotChatbot';
 import SpendingBarChart from '@/components/SpendingBarChart';
 
@@ -321,6 +322,7 @@ export default function HomeScreen() {
       >
         {/* ── Green Header Section ──────────────────────────────────────── */}
         <View style={[styles.greenSection, { backgroundColor: theme.headerBg }]}>
+          <HeaderDecor height={380} />
 
           {/* Greeting */}
           <View style={styles.greetingRow}>
@@ -351,22 +353,22 @@ export default function HomeScreen() {
               </TouchableOpacity>
 
               {/* Balance Card — marginTop:-OWL_OVERLAP pulls it up under the owl */}
-              <View style={[styles.balanceCard, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
-                <View style={[styles.balanceRow, { borderBottomColor: theme.divider }]}>
+              <View style={styles.balanceCard}>
+                <View style={[styles.balanceRow, { borderBottomColor: 'rgba(255,255,255,0.15)' }]}>
                   <View style={styles.balanceItem}>
                     <View style={styles.labelRow}>
-                      <Ionicons name="wallet-outline" size={11} color={theme.textSecondary} />
-                      <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}> Total Balance</Text>
+                      <Ionicons name="wallet-outline" size={11} color="rgba(255,255,255,0.65)" />
+                      <Text style={[styles.balanceLabel, { color: 'rgba(255,255,255,0.65)' }]}> Total Balance</Text>
                     </View>
-                    <Text style={[styles.balanceAmount, { color: theme.textPrimary }]}>
+                    <Text style={[styles.balanceAmount, { color: '#fff' }]}>
                       {formatCurrency(totalBalance)}
                     </Text>
                   </View>
-                  <View style={[styles.balanceDivider, { backgroundColor: theme.divider }]} />
+                  <View style={[styles.balanceDivider, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
                   <View style={[styles.balanceItem, { alignItems: 'flex-end' }]}>
                     <View style={styles.labelRow}>
-                      <Ionicons name="trending-down-outline" size={11} color={theme.textSecondary} />
-                      <Text style={[styles.balanceLabel, { color: theme.textSecondary }]}> Total Expense</Text>
+                      <Ionicons name="trending-down-outline" size={11} color="rgba(255,255,255,0.65)" />
+                      <Text style={[styles.balanceLabel, { color: 'rgba(255,255,255,0.65)' }]}> Total Expense</Text>
                     </View>
                     <Text style={[styles.balanceAmount, styles.expenseAmount]}>
                       {formatCurrency(-totalExpense)}
@@ -389,11 +391,11 @@ export default function HomeScreen() {
                       onPress={() => setBudgetModalVisible(true)}
                       activeOpacity={0.7}
                     >
-                      <Text style={[styles.budgetLimit, { color: theme.textSecondary }]}>{formatCurrency(budgetLimit)}</Text>
-                      <Ionicons name="pencil-outline" size={12} color={theme.textMuted} />
+                      <Text style={[styles.budgetLimit, { color: 'rgba(255,255,255,0.65)' }]}>{formatCurrency(budgetLimit)}</Text>
+                      <Ionicons name="pencil-outline" size={12} color="rgba(255,255,255,0.45)" />
                     </TouchableOpacity>
                   </View>
-                  <View style={[styles.progressTrack, { backgroundColor: theme.isDark ? 'rgba(255,255,255,0.12)' : '#E0E0E0' }]}>
+                  <View style={[styles.progressTrack, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
                     <View style={[
                       styles.progressFill,
                       { width: `${budgetPercent}%` as any },
@@ -405,9 +407,9 @@ export default function HomeScreen() {
                     <Ionicons
                       name={budgetPercent > 70 ? 'warning-outline' : 'checkbox-outline'}
                       size={14}
-                      color={budgetPercent > 70 ? '#E85D5D' : '#4A8A6A'}
+                      color={budgetPercent > 70 ? '#FF8A8A' : 'rgba(255,255,255,0.75)'}
                     />
-                    <Text style={[styles.checkText, budgetPercent > 70 && { color: '#E85D5D' }]}>
+                    <Text style={[styles.checkText, budgetPercent > 70 && { color: '#FF8A8A' }]}>
                       {' '}{budgetMsg}
                     </Text>
                   </View>
@@ -424,11 +426,11 @@ export default function HomeScreen() {
                 <View style={styles.savingsLeft}>
                   {goalsCount === 0 ? (
                     <>
-                      <View style={{ marginBottom: 8 }}>
+                      <View style={{ marginBottom: 6 }}>
                         <CircularRing
-                          size={72} stroke={5} pct={0}
+                          size={60} stroke={4} pct={0}
                           color="#fff" track="rgba(255,255,255,0.18)"
-                          icon="flag-outline" iconSize={24}
+                          icon="flag-outline" iconSize={20}
                           innerBg="rgba(255,255,255,0.15)"
                         />
                       </View>
@@ -437,12 +439,12 @@ export default function HomeScreen() {
                     </>
                   ) : goalsCount === 1 ? (
                     <>
-                      <View style={{ marginBottom: 8 }}>
+                      <View style={{ marginBottom: 6 }}>
                         <CircularRing
-                          size={72} stroke={5} pct={goalsPct}
+                          size={60} stroke={4} pct={goalsPct}
                           color={goalsPct >= 100 ? '#3ECBA8' : '#fff'}
                           track="rgba(255,255,255,0.18)"
-                          icon={firstGoal!.icon} iconSize={24}
+                          icon={firstGoal!.icon} iconSize={20}
                           innerBg={goalsPct >= 100 ? '#3ECBA8' : 'rgba(255,255,255,0.15)'}
                         />
                       </View>
@@ -454,12 +456,12 @@ export default function HomeScreen() {
                   ) : (
                     /* 2+ goals — animated carousel */
                     <Animated.View style={[{ alignItems: 'center' }, goalInfoStyle]}>
-                      <View style={{ marginBottom: 10 }}>
+                      <View style={{ marginBottom: 8 }}>
                         <CircularRing
-                          size={72} stroke={5} pct={activeGoalPct}
+                          size={60} stroke={4} pct={activeGoalPct}
                           color={activeGoalPct >= 100 ? '#3ECBA8' : '#fff'}
                           track="rgba(255,255,255,0.18)"
-                          icon={activeGoal!.icon} iconSize={24}
+                          icon={activeGoal!.icon} iconSize={20}
                           innerBg={activeGoalPct >= 100 ? '#3ECBA8' : 'rgba(255,255,255,0.15)'}
                         />
                       </View>
@@ -496,7 +498,7 @@ export default function HomeScreen() {
                       <Text style={styles.savingsStatAmount}>{formatCurrency(revenueLastWeek)}</Text>
                     </View>
                   </View>
-                  <View style={[styles.savingsStat, { marginTop: 14 }]}>
+                  <View style={[styles.savingsStat, { marginTop: 10 }]}>
                     <Ionicons name="trending-down-outline" size={18} color="#fff" />
                     <View style={styles.savingsStatText}>
                       <Text style={styles.savingsStatLabel}>Expenses Last Week</Text>
@@ -652,6 +654,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 28,
+    overflow: 'hidden',
   },
   greetingRow: {
     flexDirection: 'row',
@@ -732,21 +735,26 @@ const styles = StyleSheet.create({
     borderRightColor: '#FFFFFF',
   },
   balanceCard: {
-    backgroundColor: 'rgba(255,255,255,0.88)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 16,
-    marginTop: -OWL_OVERLAP,           // slides card up under owl feet
-    paddingTop: 12,                    // labels sit near the top; owl may overlap
+    marginTop: -OWL_OVERLAP,
+    paddingTop: 10,
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 10,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
+    borderColor: 'rgba(255,255,255,0.25)',
     zIndex: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
   },
   balanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: 14,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.07)',
   },
@@ -754,7 +762,7 @@ const styles = StyleSheet.create({
   labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   balanceLabel: {
     fontFamily: Font.bodyRegular,
@@ -763,20 +771,20 @@ const styles = StyleSheet.create({
   },
   balanceDivider: {
     width: 1,
-    height: 40,
+    height: 34,
     backgroundColor: 'rgba(0,0,0,0.1)',
     marginHorizontal: 12,
   },
   balanceAmount: {
     fontFamily: Font.headerBold,
-    fontSize: 20,
+    fontSize: 18,
     color: '#1A1A1A',
     letterSpacing: -0.3,
   },
-  expenseAmount: { color: '#4895EF' },
+  expenseAmount: { color: '#7EC8FF' },
 
   // ── Budget Progress ───────────────────────────────────────────────────────────
-  progressSection: { paddingTop: 12 },
+  progressSection: { paddingTop: 8 },
   progressLabelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -784,7 +792,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   percentBadge: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: 'rgba(0,0,0,0.35)',
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -818,16 +826,23 @@ const styles = StyleSheet.create({
   checkText: {
     fontFamily: Font.bodyRegular,
     fontSize: 12,
-    color: '#4A7A5A',
+    color: 'rgba(255,255,255,0.75)',
   },
 
   // ── Savings Card ──────────────────────────────────────────────────────────────
   savingsCard: {
-    backgroundColor: '#115533',
+    backgroundColor: 'rgba(255,255,255,0.10)',
     borderRadius: 20,
-    padding: 18,
+    padding: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
   },
   savingsLeft: {
     alignItems: 'center',
@@ -857,9 +872,9 @@ const styles = StyleSheet.create({
   },
   savingsDivider: {
     width: 1,
-    height: 80,
+    height: 64,
     backgroundColor: 'rgba(255,255,255,0.3)',
-    marginHorizontal: 16,
+    marginHorizontal: 14,
   },
   savingsRight: {
     flex: 1.4,

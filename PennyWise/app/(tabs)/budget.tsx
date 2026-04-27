@@ -15,6 +15,7 @@ import NotificationBell from "@/components/NotificationBell";
 import AnimatedOwl from "@/components/AnimatedOwl";
 import MascotChatbot from "@/components/MascotChatbot";
 import CategoryDonutChart from "@/components/CategoryDonutChart";
+import HeaderDecor from "@/components/HeaderDecor";
 import { CategoryPageSkeleton } from "@/components/SkeletonLoader";
 import {
   ActivityIndicator,
@@ -251,6 +252,7 @@ function BalanceHeader({
 
   return (
     <View style={[bh.wrap, { backgroundColor: theme.headerBg }]}>
+      <HeaderDecor />
       <View style={bh.nav}>
         <TouchableOpacity
           style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]}
@@ -345,7 +347,7 @@ function BalanceHeader({
 }
 
 const BH_SCREEN_W = Dimensions.get("window").width;
-const BH_OWL_W = Math.min(90, Math.round((BH_SCREEN_W - 40) * 0.24));
+const BH_OWL_W = Math.min(70, Math.round((BH_SCREEN_W - 40) * 0.18));
 const BH_OWL_H = Math.round(BH_OWL_W * 1.4);
 const BH_OWL_OVL = Math.round(BH_OWL_H * 0.15);
 
@@ -354,13 +356,14 @@ const bh = StyleSheet.create({
     backgroundColor: "#1B3D2B",
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 28,
+    paddingBottom: 12,
+    overflow: "hidden",
   },
   nav: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   iconBtn: {
     width: 42,
@@ -373,8 +376,8 @@ const bh = StyleSheet.create({
   title: { fontFamily: Font.headerBold, fontSize: 20, color: "#1A1A1A" },
   card: {
     backgroundColor: "rgba(255,255,255,0.88)",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.6)",
   },
@@ -389,7 +392,7 @@ const bh = StyleSheet.create({
   },
   divider: {
     width: 1,
-    height: 40,
+    height: 38,
     backgroundColor: "rgba(0,0,0,0.1)",
     marginHorizontal: 12,
   },
@@ -932,7 +935,7 @@ function CategoriesScreen({
           trackColor={theme.isDark ? "rgba(255,255,255,0.08)" : "#F0F0F0"}
           activeColor="#1B7A4A"
           inactiveTextColor={theme.textMuted as string}
-          style={{ marginHorizontal: 20, marginTop: 16, marginBottom: 4 }}
+          style={{ marginHorizontal: 20, marginTop: 10, marginBottom: 12 }}
         />
         <ScrollView
           style={[s.white, { backgroundColor: theme.cardBg }]}
@@ -942,8 +945,11 @@ function CategoriesScreen({
           {tab === "Active" ? (
             <>
               {categoryTotals.length > 0 && (
-                <CategoryDonutChart slices={categoryTotals} total={chartTotal} theme={theme} />
+                <View style={[s.chartCard, { backgroundColor: theme.surface, borderColor: theme.divider }]}>
+                  <CategoryDonutChart slices={categoryTotals} total={chartTotal} theme={theme} />
+                </View>
               )}
+              <Text style={[s.catSectionLabel, { color: theme.textMuted }]}>Categories</Text>
               <View style={s.grid}>
                 {active.map((cat) => {
                   const count = expenses.filter(
@@ -2853,7 +2859,7 @@ const s = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#1B3D2B" },
 
   white: { flex: 1, backgroundColor: "#fff" },
-  whiteContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
+  whiteContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
 
   sectionTitle: {
     fontFamily: Font.headerBold,
@@ -2869,6 +2875,9 @@ const s = StyleSheet.create({
     marginBottom: 16,
   },
 
+  chartCard:       { borderRadius: 18, padding: 16, borderWidth: 1, marginBottom: 20 },
+  catSectionLabel: { fontFamily: Font.bodySemiBold, fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
+
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -2880,7 +2889,7 @@ const s = StyleSheet.create({
   catIcon: {
     width: 76,
     height: 76,
-    borderRadius: 20,
+    borderRadius: 22,
     backgroundColor: "#2A7E8F",
     alignItems: "center",
     justifyContent: "center",
@@ -2897,7 +2906,7 @@ const s = StyleSheet.create({
     fontFamily: Font.bodyRegular,
     fontSize: 11,
     color: "#888",
-    marginTop: 2,
+    marginTop: 3,
   },
 
   // ── Per-category mini budget bar (on card) ─────────────────────────────────

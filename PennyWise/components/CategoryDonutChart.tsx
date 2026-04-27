@@ -17,11 +17,11 @@ type Props = {
   centerLabel?: string;
 };
 
-const SIZE  = 120;
+const SIZE  = 130;
 const CX    = SIZE / 2;
 const CY    = SIZE / 2;
-const R_OUT = 50;
-const R_IN  = 30;
+const R_OUT = 54;
+const R_IN  = 32;
 const SLICE_GAP = 0.025; // radians of gap between slices
 
 function polar(cx: number, cy: number, r: number, a: number) {
@@ -105,9 +105,9 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 20,
     paddingHorizontal: 4,
-    paddingVertical: 10,
+    paddingVertical: 4,
   },
   donutWrap: {
     width: SIZE,
@@ -128,10 +128,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
     textAlign: 'center',
   },
-  legend:     { flex: 1, gap: 7 },
-  legendRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot:  { width: 9, height: 9, borderRadius: 5, flexShrink: 0 },
-  legendLabel: { flex: 1, fontFamily: Font.bodyRegular, fontSize: 12 },
-  legendPct:  { fontFamily: Font.bodySemiBold, fontSize: 12, minWidth: 30, textAlign: 'right' },
+  legend:     { flex: 1, gap: 10 },
+  legendRow:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  legendDot:  { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  legendLabel: { flex: 1, fontFamily: Font.bodyMedium, fontSize: 13 },
+  legendPct:  { fontFamily: Font.bodySemiBold, fontSize: 13, minWidth: 34, textAlign: 'right' },
   emptyTxt:   { fontFamily: Font.bodyRegular, fontSize: 13 },
 });

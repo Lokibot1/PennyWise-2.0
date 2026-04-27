@@ -41,6 +41,7 @@ import { DraftSaveIndicator } from '@/components/DraftSaveIndicator';
 import MascotChatbot from '@/components/MascotChatbot';
 import CategoryDonutChart from '@/components/CategoryDonutChart';
 import AnimatedOwl from '@/components/AnimatedOwl';
+import HeaderDecor from '@/components/HeaderDecor';
 import Animated, {
   useSharedValue,
   withSpring,
@@ -203,6 +204,7 @@ function BalanceHeader({
 
   return (
     <View style={[bh.wrap, { backgroundColor: theme.headerBg }]}>
+      <HeaderDecor />
       <View style={bh.nav}>
         <TouchableOpacity
           style={[bh.iconBtn, { backgroundColor: theme.iconBtnBg }]}
@@ -254,21 +256,21 @@ function BalanceHeader({
 }
 
 const BH_SCREEN_W  = Dimensions.get('window').width;
-const BH_OWL_W     = Math.min(90, Math.round((BH_SCREEN_W - 40) * 0.24));
+const BH_OWL_W     = Math.min(70, Math.round((BH_SCREEN_W - 40) * 0.18));
 const BH_OWL_H     = Math.round(BH_OWL_W * 1.40);
 const BH_OWL_OVL   = Math.round(BH_OWL_H * 0.15);
 
 const bh = StyleSheet.create({
-  wrap:    { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 28 },
-  nav:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  wrap:    { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, overflow: 'hidden' },
+  nav:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
   title:   { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A' },
-  card:    { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
+  card:    { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 18, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
   balRow:  { flexDirection: 'row', alignItems: 'center' },
   lblRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
   lbl:     { fontFamily: Font.bodyRegular, fontSize: 11, color: '#666' },
   amt:     { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A', letterSpacing: -0.3 },
-  divider: { width: 1, height: 40, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 12 },
+  divider: { width: 1, height: 38, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 12 },
   // ── Owl perch ────────────────────────────────────────────────────────────────
   owlRow:       { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', marginRight: 12, zIndex: 2, elevation: 2 },
   owlBubble:    { backgroundColor: '#FFFFFF', borderRadius: 14, paddingVertical: 10, paddingHorizontal: 13, maxWidth: 150, marginBottom: Math.round(BH_OWL_H * 0.28), marginRight: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 4, position: 'relative' },
@@ -564,14 +566,17 @@ function CategoriesScreen({
           trackColor={theme.isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0'}
           activeColor="#1B7A4A"
           inactiveTextColor={theme.textMuted as string}
-          style={{ marginHorizontal: 20, marginTop: 16, marginBottom: 4 }}
+          style={{ marginHorizontal: 20, marginTop: 10, marginBottom: 12 }}
         />
         <ScrollView style={[s.white, { backgroundColor: theme.cardBg }]} contentContainerStyle={s.whiteContent} showsVerticalScrollIndicator={false}>
           {tab === 'Active' ? (
             <>
               {categoryTotals.length > 0 && (
-                <CategoryDonutChart slices={categoryTotals} total={chartTotal} theme={theme} />
+                <View style={[s.chartCard, { backgroundColor: theme.surface, borderColor: theme.divider }]}>
+                  <CategoryDonutChart slices={categoryTotals} total={chartTotal} theme={theme} />
+                </View>
               )}
+              <Text style={[s.catSectionLabel, { color: theme.textMuted }]}>Categories</Text>
               <View style={s.grid}>
               {active.map(cat => {
                 const count = income.filter(i => i.categoryId === cat.id && !i.isArchived).length;
@@ -1730,16 +1735,19 @@ const s = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#1B3D2B' },
 
   white:        { flex: 1, backgroundColor: '#fff' },
-  whiteContent: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40 },
+  whiteContent: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 },
 
   hint: { fontFamily: Font.bodyRegular, fontSize: 13, color: '#888', marginBottom: 16 },
 
+  chartCard:       { borderRadius: 18, padding: 16, borderWidth: 1, marginBottom: 20 },
+  catSectionLabel: { fontFamily: Font.bodySemiBold, fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 12 },
+
   grid:        { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 14, marginBottom: 24 },
   catCard:     { width: '30%', alignItems: 'center', marginBottom: 4 },
-  catIcon:     { width: 76, height: 76, borderRadius: 20, backgroundColor: '#115533', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  catIcon:     { width: 76, height: 76, borderRadius: 22, backgroundColor: '#115533', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   catIconMore: { backgroundColor: 'rgba(17,85,51,0.12)' },
   catLabel:    { fontFamily: Font.bodyMedium, fontSize: 13, color: '#1A1A1A', textAlign: 'center' },
-  catCount:    { fontFamily: Font.bodyRegular, fontSize: 11, color: '#888', marginTop: 2 },
+  catCount:    { fontFamily: Font.bodyRegular, fontSize: 11, color: '#888', marginTop: 3 },
 
   monthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   monthLabel:  { fontFamily: Font.headerBold, fontSize: 16, color: '#1A1A1A' },
