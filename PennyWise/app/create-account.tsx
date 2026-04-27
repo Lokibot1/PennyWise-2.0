@@ -262,6 +262,15 @@ export default function CreateAccountScreen() {
     }
   }
 
+  const isValid =
+    fullName.trim().length > 0 &&
+    email.trim().length > 0 &&
+    phone.trim().length > 0 &&
+    !!dob &&
+    password.length >= 6 &&
+    password === confirmPassword &&
+    termsAccepted;
+
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: theme.headerBg }]}
@@ -442,10 +451,10 @@ export default function CreateAccountScreen() {
           <TouchableOpacity
             style={[
               styles.primaryButton,
-              loading && styles.primaryButtonDisabled,
+              { opacity: (!isValid || loading) ? 0.45 : 1 },
             ]}
             activeOpacity={0.85}
-            disabled={loading}
+            disabled={!isValid || loading}
             onPress={handleSignUp}
           >
             {loading ? (
@@ -454,6 +463,12 @@ export default function CreateAccountScreen() {
               <Text style={styles.primaryButtonText}>Sign Up</Text>
             )}
           </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10, gap: 5 }}>
+            <Ionicons name={isValid ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={isValid ? '#1B7A4A' : theme.textMuted} />
+            <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: isValid ? '#1B7A4A' : theme.textMuted }}>
+              {isValid ? "All set! Tap 'Sign Up' to create your account." : 'Fill in all fields and accept the terms to continue.'}
+            </Text>
+          </View>
 
           <View style={styles.footerRow}>
             <Text style={[styles.footerText, { color: theme.textMuted }]}>

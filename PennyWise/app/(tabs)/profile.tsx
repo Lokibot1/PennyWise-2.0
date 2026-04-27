@@ -449,6 +449,7 @@ function EditProfileView({
   const username = profileDraft.username as string;
   const phone    = profileDraft.phone    as string;
   const email    = profileDraft.email    as string;
+  const isProfileValid = username.trim().length > 0 && email.trim().length > 0;
   const [saving, setSaving]     = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [errModal, setErrModal] = useState({
@@ -873,9 +874,9 @@ function EditProfileView({
 
         {/* Actions */}
         <TouchableOpacity
-          style={[styles.saveBtn, saving && { opacity: 0.7 }]}
+          style={[styles.saveBtn, { opacity: (!isProfileValid || saving) ? 0.45 : 1 }]}
           activeOpacity={0.85}
-          disabled={saving}
+          disabled={!isProfileValid || saving}
           onPress={() => setConfirm(true)}
         >
           {saving ? (
@@ -884,6 +885,12 @@ function EditProfileView({
             <Text style={styles.saveBtnText}>Save Changes</Text>
           )}
         </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10, gap: 5 }}>
+          <Ionicons name={isProfileValid ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={isProfileValid ? '#1B7A4A' : theme.textMuted} />
+          <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: isProfileValid ? '#1B7A4A' : theme.textMuted }}>
+            {isProfileValid ? "All set! Tap to save changes." : 'Name and email are required to continue.'}
+          </Text>
+        </View>
 
         <TouchableOpacity
           style={styles.cancelBtn}
@@ -2260,9 +2267,9 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
           </View>
 
           <TouchableOpacity
-            style={[styles.saveBtn, saving && styles.saveBtnOff]}
+            style={[styles.saveBtn, { opacity: (!allRulesMet || !confirmMatches || saving) ? 0.45 : 1 }]}
             onPress={handleChangePassword}
-            disabled={saving}
+            disabled={!allRulesMet || !confirmMatches || saving}
             activeOpacity={0.85}
           >
             {saving ? (
@@ -2271,6 +2278,12 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
               <Text style={styles.saveBtnText}>Update Password</Text>
             )}
           </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10, gap: 5 }}>
+            <Ionicons name={(allRulesMet && confirmMatches) ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={(allRulesMet && confirmMatches) ? '#1B7A4A' : theme.textMuted} />
+            <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: (allRulesMet && confirmMatches) ? '#1B7A4A' : theme.textMuted }}>
+              {(allRulesMet && confirmMatches) ? "All set! Tap to update password." : 'Meet all password requirements to continue.'}
+            </Text>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 

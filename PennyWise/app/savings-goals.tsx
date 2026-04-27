@@ -208,6 +208,11 @@ export default function SavingsGoalsScreen() {
   const [pendingArchiveGoal, setPendingArchiveGoal] = useState<Goal | null>(null);
   const [pendingDeleteGoal,  setPendingDeleteGoal]  = useState<Goal | null>(null);
 
+  // ── Form validity ─────────────────────────────────────────────────────────
+  const isCreateGoalValid = newTitle.trim().length > 0 && (parseAmount(newTarget) ?? 0) > 0;
+  const isEditGoalValid   = editTitle.trim().length > 0 && (parseAmount(editTarget) ?? 0) > 0;
+  const isFundsValid      = (parseAmount(fundsAmount) ?? 0) > 0;
+
   // ── Data ──────────────────────────────────────────────────────────────────
   const fetchGoals = useCallback(async (uid: string, forceRefresh = false) => {
     if (forceRefresh) DataCache.invalidateSavingsGoals(uid);
@@ -861,11 +866,19 @@ export default function SavingsGoalsScreen() {
               <IconPicker selected={newIcon} onSelect={v => setGoalField('newIcon', v)} theme={theme} />
 
               <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={handleSaveGoal} activeOpacity={0.85}
+                style={[styles.primaryBtn, { opacity: isCreateGoalValid ? 1 : 0.45 }]}
+                onPress={handleSaveGoal}
+                activeOpacity={0.85}
+                disabled={!isCreateGoalValid}
               >
                 <Text style={styles.primaryBtnText}>Create Goal</Text>
               </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 6, marginBottom: 4, gap: 5 }}>
+                <Ionicons name={isCreateGoalValid ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={isCreateGoalValid ? '#1B7A4A' : theme.textMuted} />
+                <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: isCreateGoalValid ? '#1B7A4A' : theme.textMuted }}>
+                  {isCreateGoalValid ? "All set! Tap to create." : 'Enter a name and target amount to continue.'}
+                </Text>
+              </View>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddModal(false)}>
                 <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
@@ -921,11 +934,19 @@ export default function SavingsGoalsScreen() {
               <IconPicker selected={editIcon} onSelect={v => setEditField('editIcon', v)} theme={theme} />
 
               <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={handleEditGoal} activeOpacity={0.85}
+                style={[styles.primaryBtn, { opacity: isEditGoalValid ? 1 : 0.45 }]}
+                onPress={handleEditGoal}
+                activeOpacity={0.85}
+                disabled={!isEditGoalValid}
               >
                 <Text style={styles.primaryBtnText}>Save Changes</Text>
               </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 6, marginBottom: 4, gap: 5 }}>
+                <Ionicons name={isEditGoalValid ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={isEditGoalValid ? '#1B7A4A' : theme.textMuted} />
+                <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: isEditGoalValid ? '#1B7A4A' : theme.textMuted }}>
+                  {isEditGoalValid ? "All set! Tap to save." : 'Enter a name and target amount to continue.'}
+                </Text>
+              </View>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowEditModal(false)}>
                 <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
@@ -1016,11 +1037,19 @@ export default function SavingsGoalsScreen() {
               </View>
 
               <TouchableOpacity
-                style={styles.primaryBtn}
-                onPress={handleAddFunds} activeOpacity={0.85}
+                style={[styles.primaryBtn, { opacity: isFundsValid ? 1 : 0.45 }]}
+                onPress={handleAddFunds}
+                activeOpacity={0.85}
+                disabled={!isFundsValid}
               >
                 <Text style={styles.primaryBtnText}>Add Funds</Text>
               </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 6, marginBottom: 4, gap: 5 }}>
+                <Ionicons name={isFundsValid ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={isFundsValid ? '#1B7A4A' : theme.textMuted} />
+                <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: isFundsValid ? '#1B7A4A' : theme.textMuted }}>
+                  {isFundsValid ? "All set! Tap to add funds." : 'Enter an amount greater than 0 to continue.'}
+                </Text>
+              </View>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowFundsModal(false)}>
                 <Text style={[styles.cancelBtnText, { color: theme.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>

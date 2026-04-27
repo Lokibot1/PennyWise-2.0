@@ -615,21 +615,15 @@ const NEW_CAT_ICONS: IoniconName[] = [
 ];
 
 const ncm = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 20,
-    paddingBottom: 24,
-    width: "100%",
-    maxHeight: "80%",
-  },
+  overlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  card:         { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 36, maxHeight: '88%' },
+  handle:       { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  divider:      { height: 1, marginBottom: 20 },
+  sectionLabel: { fontFamily: Font.bodySemiBold, fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 },
+  inputRow:     { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 4 },
+  iconGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 4 },
+  iconOpt:      { width: 54, height: 54, borderRadius: 16, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });
 
 function NewCategoryModal({
@@ -663,113 +657,87 @@ function NewCategoryModal({
     onClose();
   };
 
+  const isValid = label.trim().length > 0;
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+    <Modal visible={visible} transparent animationType="slide">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Pressable style={ncm.overlay} onPress={onClose}>
-          <Pressable
-            style={[ncm.card, { backgroundColor: theme.modalBg }]}
-            onPress={() => {}}
-          >
-            <Text style={[pk.heading, { color: theme.textPrimary }]}>
-              New Expense Category
-            </Text>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text
-                style={[
-                  s.label,
-                  { color: nameError ? "#E05555" : theme.textPrimary },
-                ]}
-              >
-                Category Name
-              </Text>
-              <Text style={s.hint}>
-                e.g. Rent, Groceries, Transport, Utilities…
-              </Text>
-              <View
-                style={[
-                  s.fieldRow,
-                  { marginBottom: 4 },
-                  nameError && {
-                    borderWidth: 1.5,
-                    borderColor: "#E05555",
-                    backgroundColor: "rgba(224,85,85,0.06)",
-                  },
-                ]}
-              >
-                <Ionicons
-                  name="tag-outline"
-                  size={16}
-                  color={nameError ? "#E0908A" : "#aaa"}
-                  style={{ marginRight: 8 }}
-                />
+          <Pressable style={[ncm.card, { backgroundColor: theme.cardBg }]} onPress={() => {}}>
+            <View style={[ncm.handle, { backgroundColor: theme.divider }]} />
+            <View style={ncm.header}>
+              <Text style={[pk.heading, { color: theme.textPrimary }]}>New Expense Category</Text>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }} activeOpacity={0.7}>
+                <Ionicons name="close-circle" size={26} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <View style={[ncm.divider, { backgroundColor: theme.divider }]} />
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={[ncm.sectionLabel, { color: nameError ? '#E05555' : theme.textMuted }]}>Category Name</Text>
+              <View style={[ncm.inputRow, {
+                backgroundColor: nameError ? 'rgba(224,85,85,0.06)' : theme.inputBg,
+                borderColor: nameError ? '#E05555' : theme.inputBorder,
+              }]}>
                 <TextInput
-                  style={[s.fieldTxt, { flex: 1 }]}
+                  style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
                   value={label}
-                  onChangeText={(t) => {
-                    setLabel(t);
-                    if (nameError) setNameError(false);
-                  }}
+                  onChangeText={(t) => { setLabel(t); if (nameError) setNameError(false); }}
                   placeholder="e.g. Rent, Groceries, Transport"
-                  placeholderTextColor={nameError ? "#E0908A" : "#aaa"}
+                  placeholderTextColor={nameError ? '#E0908A' : theme.textMuted}
+                  autoFocus
+                  returnKeyType="done"
                 />
               </View>
-
-              <Text style={s.label}>Icon</Text>
-              <View style={s.iconGrid}>
+              <Text style={[ncm.sectionLabel, { color: theme.textMuted, marginTop: 20 }]}>Icon</Text>
+              <View style={ncm.iconGrid}>
                 {NEW_CAT_ICONS.map((ic) => (
                   <TouchableOpacity
                     key={ic}
-                    style={[s.iconOpt, icon === ic && s.iconOptActive]}
+                    style={[ncm.iconOpt, {
+                      backgroundColor: icon === ic ? '#2A7E8F' : theme.surface,
+                      borderColor: icon === ic ? '#2A7E8F' : theme.inputBorder,
+                    }]}
                     onPress={() => setIcon(ic)}
-                    activeOpacity={0.8}
+                    activeOpacity={0.7}
                   >
-                    <Ionicons
-                      name={ic}
-                      size={22}
-                      color={icon === ic ? "#fff" : "#2A7E8F"}
-                    />
+                    <Ionicons name={ic} size={24} color={icon === ic ? '#fff' : theme.textSecondary} />
                   </TouchableOpacity>
                 ))}
               </View>
-
-              <Text style={[s.label, { marginTop: 16 }]}>Monthly Budget Limit</Text>
-              <Text style={[s.hint, { marginBottom: 6 }]}>
+              <Text style={[ncm.sectionLabel, { color: theme.textMuted, marginTop: 20 }]}>Monthly Budget Limit</Text>
+              <Text style={[s.hint, { color: theme.textMuted, marginBottom: 10 }]}>
                 Optional — track spending against a monthly cap
               </Text>
-              <View style={s.fieldRow}>
-                <Text style={[s.fieldTxt, { color: "#aaa", marginRight: 4 }]}>₱</Text>
+              <View style={[ncm.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
+                <Text style={[s.fieldTxt, { color: theme.textMuted, marginRight: 4 }]}>₱</Text>
                 <TextInput
-                  style={[s.fieldTxt, { flex: 1 }]}
+                  style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
                   value={budgetStr}
                   onChangeText={setBudgetStr}
                   placeholder="e.g. 5000 (leave blank for no limit)"
-                  placeholderTextColor="#aaa"
+                  placeholderTextColor={theme.textMuted}
                   keyboardType="numeric"
                 />
                 {budgetStr.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setBudgetStr("")}
-                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                  >
-                    <Ionicons name="close-circle" size={18} color="#aaa" />
+                  <TouchableOpacity onPress={() => setBudgetStr('')} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                    <Ionicons name="close-circle" size={18} color={theme.textMuted} />
                   </TouchableOpacity>
                 )}
               </View>
-
               <TouchableOpacity
-                style={[s.saveBtn, { marginTop: 20, marginBottom: 8 }]}
+                style={[s.saveBtn, { marginTop: 24, marginBottom: 4, opacity: isValid ? 1 : 0.45 }]}
                 onPress={handleCreate}
                 activeOpacity={0.9}
+                disabled={!isValid}
               >
                 <Text style={s.saveBtnTxt}>Create Category</Text>
               </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 8, gap: 5 }}>
+                <Ionicons name={isValid ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={isValid ? '#1B7A4A' : theme.textMuted} />
+                <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: isValid ? '#1B7A4A' : theme.textMuted }}>
+                  {isValid ? "All set! Tap to save." : 'Enter a category name to continue.'}
+                </Text>
+              </View>
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -812,97 +780,83 @@ function EditCategoryModal({
     onClose();
   };
 
+  const isValid = label.trim().length > 0;
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+    <Modal visible={visible} transparent animationType="slide">
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <Pressable style={ncm.overlay} onPress={onClose}>
-          <Pressable
-            style={[ncm.card, { backgroundColor: theme.modalBg }]}
-            onPress={() => {}}
-          >
-            <Text style={[pk.heading, { color: theme.textPrimary }]}>
-              Edit Category
-            </Text>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={[s.label, { color: theme.textPrimary }]}>
-                Category Name
-              </Text>
-              <View
-                style={[
-                  s.fieldRow,
-                  { marginBottom: 4, backgroundColor: theme.inputBg },
-                ]}
-              >
-                <Ionicons
-                  name="tag-outline"
-                  size={16}
-                  color="#aaa"
-                  style={{ marginRight: 8 }}
-                />
+          <Pressable style={[ncm.card, { backgroundColor: theme.cardBg }]} onPress={() => {}}>
+            <View style={[ncm.handle, { backgroundColor: theme.divider }]} />
+            <View style={ncm.header}>
+              <Text style={[pk.heading, { color: theme.textPrimary }]}>Edit Category</Text>
+              <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }} activeOpacity={0.7}>
+                <Ionicons name="close-circle" size={26} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <View style={[ncm.divider, { backgroundColor: theme.divider }]} />
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={[ncm.sectionLabel, { color: theme.textMuted }]}>Category Name</Text>
+              <View style={[ncm.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
                 <TextInput
                   style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
                   value={label}
                   onChangeText={setLabel}
                   placeholder="e.g. Rent, Groceries, Transport"
-                  placeholderTextColor="#aaa"
+                  placeholderTextColor={theme.textMuted}
+                  returnKeyType="done"
                 />
               </View>
-              <Text style={[s.label, { color: theme.textPrimary }]}>Icon</Text>
-              <View style={s.iconGrid}>
+              <Text style={[ncm.sectionLabel, { color: theme.textMuted, marginTop: 20 }]}>Icon</Text>
+              <View style={ncm.iconGrid}>
                 {NEW_CAT_ICONS.map((ic) => (
                   <TouchableOpacity
                     key={ic}
-                    style={[s.iconOpt, icon === ic && s.iconOptActive]}
+                    style={[ncm.iconOpt, {
+                      backgroundColor: icon === ic ? '#2A7E8F' : theme.surface,
+                      borderColor: icon === ic ? '#2A7E8F' : theme.inputBorder,
+                    }]}
                     onPress={() => setIcon(ic)}
-                    activeOpacity={0.8}
+                    activeOpacity={0.7}
                   >
-                    <Ionicons
-                      name={ic}
-                      size={22}
-                      color={icon === ic ? "#fff" : "#2A7E8F"}
-                    />
+                    <Ionicons name={ic} size={24} color={icon === ic ? '#fff' : theme.textSecondary} />
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={[s.label, { color: theme.textPrimary, marginTop: 16 }]}>
-                Monthly Budget Limit
-              </Text>
-              <Text style={[s.hint, { marginBottom: 6 }]}>
+              <Text style={[ncm.sectionLabel, { color: theme.textMuted, marginTop: 20 }]}>Monthly Budget Limit</Text>
+              <Text style={[s.hint, { color: theme.textMuted, marginBottom: 10 }]}>
                 Optional — track spending against a monthly cap
               </Text>
-              <View style={[s.fieldRow, { backgroundColor: theme.inputBg }]}>
+              <View style={[ncm.inputRow, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder }]}>
                 <Text style={[s.fieldTxt, { color: theme.textMuted, marginRight: 4 }]}>₱</Text>
                 <TextInput
                   style={[s.fieldTxt, { flex: 1, color: theme.textPrimary }]}
                   value={budgetStr}
                   onChangeText={setBudgetStr}
                   placeholder="e.g. 5000 (leave blank for no limit)"
-                  placeholderTextColor="#aaa"
+                  placeholderTextColor={theme.textMuted}
                   keyboardType="numeric"
                 />
                 {budgetStr.length > 0 && (
-                  <TouchableOpacity
-                    onPress={() => setBudgetStr("")}
-                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                  >
-                    <Ionicons name="close-circle" size={18} color="#aaa" />
+                  <TouchableOpacity onPress={() => setBudgetStr('')} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                    <Ionicons name="close-circle" size={18} color={theme.textMuted} />
                   </TouchableOpacity>
                 )}
               </View>
-
               <TouchableOpacity
-                style={[s.saveBtn, { marginTop: 20, marginBottom: 8 }]}
+                style={[s.saveBtn, { marginTop: 24, marginBottom: 4, opacity: isValid ? 1 : 0.45 }]}
                 onPress={handleSave}
                 activeOpacity={0.9}
+                disabled={!isValid}
               >
                 <Text style={s.saveBtnTxt}>Save Changes</Text>
               </TouchableOpacity>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 8, gap: 5 }}>
+                <Ionicons name={isValid ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={isValid ? '#1B7A4A' : theme.textMuted} />
+                <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: isValid ? '#1B7A4A' : theme.textMuted }}>
+                  {isValid ? "All set! Tap to save." : 'Enter a category name to continue.'}
+                </Text>
+              </View>
             </ScrollView>
           </Pressable>
         </Pressable>
@@ -1604,6 +1558,8 @@ function ExpenseFormScreen({
 
   const activeCategories = categories.filter((c) => !c.isArchived);
   const selectedCat = activeCategories.find((c) => c.id === vals.categoryId);
+  const parsedAmount = parseFloat((vals.amount || '').replace(/,/g, ''));
+  const isValid = !!vals.date && !!vals.categoryId && parsedAmount > 0 && vals.title.trim().length > 0;
 
   return (
     <>
@@ -1813,7 +1769,7 @@ function ExpenseFormScreen({
             {/* Save */}
             <Animated.View style={btnStyle}>
               <TouchableOpacity
-                style={[s.saveBtn, saving && { opacity: 0.7 }]}
+                style={[s.saveBtn, { opacity: (!isValid || saving) ? 0.45 : 1 }]}
                 onPressIn={() => {
                   btnScale.value = withSpring(0.96, {
                     damping: 15,
@@ -1828,7 +1784,7 @@ function ExpenseFormScreen({
                 }}
                 onPress={() => onSave(vals)}
                 activeOpacity={1}
-                disabled={saving}
+                disabled={!isValid || !!saving}
               >
                 {saving ? (
                   <ActivityIndicator color="#fff" size="small" />
@@ -1837,6 +1793,12 @@ function ExpenseFormScreen({
                 )}
               </TouchableOpacity>
             </Animated.View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10, marginBottom: 4, gap: 5 }}>
+              <Ionicons name={isValid ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={isValid ? '#1B7A4A' : theme.textMuted} />
+              <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: isValid ? '#1B7A4A' : theme.textMuted }}>
+                {isValid ? "All set! Tap 'Save' to continue." : 'Fill in all required fields to continue.'}
+              </Text>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </Animated.View>
