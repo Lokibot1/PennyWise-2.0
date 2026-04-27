@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { getNavTarget, clearNavTarget } from '@/lib/activityNavTarget';
 import { useNetwork } from '@/contexts/NetworkContext';
@@ -194,11 +194,13 @@ function BalanceHeader({
   totalIncome,
   onBack,
   theme,
+  tabSlot,
 }: {
   title: string;
   totalIncome: number;
   onBack?: () => void;
   theme: Theme;
+  tabSlot?: React.ReactNode;
 }) {
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -230,25 +232,27 @@ function BalanceHeader({
         <AnimatedOwl width={BH_OWL_W} height={BH_OWL_H} flipX />
       </TouchableOpacity>
 
-      <View style={[bh.card, { marginTop: -BH_OWL_OVL, paddingTop: 12, backgroundColor: theme.isDark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.88)', borderColor: theme.isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.6)' }]}>
+      <View style={[bh.card, { marginTop: -BH_OWL_OVL, paddingTop: 12 }]}>
         <View style={bh.balRow}>
           <View style={{ flex: 1 }}>
             <View style={bh.lblRow}>
-              <Ionicons name="trending-up-outline" size={11} color={theme.textSecondary} />
-              <Text style={[bh.lbl, { color: theme.textSecondary }]}> Total Income</Text>
+              <Ionicons name="trending-up-outline" size={11} color="rgba(255,255,255,0.65)" />
+              <Text style={[bh.lbl, { color: 'rgba(255,255,255,0.65)' }]}> Total Income</Text>
             </View>
-            <Text style={[bh.amt, { color: theme.isDark ? '#52C27A' : '#115533' }]}>{fmtAmt(totalIncome)}</Text>
+            <Text style={[bh.amt, { color: '#3ECBA8' }]}>{fmtAmt(totalIncome)}</Text>
           </View>
-          <View style={[bh.divider, { backgroundColor: theme.divider }]} />
+          <View style={[bh.divider, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
           <View style={{ flex: 1, alignItems: 'flex-end' }}>
             <View style={bh.lblRow}>
-              <Ionicons name="cash-outline" size={11} color={theme.textSecondary} />
-              <Text style={[bh.lbl, { color: theme.textSecondary }]}> Income Sources</Text>
+              <Ionicons name="cash-outline" size={11} color="rgba(255,255,255,0.65)" />
+              <Text style={[bh.lbl, { color: 'rgba(255,255,255,0.65)' }]}> Income Sources</Text>
             </View>
-            <Text style={[bh.amt, { color: theme.textPrimary }]}>Active</Text>
+            <Text style={[bh.amt, { color: 'rgba(255,255,255,0.9)' }]}>Active</Text>
           </View>
         </View>
       </View>
+
+      {tabSlot}
 
       <MascotChatbot visible={chatOpen} onClose={() => setChatOpen(false)} />
     </View>
@@ -261,11 +265,11 @@ const BH_OWL_H     = Math.round(BH_OWL_W * 1.40);
 const BH_OWL_OVL   = Math.round(BH_OWL_H * 0.15);
 
 const bh = StyleSheet.create({
-  wrap:    { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, overflow: 'hidden' },
+  wrap:    { backgroundColor: '#1B3D2B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, overflow: 'hidden' },
   nav:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   iconBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center' },
   title:   { fontFamily: Font.headerBold, fontSize: 20, color: '#1A1A1A' },
-  card:    { backgroundColor: 'rgba(255,255,255,0.88)', borderRadius: 18, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.6)' },
+  card:    { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 18, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 4 },
   balRow:  { flexDirection: 'row', alignItems: 'center' },
   lblRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
   lbl:     { fontFamily: Font.bodyRegular, fontSize: 11, color: '#666' },
@@ -557,17 +561,23 @@ function CategoriesScreen({
 
   return (
     <>
-      <BalanceHeader title="Income Sources" totalIncome={totalIncome} theme={theme} />
+      <BalanceHeader
+        title="Income Sources"
+        totalIncome={totalIncome}
+        theme={theme}
+        tabSlot={
+          <SlideTabBar
+            tabs={['Active', 'Archived']}
+            active={tab}
+            onChange={(t) => setTab(t as 'Active' | 'Archived')}
+            trackColor="rgba(255,255,255,0.12)"
+            activeColor="rgba(255,255,255,0.22)"
+            inactiveTextColor="rgba(255,255,255,0.6)"
+            style={{ marginTop: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
+          />
+        }
+      />
       <Animated.View style={[{ flex: 1 }, bodyAnim]}>
-        <SlideTabBar
-          tabs={['Active', 'Archived']}
-          active={tab}
-          onChange={(t) => setTab(t as 'Active' | 'Archived')}
-          trackColor={theme.isDark ? 'rgba(255,255,255,0.08)' : '#F0F0F0'}
-          activeColor="#1B7A4A"
-          inactiveTextColor={theme.textMuted as string}
-          style={{ marginHorizontal: 20, marginTop: 10, marginBottom: 12 }}
-        />
         <ScrollView style={[s.white, { backgroundColor: theme.cardBg }]} contentContainerStyle={s.whiteContent} showsVerticalScrollIndicator={false}>
           {tab === 'Active' ? (
             <>
