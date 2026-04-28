@@ -237,7 +237,6 @@ export default function HomeScreen() {
   );
 
   // ── Derived values ─────────────────────────────────────────────────────────
-  const totalBalance = totalIncome - totalExpense;
 
   const displayedTransactions = useMemo(
     () => filterByPeriod(allTransactions, activePeriod),
@@ -275,6 +274,9 @@ export default function HomeScreen() {
   const totalTarget  = savingsGoals.reduce((s, g) => s + g.target_amount, 0);
   const goalsPct     = totalTarget > 0 ? Math.min(100, (totalSaved / totalTarget) * 100) : 0;
   const firstGoal    = savingsGoals[0] ?? null;
+
+  // Balance = income minus expenses minus what's been set aside in savings
+  const totalBalance = totalIncome - totalExpense - totalSaved;
 
   // Active goal in the carousel (2+ goals)
   const activeGoal    = goalsCount > 0 ? savingsGoals[displayIdx % goalsCount] : null;
