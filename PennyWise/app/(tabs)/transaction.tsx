@@ -37,6 +37,7 @@ import { setNavTarget } from '@/lib/activityNavTarget';
 import { logActivity, ACTION, ENTITY } from '@/lib/logActivity';
 import { ActivityHistorySkeleton } from '@/components/SkeletonLoader';
 import ErrorModal from '@/components/ErrorModal';
+import HeaderDecor from '@/components/HeaderDecor';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type FilterType = 'All' | 'Income' | 'Expenses' | 'Savings';
@@ -1008,6 +1009,11 @@ export default function TransactionHistoryScreen() {
       <StatusBar style={theme.statusBar} />
 
       <Animated.View style={bodyAnim}>
+        {/* Decoration layer — absolute, never affects layout */}
+        <View style={styles.decorLayer} pointerEvents="none">
+          <HeaderDecor />
+        </View>
+
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -1061,7 +1067,7 @@ export default function TransactionHistoryScreen() {
 
         {/* Search */}
         <View style={styles.searchRow}>
-          <View style={[styles.searchBox, { backgroundColor: theme.iconBtnBg }]}>
+          <View style={styles.searchBox}>
             <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.6)" />
             <TextInput
               style={[styles.searchInput, { color: '#fff' }]}
@@ -1182,6 +1188,14 @@ export default function TransactionHistoryScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
 
+  decorLayer: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    height: 220,
+    overflow: 'hidden',
+    zIndex: 0,
+  },
+
   header: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -1204,6 +1218,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 16,
     paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
   },
   statItem:   { flex: 1, alignItems: 'center', gap: 2 },
   statValue:  { fontFamily: Font.headerBold, fontSize: 18, color: '#fff' },
@@ -1212,8 +1233,20 @@ const styles = StyleSheet.create({
 
   searchRow:   { paddingHorizontal: 20, marginBottom: 16 },
   searchBox: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 50,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
   },
   searchInput: { flex: 1, fontFamily: Font.bodyRegular, fontSize: 14, padding: 0 },
 

@@ -125,6 +125,7 @@ function Avatar({
   ) : (
     <Ionicons name="person" size={size * 0.46} color="#fff" />
   );
+  const owlSize = size * 0.58;
   return (
     <TouchableOpacity
       style={{ position: "relative" }}
@@ -147,6 +148,21 @@ function Avatar({
           {inner}
         </View>
       </View>
+      {/* Owl sitting in the left side of the circle */}
+      <Image
+        source={require('@/assets/images/owlpennywise.png')}
+        style={{
+          position: 'absolute',
+          width: owlSize,
+          height: owlSize,
+          top: (size + 8) * 0.45,
+          left: -(owlSize * 0.3),
+          transform: [{ rotate: '6deg' }],
+          zIndex: 10,
+        }}
+        resizeMode="contain"
+        pointerEvents="none"
+      />
       {showEdit && (
         <View style={[styles.cameraBadge, { bottom: 2, right: 2 }]}>
           <Ionicons name="camera" size={13} color="#fff" />
