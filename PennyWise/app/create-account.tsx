@@ -238,10 +238,11 @@ export default function CreateAccountScreen() {
     setLoading(true);
     loadingBar.start();
 
-    const { error: authError } = await supabase.auth.signUp({
+    const { data, error: authError } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
       options: {
+        emailRedirectTo: 'pennywise://',
         data: {
           full_name: fullName.trim(),
           phone: phone.trim(),
@@ -257,8 +258,12 @@ export default function CreateAccountScreen() {
 
     if (authError) {
       setError(authError.message);
+    } else if (!data.session) {
+      // Email confirmation is enabled — user must verify before proceeding
+      router.replace({ pathname: '/check-email', params: { email: cleanEmail } });
     } else {
-      router.replace("/onboarding");
+      // Email confirmation disabled — immediate session (fallback)
+      router.replace('/onboarding');
     }
   }
 

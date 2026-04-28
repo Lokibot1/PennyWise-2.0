@@ -276,6 +276,10 @@ export default function RootLayout() {
             options={{ headerShown: false }}
           />
           <Stack.Screen
+            name="check-email"
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
             name="savings-goals"
             options={{ headerShown: false }}
           />
