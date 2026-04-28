@@ -68,6 +68,11 @@ export function sanitizeEmail(value: string): string {
   return value.trim().toLowerCase().slice(0, 254);
 }
 
+/** Validates that the value looks like a real email address. */
+export function validateEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
 /**
  * Phone number: keep only digits and leading +. Max 20 chars.
  */

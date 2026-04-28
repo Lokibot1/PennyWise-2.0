@@ -25,7 +25,7 @@ import { PasswordStrength } from "@/components/password-strength";
 import { Font } from "@/constants/fonts";
 import { TERMS_SECTIONS, TERMS_VERSION } from "@/constants/terms";
 import { useAppTheme } from "@/contexts/AppTheme";
-import { sanitizeEmail, sanitizeName, sanitizePhone, validatePhone, filterName, filterEmail, filterPhone } from "@/lib/sanitize";
+import { sanitizeEmail, validateEmail, sanitizeName, sanitizePhone, validatePhone, filterName, filterEmail, filterPhone } from "@/lib/sanitize";
 import { supabase } from "@/lib/supabase";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -225,6 +225,7 @@ export default function CreateAccountScreen() {
 
     if (!cleanName) return setError("Full name is required.");
     if (!cleanEmail) return setError("Email is required.");
+    if (!validateEmail(cleanEmail)) return setError("Please enter a valid email address.");
     if (!cleanPhone) return setError("Mobile number is required.");
     if (!validatePhone(cleanPhone)) return setError("Mobile number must be 11 digits starting with 09, or use the format +639XXXXXXXXX.");
     if (!dob) return setError("Date of birth is required.");
@@ -271,6 +272,7 @@ export default function CreateAccountScreen() {
   const isValid =
     fullName.trim().length > 0 &&
     email.trim().length > 0 &&
+    validateEmail(email) &&
     phone.trim().length > 0 &&
     !!dob &&
     password.length >= 6 &&
