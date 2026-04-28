@@ -40,6 +40,7 @@ import { Font } from "@/constants/fonts";
 import { ABOUT_SECTIONS } from "@/constants/about";
 import { PRIVACY_SECTIONS } from "@/constants/privacy";
 import { TERMS_SECTIONS } from "@/constants/terms";
+import { HELP_TOPICS, HELP_FAQS } from "@/constants/help";
 import { useAppTheme } from "@/contexts/AppTheme";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useNetwork } from "@/contexts/NetworkContext";
@@ -53,7 +54,7 @@ import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftSaveIndicator } from "@/components/DraftSaveIndicator";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Screen = "profile" | "edit" | "terms" | "privacy" | "about" | "developers" | "settings" | "notif-settings" | "change-password";
+type Screen = "profile" | "edit" | "terms" | "privacy" | "about" | "developers" | "settings" | "notif-settings" | "change-password" | "help";
 type IoniconName = keyof typeof Ionicons.glyphMap;
 type ProfileData = {
   full_name: string;
@@ -393,6 +394,7 @@ function ProfileView({
                 iconBg="#43A872"
                 label="Help & Support"
                 last
+                onPress={() => navigate("help")}
               />
             </MenuGroup>
 
@@ -946,6 +948,243 @@ function EditProfileView({
 
 // ── Terms view ────────────────────────────────────────────────────────────────
 
+// ── Help & Support view ───────────────────────────────────────────────────────
+function HelpSupportView({ onBack }: { onBack: () => void }) {
+  const { theme } = useAppTheme();
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const faqs = HELP_FAQS.filter((s) => s.type === 'faq');
+
+  return (
+    <SafeAreaView
+      style={[styles.safe, { backgroundColor: theme.headerBg }]}
+      edges={['top', 'left', 'right']}
+      {...({ filterTouchesWhenObscured: true } as any)}
+    >
+      <StatusBar style={theme.statusBar} />
+      <View style={[styles.greenSection, styles.termsHeader, { backgroundColor: theme.headerBg }]}>
+        <NavHeader title="Help & Support" onBack={onBack} />
+      </View>
+
+      <ScrollView
+        style={[styles.termsScroll, { backgroundColor: theme.cardBg }]}
+        contentContainerStyle={styles.termsContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero */}
+        <View style={helpSt.hero}>
+          <View style={helpSt.heroIcon}>
+            <Ionicons name="headset-outline" size={32} color="#fff" />
+          </View>
+          <Text style={[helpSt.heroTitle, { color: theme.textPrimary }]}>How can we help?</Text>
+          <Text style={[helpSt.heroSub, { color: theme.textSecondary }]}>
+            Browse the guides below or check the FAQs for quick answers.
+          </Text>
+        </View>
+
+        {/* Quick-start topics */}
+        <Text style={[helpSt.sectionLabel, { color: theme.textMuted }]}>GETTING STARTED</Text>
+        {HELP_TOPICS.map((topic, i) => (
+          <View
+            key={i}
+            style={[helpSt.topicCard, { backgroundColor: theme.surface, borderColor: theme.divider }]}
+          >
+            <View style={helpSt.topicIconWrap}>
+              <Ionicons name={topic.icon as any} size={20} color="#3ECBA8" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[helpSt.topicTitle, { color: theme.textPrimary }]}>{topic.title}</Text>
+              <Text style={[helpSt.topicBody, { color: theme.textSecondary }]}>{topic.body}</Text>
+            </View>
+          </View>
+        ))}
+
+        {/* FAQ divider */}
+        <View style={helpSt.faqHeader}>
+          <View style={[helpSt.faqLine, { backgroundColor: theme.divider }]} />
+          <Text style={[helpSt.faqHeaderText, { color: theme.textMuted }]}>FAQ</Text>
+          <View style={[helpSt.faqLine, { backgroundColor: theme.divider }]} />
+        </View>
+
+        {/* FAQ accordion */}
+        {faqs.map((faq, i) => {
+          const open = expandedFaq === i;
+          return (
+            <TouchableOpacity
+              key={i}
+              style={[
+                helpSt.faqItem,
+                { backgroundColor: theme.surface, borderColor: open ? '#3ECBA8' : theme.divider },
+              ]}
+              activeOpacity={0.75}
+              onPress={() => setExpandedFaq(open ? null : i)}
+            >
+              <View style={helpSt.faqRow}>
+                <Text style={[helpSt.faqQ, { color: theme.textPrimary }]}>{faq.title}</Text>
+                <Ionicons
+                  name={open ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={open ? '#3ECBA8' : theme.textMuted}
+                />
+              </View>
+              {open && (
+                <Text style={[helpSt.faqA, { color: theme.textSecondary }]}>{faq.body}</Text>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* Contact */}
+        <View style={[helpSt.contactCard, { backgroundColor: 'rgba(62,203,168,0.08)', borderColor: 'rgba(62,203,168,0.25)' }]}>
+          <Ionicons name="mail-outline" size={22} color="#3ECBA8" />
+          <View style={{ flex: 1 }}>
+            <Text style={[helpSt.contactTitle, { color: theme.textPrimary }]}>Still need help?</Text>
+            <Text style={[helpSt.contactBody, { color: theme.textSecondary }]}>
+              Reach us at{' '}
+              <Text style={{ color: '#3ECBA8', fontFamily: Font.bodySemiBold }}>
+                support@pennywiseph.app
+              </Text>
+              {' '}and we'll get back to you within 1–2 business days.
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[helpSt.version, { color: theme.textMuted }]}>PennyWise · Version 2.0</Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const helpSt = StyleSheet.create({
+  hero: {
+    alignItems: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 8,
+    marginBottom: 4,
+  },
+  heroIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 22,
+    backgroundColor: '#1B7A4A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  heroTitle: {
+    fontFamily: Font.headerBold,
+    fontSize: 22,
+    letterSpacing: 0.3,
+    marginBottom: 6,
+    textAlign: 'center',
+  },
+  heroSub: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  sectionLabel: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  topicCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 10,
+  },
+  topicIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(62,203,168,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  topicTitle: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  topicBody: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  faqHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 14,
+    gap: 10,
+  },
+  faqLine: { flex: 1, height: 1 },
+  faqHeaderText: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 11,
+    letterSpacing: 1.2,
+  },
+  faqItem: {
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 14,
+    marginBottom: 10,
+  },
+  faqRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  faqQ: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 13.5,
+    flex: 1,
+    lineHeight: 19,
+  },
+  faqA: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 10,
+  },
+  contactCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 16,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  contactTitle: {
+    fontFamily: Font.bodySemiBold,
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  contactBody: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  version: {
+    fontFamily: Font.bodyRegular,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+});
+
+// ── Terms & Conditions view ───────────────────────────────────────────────────
 function TermsView({ onBack }: { onBack: () => void }) {
   const { theme } = useAppTheme();
 
@@ -2940,6 +3179,8 @@ export default function ProfileScreen() {
         onSaved={(u) => setProfile(u)}
       />
     );
+  if (screen === "help")
+    return <HelpSupportView onBack={() => setScreen("profile")} />;
   if (screen === "terms")
     return <TermsView onBack={() => setScreen("profile")} />;
   if (screen === "privacy")
