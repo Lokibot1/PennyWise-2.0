@@ -10,9 +10,16 @@ A mobile-first budget tracker app built with React Native and Expo. PennyWise he
 - **Dashboard** — Balance overview, budget progress, savings goals carousel, and recent transactions
 - **Income Tracking** — Log income entries by category with date, description, and recurring support
 - **Expense Tracking** — Track expenses by category with budget limit visualization
-- **Transaction History** — Unified income/expense log filterable by Daily, Weekly, or Monthly period
+- **Transaction History** — Unified income/expense log with search, edit, delete, and CSV export
 - **Savings Goals** — Create and track multiple savings goals shown in an auto-rotating carousel
 - **Profile & Settings** — Edit personal info, upload avatar, toggle dark mode, manage notifications
+- **Charts & Trends** — Spending bar chart and category donut chart with animated visualizations
+- **Per-Category Budget Limits** — Set and track spending limits per expense category
+
+### Penny the Owl (AI Mascot & Chatbot)
+- **Animated Mascot** — Penny the Owl appears throughout the app with idle/talking animations
+- **Financial Chatbot** — Rule-based chatbot (`pennyBrain`) with cloud AI via the `pennywise-chat` Edge Function
+- **Contextual Advice** — Responds to spending queries, savings tips, and budget questions
 
 ### Authentication & Account
 - **Sign Up** — Register with full name, email, phone, and date of birth (minimum age: 13)
@@ -21,9 +28,10 @@ A mobile-first budget tracker app built with React Native and Expo. PennyWise he
 - **OTP Verification** — 6-digit code entry with auto-focus, paste support, resend cooldown, and attempt tracking
 - **Password Reset** — Set a new password with strength requirements after OTP verification
 - **Password Change** — Change password from the Profile screen with strength validation
+- **Onboarding** — First-time setup flow after registration (name, preferences)
 
 ### Security
-- **Input Sanitization** — All user inputs (names, emails, phone numbers, titles, descriptions) are stripped of HTML tags, null bytes, and control characters before being saved
+- **Input Sanitization** — All user inputs are stripped of HTML tags, null bytes, control characters, and emojis before being saved
 - **OTP Hashing** — Reset codes are SHA-256 hashed before storage; plaintext is never saved to the database
 - **Rate Limiting** — OTP requests are capped at 5 per hour and a 60-second minimum between sends
 - **Attempt Limiting** — OTP verification is locked after 5 failed attempts
@@ -33,16 +41,32 @@ A mobile-first budget tracker app built with React Native and Expo. PennyWise he
 - **Clickjacking Prevention** — `filterTouchesWhenObscured={true}` applied to all auth screens
 - **Password Changed Notification** — Users receive an email after a successful password change
 
+### Offline & Performance
+- **Offline-First Mutation Queue** — Changes made while offline are queued and auto-synced on reconnect
+- **Offline Banner** — Visual indicator when the device has no network connection
+- **Optimistic UI Updates** — UI reflects changes immediately before the server confirms
+- **Auto-Save with Status Indicators** — Draft state is saved automatically with visible save status
+- **In-Memory TTL Cache** — 5-minute cache for static data, 2-minute for transactional data to reduce redundant network calls
+- **Debounced Search** — Transaction history search uses debouncing to reduce query frequency
+
+### Notifications & Automation
+- **Push Notifications** — Expo push notifications with per-category budget alert support
+- **In-App Notification Panel** — Per-type notification preference toggles
+- **Recurring Transactions** — Auto-processed on app open via `recurringProcessor`
+
 ### UX & Polish
 - **Animated Splash Screen** — Coin flip animation with sound effects and haptic feedback
+- **Glassmorphism UI** — Frosted-glass cards and headers throughout the app
+- **Header Decorations** — Decorative elements (`HeaderDecor`) on key screens
 - **Liquid Tab Bar** — Animated indicator pill with dual-spring stretchy effect
 - **Skeleton Loaders** — Shown during data fetch on home and profile screens
-- **Caching** — In-memory TTL cache (5 min for static data, 2 min for transactional data) to reduce redundant network calls
-- **Activity Logging** — Audit trail of user actions (income added, expense deleted, etc.) stored in the database
 - **Dark Mode** — Full light/dark theme via custom `AppTheme` context
-- **Notifications** — In-app notification panel with per-type preference toggles
 - **Sound & Haptics** — Audio and haptic feedback on key interactions
+- **CSV Export** — Export transaction history to a CSV file via `expo-sharing`
+- **Activity Logging** — Audit trail of user actions stored in the database
 - **Delete Account** — Permanently deletes the account and all associated data with confirmation
+- **Help & Support** — FAQ topics and support section inside the Profile screen
+- **About / Meet the Developers** — Info pages accessible from the Profile screen
 
 ---
 
@@ -64,11 +88,16 @@ A mobile-first budget tracker app built with React Native and Expo. PennyWise he
 | Database & Auth | `@supabase/supabase-js` ^2 |
 | Session storage | `@react-native-async-storage/async-storage` |
 | Animations | `react-native-reanimated` ~4 |
+| SVG / Charts | `react-native-svg` |
 | Icons | `@expo/vector-icons` (Ionicons) |
 | Fonts | `@expo-google-fonts/kumbh-sans`, `@expo-google-fonts/league-spartan` |
 | Image picker | `expo-image-picker` |
 | Sound | `expo-av` |
 | Haptics | `expo-haptics` |
+| Push notifications | `expo-notifications` |
+| File sharing / CSV | `expo-file-system`, `expo-sharing` |
+| Network state | `@react-native-community/netinfo` |
+| Date picker | `@react-native-community/datetimepicker` |
 
 ---
 
@@ -76,24 +105,33 @@ A mobile-first budget tracker app built with React Native and Expo. PennyWise he
 
 ```
 PennyWise-2.0/
-├── PennyWise/                       # Main application
+├── PennyWise/                           # Main application
 │   ├── app/
-│   │   ├── _layout.tsx              # Root stack layout + auth state listener
-│   │   ├── index.tsx                # Splash screen (animated coin flip)
-│   │   ├── login-form.tsx           # Login screen
-│   │   ├── create-account.tsx       # Registration screen
-│   │   ├── forgot-password.tsx      # Password reset — email entry
-│   │   ├── verify-code.tsx          # Password reset — OTP verification
-│   │   ├── reset-password.tsx       # Password reset — new password entry
-│   │   ├── savings-goals.tsx        # Savings goal management screen
+│   │   ├── _layout.tsx                  # Root stack layout + auth state listener
+│   │   ├── index.tsx                    # Splash screen (animated coin flip)
+│   │   ├── onboarding.tsx               # First-time user onboarding flow
+│   │   ├── login-form.tsx               # Login screen
+│   │   ├── create-account.tsx           # Registration screen
+│   │   ├── forgot-password.tsx          # Password reset — email entry
+│   │   ├── verify-code.tsx              # Password reset — OTP verification
+│   │   ├── reset-password.tsx           # Password reset — new password entry
+│   │   ├── savings-goals.tsx            # Savings goal management screen
 │   │   └── (tabs)/
-│   │       ├── _layout.tsx          # Custom bottom tab bar (animated)
-│   │       ├── index.tsx            # Home dashboard
-│   │       ├── analytics.tsx        # Income tracking & categories
-│   │       ├── budget.tsx           # Expense tracking & categories
-│   │       ├── transaction.tsx      # Unified transaction history
-│   │       └── profile.tsx          # Profile & settings
-│   ├── components/                  # Reusable UI components
+│   │       ├── _layout.tsx              # Custom bottom tab bar (animated)
+│   │       ├── index.tsx                # Home dashboard
+│   │       ├── analytics.tsx            # Income tracking & categories
+│   │       ├── budget.tsx               # Expense tracking & categories
+│   │       ├── transaction.tsx          # Unified transaction history
+│   │       └── profile.tsx              # Profile, settings, help & about
+│   ├── components/                      # Reusable UI components
+│   │   ├── AnimatedOwl.tsx              # Penny the Owl idle/talking animations
+│   │   ├── PennyMascot.tsx              # Owl mascot wrapper component
+│   │   ├── MascotChatbot.tsx            # Chatbot UI powered by pennyBrain
+│   │   ├── CategoryDonutChart.tsx       # Donut chart for category breakdown
+│   │   ├── SpendingBarChart.tsx         # Bar chart for spending trends
+│   │   ├── HeaderDecor.tsx              # Decorative header elements
+│   │   ├── DraftSaveIndicator.tsx       # Auto-save status indicator
+│   │   ├── OfflineBanner.tsx            # Offline network status banner
 │   │   ├── BudgetLimitModal.tsx
 │   │   ├── CircularRing.tsx
 │   │   ├── ConfirmModal.tsx
@@ -107,29 +145,44 @@ PennyWise-2.0/
 │   │   ├── form-input.tsx
 │   │   ├── password-strength.tsx
 │   │   └── penny-wise-logo.tsx
-│   ├── constants/                   # Design tokens (colors, fonts, theme)
+│   ├── constants/                       # Design tokens (colors, fonts, theme)
 │   ├── contexts/
-│   │   ├── AppTheme.tsx             # Light/dark theme provider
+│   │   ├── AppTheme.tsx                 # Light/dark theme provider
 │   │   └── NotificationContext.tsx
-│   ├── hooks/                       # Custom React hooks
+│   ├── hooks/                           # Custom React hooks (useDebounce, etc.)
 │   ├── lib/
-│   │   ├── supabase.ts              # Supabase client initialization
-│   │   ├── sanitize.ts              # Input sanitization helpers
-│   │   ├── cache.ts                 # In-memory TTL cache
-│   │   ├── dataCache.ts             # Fetch-or-cache layer for Supabase
-│   │   ├── callFunction.ts          # Supabase Edge Function caller
-│   │   ├── logActivity.ts           # Activity audit logging
-│   │   └── notifications.ts
+│   │   ├── supabase.ts                  # Supabase client initialization
+│   │   ├── sanitize.ts                  # Input sanitization helpers
+│   │   ├── cache.ts                     # In-memory TTL cache
+│   │   ├── dataCache.ts                 # Fetch-or-cache layer for Supabase
+│   │   ├── callFunction.ts              # Supabase Edge Function caller
+│   │   ├── logActivity.ts               # Activity audit logging
+│   │   ├── activityNavTarget.ts         # Maps activity log entries to nav targets
+│   │   ├── notifications.ts             # In-app notification helpers
+│   │   ├── notificationPrefs.ts         # Notification preference storage
+│   │   ├── pushNotifications.ts         # Expo push notification registration & dispatch
+│   │   ├── recurringProcessor.ts        # Auto-processes recurring transactions on launch
+│   │   ├── mutationQueue.ts             # Offline mutation queue
+│   │   ├── syncEngine.ts                # Syncs queued mutations on reconnect
+│   │   ├── network.ts                   # Network connectivity monitoring
+│   │   ├── pennyBrain.ts                # Rule-based chatbot logic for Penny
+│   │   └── sfx.ts                       # Sound effect helpers
 │   ├── database/
-│   │   ├── schema.sql               # Full PostgreSQL schema
-│   │   └── migrations/              # Incremental schema changes
+│   │   ├── schema.sql                   # Full PostgreSQL schema
+│   │   └── migrations/                  # Incremental schema changes
+│   │       ├── add_activity_logs.sql
+│   │       ├── add_savings_goals_completion.sql
+│   │       ├── add_password_reset_otps.sql
+│   │       ├── add_category_budget_limit.sql
+│   │       └── add_recurring_last_processed.sql
 │   └── supabase/
 │       └── functions/
-│           ├── send-reset-otp/      # Edge Function: generate & email OTP
-│           └── verify-reset-otp/   # Edge Function: verify OTP, return token
+│           ├── send-reset-otp/          # Edge Function: generate & email OTP
+│           └── verify-reset-otp/        # Edge Function: verify OTP, return token
 └── supabase/
     └── functions/
-        └── send-password-changed-email/  # Edge Function: notify on password change
+        ├── send-password-changed-email/ # Edge Function: notify on password change
+        └── pennywise-chat/              # Edge Function: AI-powered chatbot responses
 ```
 
 ---
@@ -142,7 +195,7 @@ All tables have **Row Level Security (RLS)** enabled. Users can only access thei
 |---|---|
 | `profiles` | User profile data linked to `auth.users` (name, phone, DOB, avatar, budget limit) |
 | `expenses` | Individual expense entries with category, date, amount, and recurring support |
-| `expense_categories` | User-defined expense categories with label and icon |
+| `expense_categories` | User-defined expense categories with label, icon, and monthly budget limit |
 | `income_sources` | Individual income entries with category, date, amount, and recurring support |
 | `income_categories` | User-defined income categories with label and icon |
 | `savings_goals` | Savings targets with progress tracking and completion state |
@@ -161,6 +214,8 @@ Splash Screen
          ├── Authenticated → Home Dashboard
          └── Unauthenticated → Login
               ├── Create Account
+              │    └── Onboarding (first-time setup)
+              │         └── Home Dashboard
               └── Forgot Password
                    └── OTP Verification
                         └── Reset Password
@@ -169,11 +224,17 @@ Splash Screen
 Home Dashboard
     └── Bottom Tab Bar
          ├── Home (Dashboard)
+         │    └── Penny the Owl Chatbot
          ├── Analytics (Income)
          ├── Budget (Expenses)
          ├── Transactions
+         │    └── Edit / Delete / Export CSV
          └── Profile
-              └── Savings Goals
+              ├── Savings Goals
+              ├── Notifications
+              ├── Help & Support
+              ├── About / Meet the Developers
+              └── Change Password / Delete Account
 ```
 
 ---
@@ -218,14 +279,15 @@ In your Supabase project, open the **SQL Editor** and run:
 PennyWise/database/schema.sql
 ```
 
-Then apply any migrations in `PennyWise/database/migrations/` in order.
+Then apply migrations in `PennyWise/database/migrations/` in order.
 
-### 5. Deploy Edge Functions (optional — required for password reset)
+### 5. Deploy Edge Functions (optional — required for password reset and chatbot)
 
 ```bash
 supabase functions deploy send-reset-otp
 supabase functions deploy verify-reset-otp
 supabase functions deploy send-password-changed-email
+supabase functions deploy pennywise-chat
 ```
 
 Set the required secrets in your Supabase project:
@@ -247,21 +309,6 @@ npm start
 | Press `i` | iOS simulator (macOS only) |
 | Press `w` | Web browser |
 | Scan QR code | Expo Go on physical device |
-
----
-
-## Design System
-
-| Token | Value | Usage |
-|---|---|---|
-| Sage Green | `#7CB898` | Header backgrounds, splash |
-| Teal | `#3ECBA8` | Active tabs, primary buttons |
-| Dark Teal | `#1E9C70` | Savings card |
-| Light Mint | `#F0FAF6` | Login screen background |
-| Dark bg | `#141414` | Dark mode cards |
-| Dark header | `#1B3028` | Dark mode header |
-
-**Fonts:** Kumbh Sans (body) · League Spartan (headings & logo)
 
 ---
 
