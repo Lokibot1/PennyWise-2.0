@@ -103,7 +103,7 @@ export default function CheckEmailScreen() {
         </TouchableOpacity>
 
         <Text style={[styles.hint, { color: theme.textMuted }]}>
-          Didn't receive it? Check your spam folder or tap "Resend Email".
+          Didn&apos;t receive it? Check your spam folder or tap &quot;Resend Email&quot;.
         </Text>
       </View>
     </SafeAreaView>

@@ -234,7 +234,7 @@ export default function OnboardingScreen() {
       case 2:
         return (
           <>
-            <Text style={[s.title, { color: theme.textPrimary }]}>Here's what awaits you</Text>
+            <Text style={[s.title, { color: theme.textPrimary }]}>Here&apos;s what awaits you</Text>
             <Text style={[s.subtitle, { color: theme.textSecondary }]}>
               Everything you need to take control of your money.
             </Text>
@@ -258,7 +258,7 @@ export default function OnboardingScreen() {
               ))}
             </View>
             <TouchableOpacity style={[s.primaryBtn, { marginTop: 20 }]} onPress={handleNext} activeOpacity={0.85}>
-              <Text style={s.primaryBtnText}>I'm Ready</Text>
+              <Text style={s.primaryBtnText}>I&apos;m Ready</Text>
               <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 6 }} />
             </TouchableOpacity>
           </>

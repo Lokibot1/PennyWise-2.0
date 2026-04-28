@@ -95,9 +95,9 @@ export default function ForgotPasswordScreen() {
           <View style={styles.resetSection}>
             <Text style={[styles.resetTitle, { color: theme.textPrimary }]}>Reset Password?</Text>
             <Text style={[styles.resetDescription, { color: theme.textMuted }]}>
-              Enter the email address linked to your account and we'll send
+              Enter the email address linked to your account and we&apos;ll send
               you a 6-digit verification code.
-            </Text>
+</Text>
           </View>
 
           {/* Email input */}
@@ -159,7 +159,7 @@ export default function ForgotPasswordScreen() {
 
           {/* Footer */}
           <View style={styles.footerRow}>
-            <Text style={[styles.footerText, { color: theme.textMuted }]}>Don't have an account? </Text>
+            <Text style={[styles.footerText, { color: theme.textMuted }]}>Don&apos;t have an account? </Text>
             <TouchableOpacity onPress={() => router.push('/create-account')} activeOpacity={0.7}>
               <Text style={styles.footerLink}>Sign Up</Text>
             </TouchableOpacity>

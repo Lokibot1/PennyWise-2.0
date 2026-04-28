@@ -265,7 +265,7 @@ export default function VerifyCodeScreen() {
 
           {/* Resend */}
           <View style={styles.resendRow}>
-            <Text style={[styles.resendLabel, { color: theme.textMuted }]}>Didn't receive it? </Text>
+            <Text style={[styles.resendLabel, { color: theme.textMuted }]}>Didn&apos;t receive it? </Text>
             {cooldown > 0 ? (
               <Text style={[styles.resendCooldown, { color: theme.textMuted }]}>
                 Resend in {cooldown}s

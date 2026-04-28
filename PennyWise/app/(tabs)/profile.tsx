@@ -1043,7 +1043,7 @@ function HelpSupportView({ onBack }: { onBack: () => void }) {
               <Text style={{ color: '#3ECBA8', fontFamily: Font.bodySemiBold }}>
                 support@pennywiseph.app
               </Text>
-              {' '}and we'll get back to you within 1–2 business days.
+              {' '}and we&apos;ll get back to you within 1–2 business days.
             </Text>
           </View>
         </View>
@@ -2558,7 +2558,7 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
               Password Changed!
             </Text>
             <Text style={[styles.pwSuccessBody, { color: theme.textMuted }]}>
-              Your password has been updated successfully. For your security, you'll be signed out automatically.
+              Your password has been updated successfully. For your security, you&apos;ll be signed out automatically.
             </Text>
             <View style={[styles.pwSuccessBarTrack, { backgroundColor: theme.divider }]}>
               <Animated.View

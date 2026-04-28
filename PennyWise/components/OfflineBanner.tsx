@@ -44,7 +44,7 @@ export default function OfflineBanner() {
       pointerEvents="none"
     >
       <Ionicons name="cloud-offline-outline" size={15} color="#fff" />
-      <Text style={styles.text}>You're offline — viewing cached data</Text>
+      <Text style={styles.text}>You&apos;re offline — viewing cached data</Text>
     </Animated.View>
   );
 }

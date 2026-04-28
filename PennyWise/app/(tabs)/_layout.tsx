@@ -79,8 +79,6 @@ const AUTH_SCREENS = new Set(['login']);
 
 // ── CustomTabBar ───────────────────────────────────────────────────────────────
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
-  if (AUTH_SCREENS.has(state.routes[state.index].name)) return null;
-
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
 
@@ -123,6 +121,8 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
     left:  pillLeft.value,
     width: pillRight.value - pillLeft.value,
   }));
+
+  if (AUTH_SCREENS.has(state.routes[state.index].name)) return null;
 
   return (
     <View style={[
