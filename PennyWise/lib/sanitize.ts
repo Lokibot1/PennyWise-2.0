@@ -39,11 +39,14 @@ export function filterEmail(value: string): string {
 
 /**
  * Phone / mobile number fields.
- * Allows digits, +, spaces, hyphens, and parentheses only.
- * Consistent with sanitizePhone applied at submit time.
+ * Allows digits and leading + only (supports 09XXXXXXXXX and +639XXXXXXXXX).
  */
 export function filterPhone(value: string): string {
-  return value.replace(/[^\d+\s\-()]/g, '');
+  // Allow + only as the very first character
+  if (value.startsWith('+')) {
+    return '+' + value.slice(1).replace(/[^\d]/g, '');
+  }
+  return value.replace(/[^\d]/g, '');
 }
 
 /** Remove HTML tags, null bytes, and control characters. Collapse whitespace. */
@@ -66,11 +69,23 @@ export function sanitizeEmail(value: string): string {
 }
 
 /**
- * Phone number: keep only digits, +, spaces, hyphens, and parentheses.
- * Max 20 chars.
+ * Phone number: keep only digits and leading +. Max 20 chars.
  */
 export function sanitizePhone(value: string): string {
-  return value.replace(/[^\d+\s\-()]/g, '').trim().slice(0, 20);
+  const trimmed = value.trim();
+  if (trimmed.startsWith('+')) {
+    return '+' + trimmed.slice(1).replace(/[^\d]/g, '').slice(0, 19);
+  }
+  return trimmed.replace(/[^\d]/g, '').slice(0, 20);
+}
+
+/**
+ * Validates Philippine mobile number format.
+ * Accepts: 09XXXXXXXXX (11 digits) or +639XXXXXXXXX (13 chars).
+ */
+export function validatePhone(value: string): boolean {
+  const v = value.trim();
+  return /^09\d{9}$/.test(v) || /^\+639\d{9}$/.test(v);
 }
 
 /** Short label text — income/expense category names. Max 60 chars. */
