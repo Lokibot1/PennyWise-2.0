@@ -201,6 +201,14 @@ export default function RootLayout() {
           const access_token  = params.get('access_token');
           const refresh_token = params.get('refresh_token');
           if (access_token && refresh_token) {
+            // On Android, openAuthSessionAsync can return before the Linking event fires.
+            // handleSocialSignIn may have already exchanged these tokens and routed the
+            // user — if a session already exists, skip to avoid overwriting the route
+            // with stale user_metadata (onboarding_completed can still be true even for
+            // a deleted-then-recreated profile).
+            const { data: { session: alreadySet } } = await supabase.auth.getSession();
+            if (alreadySet) return;
+
             const { error } = await supabase.auth.setSession({ access_token, refresh_token });
             if (error) return;
             const { data: { session } } = await supabase.auth.getSession();
