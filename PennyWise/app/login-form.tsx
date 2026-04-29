@@ -77,10 +77,31 @@ export default function LoginFormScreen() {
       return;
     }
 
-    // Session is now set — route based on onboarding status
+    // Session is now set — sync profile then route
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      const onboarded = session.user.user_metadata?.onboarding_completed !== false;
+      const meta = session.user.user_metadata ?? {};
+
+      // Check what actually exists in the DB (user_metadata can be stale)
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('id', session.user.id)
+        .single();
+
+      const hasExistingAvatar = !!existing?.avatar_url;
+      const profileMissing    = !existing;
+
+      await supabase.from('profiles').upsert({
+        id:        session.user.id,
+        full_name: meta.full_name ?? meta.name ?? '',
+        email:     session.user.email ?? '',
+        // Save OAuth avatar if profile has no avatar (new user or deleted profile)
+        ...(!hasExistingAvatar && meta.avatar_url ? { avatar_url: meta.avatar_url } : {}),
+      }, { onConflict: 'id', ignoreDuplicates: false });
+
+      // If profile row was missing, treat as new user regardless of metadata
+      const onboarded = !profileMissing && (meta.onboarding_completed !== false);
       router.replace(onboarded ? '/(tabs)' : '/onboarding');
     }
   }

@@ -186,7 +186,10 @@ export default function RootLayout() {
           if (error) return;
           const { data: { session } } = await supabase.auth.getSession();
           if (!session) return;
-          const onboarded = session.user.user_metadata?.onboarding_completed !== false;
+          // Check the DB — metadata can be stale if the profile was deleted
+          const { data: profile } = await supabase
+            .from('profiles').select('id').eq('id', session.user.id).single();
+          const onboarded = !!profile && session.user.user_metadata?.onboarding_completed === true;
           router.replace(onboarded ? '/(tabs)' : '/onboarding');
           return;
         }
@@ -202,7 +205,9 @@ export default function RootLayout() {
             if (error) return;
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) return;
-            const onboarded = session.user.user_metadata?.onboarding_completed !== false;
+            const { data: profile } = await supabase
+              .from('profiles').select('id').eq('id', session.user.id).single();
+            const onboarded = !!profile && session.user.user_metadata?.onboarding_completed === true;
             router.replace(onboarded ? '/(tabs)' : '/onboarding');
           }
         }

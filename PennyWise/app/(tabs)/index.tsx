@@ -152,7 +152,11 @@ export default function HomeScreen() {
     const weekAgoStr = weekAgo.toISOString().slice(0, 10);
 
     const dashboard = await DataCache.fetchDashboard(userId);
-    if (!dashboard) throw new Error('Could not load dashboard data.');
+    if (!dashboard) {
+      // Profile row missing — user may have been re-routed to onboarding
+      setLoading(false);
+      return;
+    }
 
     setUserName(dashboard.profile.full_name);
     setBudgetLimit(dashboard.profile.budget_limit);
@@ -208,6 +212,12 @@ export default function HomeScreen() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        // Skip dashboard load if user hasn't finished onboarding yet
+        if (session.user.user_metadata?.onboarding_completed === false ||
+            session.user.user_metadata?.onboarding_completed === undefined) {
+          setLoading(false);
+          return;
+        }
         userIdRef.current = session.user.id;
         loadDashboard(session.user.id);
       } else {

@@ -27,6 +27,11 @@ async function signInWithProvider(
 
   const url = result.url;
 
+  // On Android the Linking event can fire before openAuthSessionAsync returns,
+  // meaning _layout.tsx may have already exchanged the code and set the session.
+  const { data: { session: already } } = await supabase.auth.getSession();
+  if (already) return { error: null, cancelled: false };
+
   // PKCE flow — Supabase v2 default for mobile
   const codeMatch = url.match(/[?&]code=([^&#]+)/);
   if (codeMatch) {

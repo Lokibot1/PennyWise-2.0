@@ -177,9 +177,9 @@ export default function OnboardingScreen() {
   }
 
   // ── Card content per step ───────────────────────────────────────────────────
-  function renderStep() {
+  // Scrollable content only — no buttons
+  function renderStepContent() {
     switch (step) {
-
       case 0:
         return (
           <>
@@ -189,16 +189,8 @@ export default function OnboardingScreen() {
             <Text style={[s.subtitle, { color: theme.textSecondary }]}>
               PennyWise helps you track income, manage budgets, and reach your savings goals — all in one place.
             </Text>
-            <TouchableOpacity style={s.primaryBtn} onPress={handleNext} activeOpacity={0.85}>
-              <Text style={s.primaryBtnText}>Get Started</Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 6 }} />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.skipBtn} onPress={skipToApp} activeOpacity={0.7}>
-              <Text style={[s.skipText, { color: theme.textMuted }]}>Skip setup</Text>
-            </TouchableOpacity>
           </>
         );
-
       case 1:
         return (
           <>
@@ -221,16 +213,8 @@ export default function OnboardingScreen() {
             <Text style={[s.hint, { color: theme.textMuted }]}>
               You can change this anytime in Profile → Edit.
             </Text>
-            <TouchableOpacity style={s.primaryBtn} onPress={handleNext} activeOpacity={0.85}>
-              <Text style={s.primaryBtnText}>Looks Good</Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 6 }} />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.skipBtn} onPress={handleNext} activeOpacity={0.7}>
-              <Text style={[s.skipText, { color: theme.textMuted }]}>Skip, use ₱20,000</Text>
-            </TouchableOpacity>
           </>
         );
-
       case 2:
         return (
           <>
@@ -257,13 +241,8 @@ export default function OnboardingScreen() {
                 </View>
               ))}
             </View>
-            <TouchableOpacity style={[s.primaryBtn, { marginTop: 20 }]} onPress={handleNext} activeOpacity={0.85}>
-              <Text style={s.primaryBtnText}>I&apos;m Ready</Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 6 }} />
-            </TouchableOpacity>
           </>
         );
-
       case 3:
         return (
           <>
@@ -275,9 +254,9 @@ export default function OnboardingScreen() {
             </Text>
             <View style={[s.readyCard, { backgroundColor: theme.surface }]}>
               {[
-                { icon: 'add-circle-outline',  color: '#22C55E', label: 'Add your first income source' },
-                { icon: 'receipt-outline',      color: '#4895EF', label: 'Log your first expense' },
-                { icon: 'flag-outline',         color: '#F59E0B', label: 'Create a savings goal' },
+                { icon: 'add-circle-outline', color: '#22C55E', label: 'Add your first income source' },
+                { icon: 'receipt-outline',     color: '#4895EF', label: 'Log your first expense' },
+                { icon: 'flag-outline',        color: '#F59E0B', label: 'Create a savings goal' },
               ].map((item, i, arr) => (
                 <View
                   key={item.label}
@@ -291,20 +270,61 @@ export default function OnboardingScreen() {
                 </View>
               ))}
             </View>
-            <TouchableOpacity
-              style={[s.primaryBtn, s.primaryBtnLarge, finishing && { opacity: 0.6 }]}
-              onPress={finish}
-              disabled={finishing}
-              activeOpacity={0.85}
-            >
-              <Ionicons name="rocket-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={s.primaryBtnText}>
-                {finishing ? 'Loading…' : 'Start Using PennyWise'}
-              </Text>
+          </>
+        );
+      default:
+        return null;
+    }
+  }
+
+  // Fixed footer buttons per step
+  function renderFooter() {
+    switch (step) {
+      case 0:
+        return (
+          <>
+            <TouchableOpacity style={s.primaryBtn} onPress={handleNext} activeOpacity={0.85}>
+              <Text style={s.primaryBtnText}>Get Started</Text>
+              <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.skipBtn} onPress={skipToApp} activeOpacity={0.7}>
+              <Text style={[s.skipText, { color: theme.textMuted }]}>Skip setup</Text>
             </TouchableOpacity>
           </>
         );
-
+      case 1:
+        return (
+          <>
+            <TouchableOpacity style={s.primaryBtn} onPress={handleNext} activeOpacity={0.85}>
+              <Text style={s.primaryBtnText}>Looks Good</Text>
+              <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 6 }} />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.skipBtn} onPress={handleNext} activeOpacity={0.7}>
+              <Text style={[s.skipText, { color: theme.textMuted }]}>Skip, use ₱20,000</Text>
+            </TouchableOpacity>
+          </>
+        );
+      case 2:
+        return (
+          <TouchableOpacity style={s.primaryBtn} onPress={handleNext} activeOpacity={0.85}>
+            <Text style={s.primaryBtnText}>I&apos;m Ready</Text>
+            <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 6 }} />
+          </TouchableOpacity>
+        );
+      case 3:
+        return (
+          <TouchableOpacity
+            style={[s.primaryBtn, s.primaryBtnLarge, finishing && { opacity: 0.6 }]}
+            onPress={finish}
+            disabled={finishing}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="rocket-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={s.primaryBtnText}>
+              {finishing ? 'Loading…' : 'Start Using PennyWise'}
+            </Text>
+          </TouchableOpacity>
+        );
       default:
         return null;
     }
@@ -338,19 +358,24 @@ export default function OnboardingScreen() {
 
       {/* White card content */}
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={[s.cardShell, { backgroundColor: theme.cardBg }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          style={[s.card, { backgroundColor: theme.cardBg }]}
+          style={s.cardScroll}
           contentContainerStyle={s.cardContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
           <Animated.View style={contentStyle}>
-            {renderStep()}
+            {renderStepContent()}
           </Animated.View>
         </ScrollView>
+
+        {/* Fixed footer — buttons always visible without scrolling */}
+        <View style={s.footer}>
+          {renderFooter()}
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -403,15 +428,25 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  card: {
+  cardShell: {
     flex: 1,
     borderTopLeftRadius:  28,
     borderTopRightRadius: 28,
+    overflow: 'hidden',
+  },
+  cardScroll: {
+    flex: 1,
   },
   cardContent: {
     paddingHorizontal: 26,
     paddingTop:        28,
-    paddingBottom:     48,
+    paddingBottom:     16,
+  },
+  footer: {
+    paddingHorizontal: 26,
+    paddingTop:        12,
+    paddingBottom:     32,
+    gap:               10,
   },
 
   title: {
@@ -424,7 +459,7 @@ const s = StyleSheet.create({
     fontFamily: Font.bodyRegular,
     fontSize:   14,
     lineHeight: 22,
-    marginBottom: 28,
+    marginBottom: 16,
   },
 
   // Budget input
