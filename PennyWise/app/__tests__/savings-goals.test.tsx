@@ -73,6 +73,15 @@ jest.mock('@/lib/activityNavTarget', () => ({
   clearNavTarget: jest.fn(),
 }));
 
+jest.mock('@/contexts/NetworkContext', () => ({
+  NetworkProvider: ({ children }: any) => <>{children}</>,
+  useNetwork: () => ({ isOnline: true, pendingSync: false }),
+}));
+
+jest.mock('@/lib/mutationQueue', () => ({
+  MutationQueue: { add: jest.fn().mockResolvedValue(undefined) },
+}));
+
 jest.mock('@/contexts/AppTheme', () => ({
   useAppTheme: () => ({
     theme: {
@@ -144,7 +153,19 @@ const GOAL = {
 beforeEach(() => {
   jest.clearAllMocks();
   mockOnAuthCb = null;
-  mockInsert.mockResolvedValue({ error: null });
+  mockInsert.mockReturnValue({
+    select: jest.fn(() => ({
+      single: jest.fn().mockResolvedValue({
+        data: {
+          id: 'new-g1', title: 'New Goal', icon: 'wallet-outline',
+          target_amount: 1000, current_amount: 0,
+          is_completed: false, is_archived: false,
+          completed_at: null, created_at: '2024-01-01T00:00:00Z',
+        },
+        error: null,
+      }),
+    })),
+  });
   mockUpdateFn.mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) });
   mockDeleteFn.mockReturnValue({ eq: jest.fn().mockResolvedValue({ error: null }) });
   mockFetchSavingsGoals.mockResolvedValue([]);
@@ -250,7 +271,7 @@ describe('SavingsGoalsScreen — create goal', () => {
     await waitFor(() => expect(mockInvalidateDashboard).toHaveBeenCalledWith(UID));
   });
 
-  it('re-fetches goals with force-refresh after successful create', async () => {
+  it('invalidates savings goals cache after successful create', async () => {
     const { getByText, getByPlaceholderText } = render(<SavingsGoalsScreen />);
     signIn();
     await waitFor(() => expect(mockFetchSavingsGoals).toHaveBeenCalledTimes(1));
@@ -260,12 +281,15 @@ describe('SavingsGoalsScreen — create goal', () => {
     fireEvent.changeText(getByPlaceholderText('e.g. 50,000.00'), '3000');
     await act(async () => { fireEvent.press(getByText('Create Goal')); });
 
-    // Called again for force-refresh
-    await waitFor(() => expect(mockFetchSavingsGoals).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockInvalidateSavingsGoals).toHaveBeenCalledWith(UID));
   });
 
   it('shows Supabase error in Alert when insert fails', async () => {
-    mockInsert.mockResolvedValue({ error: { message: 'DB error' } });
+    mockInsert.mockReturnValue({
+      select: jest.fn(() => ({
+        single: jest.fn().mockResolvedValue({ data: null, error: { message: 'DB error' } }),
+      })),
+    });
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const { getByText, getByPlaceholderText } = render(<SavingsGoalsScreen />);
     signIn();

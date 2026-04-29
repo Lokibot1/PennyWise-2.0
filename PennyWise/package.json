@@ -10,7 +10,13 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:components": "jest --testPathPattern=\"components/__tests__\"",
+    "test:screens": "jest --testPathPattern=\"app/__tests__\"",
+    "test:contexts": "jest --testPathPattern=\"contexts/__tests__\"",
+    "test:lib": "jest --testPathPattern=\"lib/__tests__\"",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:verbose": "jest --verbose"
   },
   "dependencies": {
     "@expo-google-fonts/kumbh-sans": "^0.4.2",

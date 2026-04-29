@@ -2,10 +2,11 @@ import { generateNotifications } from '../notifications';
 
 // ── Mock Supabase ─────────────────────────────────────────────────────────────
 
-const mockSingleProfile = jest.fn();
-const mockExpensesQuery = jest.fn();
-const mockIncomeQuery   = jest.fn();
-const mockGoalsQuery    = jest.fn();
+const mockSingleProfile  = jest.fn();
+const mockExpensesQuery  = jest.fn();
+const mockIncomeQuery    = jest.fn();
+const mockGoalsQuery     = jest.fn();
+const mockCategoriesQuery = jest.fn();
 
 jest.mock('@/lib/supabase', () => ({
   supabase: {
@@ -25,6 +26,17 @@ jest.mock('@/lib/supabase', () => ({
       }
       if (table === 'savings_goals') {
         return { select: jest.fn(() => ({ eq: jest.fn(() => ({ eq: mockGoalsQuery })) })) };
+      }
+      if (table === 'expense_categories') {
+        return {
+          select: jest.fn(() => ({
+            eq: jest.fn(() => ({
+              eq: jest.fn(() => ({
+                not: mockCategoriesQuery,
+              })),
+            })),
+          })),
+        };
       }
     }),
   },
@@ -59,6 +71,7 @@ function setupMocks({
   expenses = [] as ReturnType<typeof expense>[],
   incomes  = [] as ReturnType<typeof income>[],
   goals    = [] as ReturnType<typeof goal>[],
+  categories = [] as { id: string; label: string; budget_limit: number }[],
 } = {}) {
   mockSingleProfile.mockResolvedValue({
     data: { budget_limit: budgetLimit, full_name: 'Test' },
@@ -67,6 +80,7 @@ function setupMocks({
   mockExpensesQuery.mockResolvedValue({ data: expenses, error: null });
   mockIncomeQuery.mockResolvedValue({ data: incomes, error: null });
   mockGoalsQuery.mockResolvedValue({ data: goals, error: null });
+  mockCategoriesQuery.mockResolvedValue({ data: categories, error: null });
 }
 
 beforeEach(() => {

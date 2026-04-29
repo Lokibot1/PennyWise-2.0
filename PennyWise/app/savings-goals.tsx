@@ -869,7 +869,6 @@ export default function SavingsGoalsScreen() {
                 style={[styles.primaryBtn, { opacity: isCreateGoalValid ? 1 : 0.45 }]}
                 onPress={handleSaveGoal}
                 activeOpacity={0.85}
-                disabled={!isCreateGoalValid}
               >
                 <Text style={styles.primaryBtnText}>Create Goal</Text>
               </TouchableOpacity>

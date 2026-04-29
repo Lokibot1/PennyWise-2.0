@@ -26,6 +26,42 @@ jest.mock('expo-splash-screen', () => ({
 
 jest.mock('expo-font', () => ({
   useFonts: jest.fn(() => [true]),
+  Font: { isLoaded: jest.fn(() => true), loadAsync: jest.fn() },
+}));
+
+jest.mock('expo-linking', () => ({
+  getInitialURL: jest.fn().mockResolvedValue(null),
+  addEventListener: jest.fn(() => ({ remove: jest.fn() })),
+  parse: jest.fn(() => ({ queryParams: {} })),
+}));
+
+jest.mock('@expo/vector-icons', () => {
+  const { Text } = require('react-native');
+  return { Ionicons: ({ name }: any) => <Text>{name}</Text> };
+});
+
+jest.mock('@/contexts/NetworkContext', () => ({
+  NetworkProvider: ({ children }: any) => <>{children}</>,
+  useNetwork: () => ({ isOnline: true, pendingSync: false }),
+}));
+
+jest.mock('@/components/OfflineBanner', () => {
+  const { View } = require('react-native');
+  return { __esModule: true, default: () => <View testID="offline-banner" /> };
+});
+
+jest.mock('@/lib/recurringProcessor', () => ({
+  processRecurringTransactions: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/lib/pushNotifications', () => ({
+  registerForPushNotifications: jest.fn().mockResolvedValue(undefined),
+  clearPushedSet: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/constants/terms', () => ({
+  TERMS_SECTIONS: [{ title: 'Terms', body: 'Body.' }],
+  TERMS_VERSION: '1.0',
 }));
 
 jest.mock('@react-navigation/native', () => ({
@@ -48,6 +84,10 @@ jest.mock('@/lib/supabase', () => ({
         mockOnAuthCb = cb;
         return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
       }),
+      exchangeCodeForSession: jest.fn().mockResolvedValue({ error: null }),
+      getSession: jest.fn().mockResolvedValue({ data: { session: null } }),
+      getUser: jest.fn().mockResolvedValue({ data: { user: null } }),
+      updateUser: jest.fn().mockResolvedValue({ data: {}, error: null }),
     },
   },
 }));

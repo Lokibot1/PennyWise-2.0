@@ -4,6 +4,19 @@ import BudgetLimitModal from '../BudgetLimitModal';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+// BudgetLimitModal → useFormDraft → AsyncStorage (native module).
+// Mock it so the test environment doesn't crash on the missing native binding.
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem:    jest.fn().mockResolvedValue(null),
+  setItem:    jest.fn().mockResolvedValue(undefined),
+  removeItem: jest.fn().mockResolvedValue(undefined),
+  clear:      jest.fn().mockResolvedValue(undefined),
+  getAllKeys:  jest.fn().mockResolvedValue([]),
+  multiGet:   jest.fn().mockResolvedValue([]),
+  multiSet:   jest.fn().mockResolvedValue(undefined),
+  multiRemove:jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('@/contexts/AppTheme', () => ({
   useAppTheme: () => ({
     theme: {

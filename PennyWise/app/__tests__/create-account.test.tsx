@@ -54,12 +54,15 @@ jest.mock('@/constants/fonts', () => ({
   },
 }));
 
-// PasswordStrength is already unit-tested separately — stub it out here
+jest.mock('@/constants/terms', () => ({
+  TERMS_SECTIONS: [{ title: 'Terms', body: 'Body text.' }],
+  TERMS_VERSION:  '1.0',
+}));
+
 jest.mock('@/components/password-strength', () => ({
   PasswordStrength: () => null,
 }));
 
-// DatePickerModal: expose a Confirm button that calls onConfirm(Jan 1 2000)
 jest.mock('@/components/DatePickerModal', () => {
   const { TouchableOpacity, Text, View } = require('react-native');
   return ({ visible, onConfirm }: any) =>
@@ -86,30 +89,49 @@ const mockRouter   = router   as jest.Mocked<typeof router>;
 const PH = {
   name:     'John Doe',
   email:    'example@example.com',
-  phone:    '+63 912 345 6789',
+  phone:    '09XXXXXXXXX or +639XXXXXXXXX',
   password: '••••••••',
   dob:      'Select your date of birth',
 };
 
-/** Fill every required field with valid values. */
+/** Accept Terms via the modal: open → scroll to bottom → check → accept. */
+async function acceptTerms(utils: ReturnType<typeof render>) {
+  fireEvent.press(utils.getByTestId('terms-row'));
+  fireEvent.scroll(utils.getByTestId('terms-modal-scroll'), {
+    nativeEvent: {
+      contentOffset:     { y: 1000 },
+      layoutMeasurement: { height: 100 },
+      contentSize:       { height: 500 },
+    },
+  });
+  fireEvent.press(utils.getByTestId('terms-modal-checkbox'));
+  fireEvent.press(utils.getByTestId('terms-modal-accept'));
+}
+
+/** Fill every required field with valid values (including terms). */
 async function fillAllFields(utils: ReturnType<typeof render>) {
   fireEvent.changeText(utils.getByPlaceholderText(PH.name),  'Jane Doe');
   fireEvent.changeText(utils.getByPlaceholderText(PH.email), 'jane@example.com');
-  fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '+63912345678');
+  fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '09123456789');
 
   // Open and confirm DOB picker
   fireEvent.press(utils.getByText(PH.dob));
   fireEvent.press(utils.getByTestId('date-picker-confirm'));
 
-  // Two password fields share the same placeholder — [0]=password, [1]=confirm
+  // Two password fields share the same placeholder
   const pwInputs = utils.getAllByPlaceholderText(PH.password);
   fireEvent.changeText(pwInputs[0], 'Password1');
   fireEvent.changeText(pwInputs[1], 'Password1');
+
+  await acceptTerms(utils);
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (mockSupabase.auth.signUp as jest.Mock).mockResolvedValue({ error: null });
+  (mockSupabase.auth.signUp as jest.Mock).mockResolvedValue({
+    data: { session: null },
+    error: null,
+  });
 });
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
@@ -160,9 +182,9 @@ describe('CreateAccountScreen — rendering', () => {
 
 describe('CreateAccountScreen — validation', () => {
   it('shows "Full name is required" when name is empty', async () => {
-    const { getByText } = render(<CreateAccountScreen />);
-    await act(async () => { fireEvent.press(getByText('Sign Up')); });
-    expect(getByText('Full name is required.')).toBeTruthy();
+    const utils = render(<CreateAccountScreen />);
+    await act(async () => { fireEvent.press(utils.getByText('Sign Up')); });
+    expect(utils.getByText('Full name is required.')).toBeTruthy();
   });
 
   it('shows "Email is required" when email is empty', async () => {
@@ -184,7 +206,7 @@ describe('CreateAccountScreen — validation', () => {
     const utils = render(<CreateAccountScreen />);
     fireEvent.changeText(utils.getByPlaceholderText(PH.name),  'Jane Doe');
     fireEvent.changeText(utils.getByPlaceholderText(PH.email), 'jane@example.com');
-    fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '+63912345678');
+    fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '09123456789');
     await act(async () => { fireEvent.press(utils.getByText('Sign Up')); });
     expect(utils.getByText('Date of birth is required.')).toBeTruthy();
   });
@@ -193,7 +215,7 @@ describe('CreateAccountScreen — validation', () => {
     const utils = render(<CreateAccountScreen />);
     fireEvent.changeText(utils.getByPlaceholderText(PH.name),  'Jane Doe');
     fireEvent.changeText(utils.getByPlaceholderText(PH.email), 'jane@example.com');
-    fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '+63912345678');
+    fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '09123456789');
     fireEvent.press(utils.getByText(PH.dob));
     fireEvent.press(utils.getByTestId('date-picker-confirm'));
     await act(async () => { fireEvent.press(utils.getByText('Sign Up')); });
@@ -204,7 +226,7 @@ describe('CreateAccountScreen — validation', () => {
     const utils = render(<CreateAccountScreen />);
     fireEvent.changeText(utils.getByPlaceholderText(PH.name),  'Jane Doe');
     fireEvent.changeText(utils.getByPlaceholderText(PH.email), 'jane@example.com');
-    fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '+63912345678');
+    fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '09123456789');
     fireEvent.press(utils.getByText(PH.dob));
     fireEvent.press(utils.getByTestId('date-picker-confirm'));
     fireEvent.changeText(utils.getAllByPlaceholderText(PH.password)[0], 'abc');
@@ -216,7 +238,7 @@ describe('CreateAccountScreen — validation', () => {
     const utils = render(<CreateAccountScreen />);
     fireEvent.changeText(utils.getByPlaceholderText(PH.name),  'Jane Doe');
     fireEvent.changeText(utils.getByPlaceholderText(PH.email), 'jane@example.com');
-    fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '+63912345678');
+    fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '09123456789');
     fireEvent.press(utils.getByText(PH.dob));
     fireEvent.press(utils.getByTestId('date-picker-confirm'));
     const pwInputs = utils.getAllByPlaceholderText(PH.password);
@@ -240,7 +262,6 @@ describe('CreateAccountScreen — date of birth picker', () => {
     const { getByText, getByTestId } = render(<CreateAccountScreen />);
     fireEvent.press(getByText(PH.dob));
     fireEvent.press(getByTestId('date-picker-confirm'));
-    // Jan 1 2000 formatted via toLocaleDateString('en-US', ...)
     expect(getByText('January 1, 2000')).toBeTruthy();
   });
 });
@@ -250,15 +271,16 @@ describe('CreateAccountScreen — date of birth picker', () => {
 describe('CreateAccountScreen — sign up success', () => {
   it('calls supabase.auth.signUp with sanitized name, email, and phone', async () => {
     const utils = render(<CreateAccountScreen />);
-    // Use dirty inputs to verify sanitizers are applied
+    // Dirty inputs verify sanitizers are applied
     fireEvent.changeText(utils.getByPlaceholderText(PH.name),  '  Jane Doe  ');
     fireEvent.changeText(utils.getByPlaceholderText(PH.email), '  JANE@EXAMPLE.COM  ');
-    fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '091abc234567');
+    fireEvent.changeText(utils.getByPlaceholderText(PH.phone), '0912345abc6789');
     fireEvent.press(utils.getByText(PH.dob));
     fireEvent.press(utils.getByTestId('date-picker-confirm'));
     const pwInputs = utils.getAllByPlaceholderText(PH.password);
     fireEvent.changeText(pwInputs[0], 'Password1');
     fireEvent.changeText(pwInputs[1], 'Password1');
+    await acceptTerms(utils);
 
     await act(async () => { fireEvent.press(utils.getByText('Sign Up')); });
 
@@ -269,18 +291,20 @@ describe('CreateAccountScreen — sign up success', () => {
         options: expect.objectContaining({
           data: expect.objectContaining({
             full_name: 'Jane Doe',
-            phone:     '091234567',
+            phone:     '09123456789',
           }),
         }),
       })
     );
   });
 
-  it('navigates to /(tabs) after a successful sign up', async () => {
+  it('navigates to /check-email after a successful sign up', async () => {
     const utils = render(<CreateAccountScreen />);
     await fillAllFields(utils);
     await act(async () => { fireEvent.press(utils.getByText('Sign Up')); });
-    expect(mockRouter.replace).toHaveBeenCalledWith('/(tabs)');
+    expect(mockRouter.replace).toHaveBeenCalledWith(
+      expect.objectContaining({ pathname: '/check-email' })
+    );
   });
 });
 
@@ -289,6 +313,7 @@ describe('CreateAccountScreen — sign up success', () => {
 describe('CreateAccountScreen — sign up failure', () => {
   it('displays the auth error message when sign up fails', async () => {
     (mockSupabase.auth.signUp as jest.Mock).mockResolvedValue({
+      data: null,
       error: { message: 'Email already in use' },
     });
     const utils = render(<CreateAccountScreen />);
@@ -306,7 +331,9 @@ describe('CreateAccountScreen — loading state', () => {
   it('shows a loading indicator while sign up is in progress', async () => {
     let resolveSignUp!: () => void;
     (mockSupabase.auth.signUp as jest.Mock).mockReturnValue(
-      new Promise(resolve => { resolveSignUp = () => resolve({ error: null }); })
+      new Promise(resolve => {
+        resolveSignUp = () => resolve({ data: { session: null }, error: null });
+      })
     );
     const utils = render(<CreateAccountScreen />);
     await fillAllFields(utils);
@@ -331,11 +358,9 @@ describe('CreateAccountScreen — navigation and error clearing', () => {
 
   it('clears the error when the user starts typing in any field', async () => {
     const utils = render(<CreateAccountScreen />);
-    // Trigger an error first
     await act(async () => { fireEvent.press(utils.getByText('Sign Up')); });
     expect(utils.getByText('Full name is required.')).toBeTruthy();
 
-    // Start typing — error should clear
     fireEvent.changeText(utils.getByPlaceholderText(PH.name), 'J');
     expect(utils.queryByText('Full name is required.')).toBeNull();
   });

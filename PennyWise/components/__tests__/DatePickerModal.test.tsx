@@ -98,8 +98,7 @@ describe('DatePickerModal — iOS', () => {
 
   it('shows the initial date formatted in the badge', () => {
     const { getByText } = renderModal({ value: new Date(1995, 3, 20) });
-    // After the mock onChange fires with mockPickedDate, the draft updates to mockPickedDate
-    expect(getByText('June 15, 2000')).toBeTruthy();
+    expect(getByText('April 20, 1995')).toBeTruthy();
   });
 
   it('calls onClose when Cancel is pressed', () => {
@@ -115,10 +114,10 @@ describe('DatePickerModal — iOS', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onConfirm with the selected date when Done is pressed', () => {
+  it('calls onConfirm with the current draft date when Done is pressed', () => {
     const { getByText, onConfirm } = renderModal();
     fireEvent.press(getByText('Done'));
-    expect(onConfirm).toHaveBeenCalledWith(mockPickedDate);
+    expect(onConfirm).toHaveBeenCalledWith(BASE_DATE);
   });
 
   it('calls onConfirm and onClose when Confirm Date is pressed', () => {
@@ -142,22 +141,32 @@ describe('DatePickerModal — iOS', () => {
 });
 
 // ── Android picker ────────────────────────────────────────────────────────────
+// Android now uses a pure-RN custom calendar (no native dialog).
 
 describe('DatePickerModal — Android', () => {
   beforeEach(() => { Platform.OS = 'android' as any; });
 
-  it('calls onConfirm with the picked date and onClose on change', () => {
-    const { onConfirm, onClose } = renderModal();
-    // The mock DateTimePicker calls onChange on mount
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(onConfirm).toHaveBeenCalledWith(mockPickedDate);
+  it('shows the initial date in the badge', () => {
+    const { getByText } = renderModal();
+    expect(getByText('April 20, 1995')).toBeTruthy();
   });
 
-  it('calls only onClose (no onConfirm) when picker is dismissed without a selection', () => {
-    mockPickerSelected = undefined; // picker fires onChange with no date (dismissed)
-    const { onConfirm, onClose } = renderModal();
+  it('calls onConfirm with the initial date and onClose when Done is pressed', () => {
+    const { getByText, onConfirm, onClose } = renderModal();
+    fireEvent.press(getByText('Done'));
+    expect(onConfirm).toHaveBeenCalledWith(BASE_DATE);
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(onConfirm).not.toHaveBeenCalled();
-    mockPickerSelected = mockPickedDate; // restore
+  });
+
+  it('calls onClose when Cancel is pressed', () => {
+    const { getByText, onClose } = renderModal();
+    fireEvent.press(getByText('Cancel'));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onClose when the backdrop is pressed', () => {
+    const { getByTestId, onClose } = renderModal();
+    fireEvent.press(getByTestId('date-picker-backdrop'));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

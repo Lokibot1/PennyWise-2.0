@@ -42,11 +42,11 @@ export function filterEmail(value: string): string {
  * Allows digits and leading + only (supports 09XXXXXXXXX and +639XXXXXXXXX).
  */
 export function filterPhone(value: string): string {
-  // Allow + only as the very first character
+  // Allow + only as the very first character; cap at 13 (+639XXXXXXXXX)
   if (value.startsWith('+')) {
-    return '+' + value.slice(1).replace(/[^\d]/g, '');
+    return ('+' + value.slice(1).replace(/[^\d]/g, '')).slice(0, 13);
   }
-  return value.replace(/[^\d]/g, '');
+  return value.replace(/[^\d]/g, '').slice(0, 13);
 }
 
 /** Remove HTML tags, null bytes, and control characters. Collapse whitespace. */
@@ -74,14 +74,14 @@ export function validateEmail(value: string): boolean {
 }
 
 /**
- * Phone number: keep only digits and leading +. Max 20 chars.
+ * Phone number: keep only digits and leading +. Max 13 chars (+639XXXXXXXXX).
  */
 export function sanitizePhone(value: string): string {
   const trimmed = value.trim();
   if (trimmed.startsWith('+')) {
-    return '+' + trimmed.slice(1).replace(/[^\d]/g, '').slice(0, 19);
+    return ('+' + trimmed.slice(1).replace(/[^\d]/g, '')).slice(0, 13);
   }
-  return trimmed.replace(/[^\d]/g, '').slice(0, 20);
+  return trimmed.replace(/[^\d]/g, '').slice(0, 13);
 }
 
 /**

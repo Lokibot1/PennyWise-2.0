@@ -23,7 +23,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import BudgetLimitModal from "@/components/BudgetLimitModal";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -48,13 +51,30 @@ import { sfx } from "@/lib/sfx";
 import { supabase } from "@/lib/supabase";
 import { DataCache } from "@/lib/dataCache";
 import { Cache } from "@/lib/cache";
-import { sanitizeName, sanitizeEmail, sanitizePhone, filterName, filterEmail, filterPhone } from "@/lib/sanitize";
-import { MutationQueue } from '@/lib/mutationQueue';
+import {
+  sanitizeName,
+  sanitizeEmail,
+  sanitizePhone,
+  filterName,
+  filterEmail,
+  filterPhone,
+} from "@/lib/sanitize";
+import { MutationQueue } from "@/lib/mutationQueue";
 import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftSaveIndicator } from "@/components/DraftSaveIndicator";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Screen = "profile" | "edit" | "terms" | "privacy" | "about" | "developers" | "settings" | "notif-settings" | "change-password" | "help";
+type Screen =
+  | "profile"
+  | "edit"
+  | "terms"
+  | "privacy"
+  | "about"
+  | "developers"
+  | "settings"
+  | "notif-settings"
+  | "change-password"
+  | "help";
 type IoniconName = keyof typeof Ionicons.glyphMap;
 type ProfileData = {
   full_name: string;
@@ -151,14 +171,14 @@ function Avatar({
       </View>
       {/* Owl sitting in the left side of the circle */}
       <Image
-        source={require('@/assets/images/owlpennywise.png')}
+        source={require("@/assets/images/owlpennywise.png")}
         style={{
-          position: 'absolute',
+          position: "absolute",
           width: owlSize,
           height: owlSize,
           top: (size + 8) * 0.45,
           left: -(owlSize * 0.3),
-          transform: [{ rotate: '6deg' }],
+          transform: [{ rotate: "6deg" }],
           zIndex: 10,
         }}
         resizeMode="contain"
@@ -455,20 +475,20 @@ function EditProfileView({
   const { isOnline } = useNetwork();
 
   const {
-    draft:         profileDraft,
+    draft: profileDraft,
     setDraftField: setProfileField,
-    clearDraft:    clearProfileDraft,
-    saveStatus:    profileSaveStatus,
-  } = useFormDraft('draft:edit-profile', {
+    clearDraft: clearProfileDraft,
+    saveStatus: profileSaveStatus,
+  } = useFormDraft("draft:edit-profile", {
     username: profile.full_name,
-    phone:    profile.phone ?? '',
-    email:    profile.email,
+    phone: profile.phone ?? "",
+    email: profile.email,
   });
   const username = profileDraft.username as string;
-  const phone    = profileDraft.phone    as string;
-  const email    = profileDraft.email    as string;
+  const phone = profileDraft.phone as string;
+  const email = profileDraft.email as string;
   const isProfileValid = username.trim().length > 0 && email.trim().length > 0;
-  const [saving, setSaving]     = useState(false);
+  const [saving, setSaving] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [errModal, setErrModal] = useState({
     visible: false,
@@ -540,20 +560,31 @@ function EditProfileView({
 
     // Photo uploads require network (binary data can't be queued in AsyncStorage)
     if (!isOnline && previewUri) {
-      setErrModal({ visible: true, title: 'No Internet Connection', message: 'You\'re offline. Connect to the internet to upload a profile photo.' });
+      setErrModal({
+        visible: true,
+        title: "No Internet Connection",
+        message:
+          "You're offline. Connect to the internet to upload a profile photo.",
+      });
       return;
     }
 
     // Text-only edit while offline — queue and apply optimistically
     if (!isOnline) {
-      const cleanName  = sanitizeName(username);
+      const cleanName = sanitizeName(username);
       const cleanPhone = sanitizePhone(phone);
       const cleanEmail = sanitizeEmail(email);
       const uid = (await supabase.auth.getUser()).data.user?.id;
       if (!uid) return;
-      onSaved({ full_name: cleanName, phone: cleanPhone, email: cleanEmail, avatar_url: profile.avatar_url ?? undefined });
+      onSaved({
+        full_name: cleanName,
+        phone: cleanPhone,
+        email: cleanEmail,
+        avatar_url: profile.avatar_url ?? undefined,
+      });
       await MutationQueue.add({
-        op: 'update', table: 'profiles',
+        op: "update",
+        table: "profiles",
         payload: { full_name: cleanName, phone: cleanPhone, email: cleanEmail },
         match: { id: uid },
       });
@@ -616,7 +647,7 @@ function EditProfileView({
       newAvatarUrl = null;
     }
 
-    const cleanName  = sanitizeName(username);
+    const cleanName = sanitizeName(username);
     const cleanPhone = sanitizePhone(phone);
     const cleanEmail = sanitizeEmail(email);
 
@@ -624,8 +655,8 @@ function EditProfileView({
       .from("profiles")
       .update({
         full_name: cleanName,
-        phone:     cleanPhone,
-        email:     cleanEmail,
+        phone: cleanPhone,
+        email: cleanEmail,
         avatar_url: newAvatarUrl,
       })
       .eq("id", user.id);
@@ -644,8 +675,8 @@ function EditProfileView({
       await clearProfileDraft();
       onSaved({
         full_name: cleanName,
-        phone:     cleanPhone,
-        email:     cleanEmail,
+        phone: cleanPhone,
+        email: cleanEmail,
         avatar_url: newAvatarUrl ?? undefined,
       });
       onBack();
@@ -838,7 +869,7 @@ function EditProfileView({
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={username}
-                onChangeText={(v) => setProfileField('username', filterName(v))}
+                onChangeText={(v) => setProfileField("username", filterName(v))}
                 placeholderTextColor={theme.textMuted}
                 placeholder="e.g. John Smith"
               />
@@ -856,12 +887,12 @@ function EditProfileView({
             </View>
             <View style={styles.formFieldBody}>
               <Text style={[styles.formFieldLabel, { color: theme.textMuted }]}>
-                Phone (optional)
+                Phone
               </Text>
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={phone}
-                onChangeText={(v) => setProfileField('phone', filterPhone(v))}
+                onChangeText={(v) => setProfileField("phone", filterPhone(v))}
                 keyboardType="phone-pad"
                 placeholderTextColor={theme.textMuted}
                 placeholder="e.g. +63 912 345 6789"
@@ -875,12 +906,12 @@ function EditProfileView({
             </View>
             <View style={styles.formFieldBody}>
               <Text style={[styles.formFieldLabel, { color: theme.textMuted }]}>
-                Email (optional)
+                Email
               </Text>
               <TextInput
                 style={[styles.formFieldInput, { color: theme.textPrimary }]}
                 value={email}
-                onChangeText={(v) => setProfileField('email', filterEmail(v))}
+                onChangeText={(v) => setProfileField("email", filterEmail(v))}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 placeholderTextColor={theme.textMuted}
@@ -892,7 +923,10 @@ function EditProfileView({
 
         {/* Actions */}
         <TouchableOpacity
-          style={[styles.saveBtn, { opacity: (!isProfileValid || saving) ? 0.45 : 1 }]}
+          style={[
+            styles.saveBtn,
+            { opacity: !isProfileValid || saving ? 0.45 : 1 },
+          ]}
           activeOpacity={0.85}
           disabled={!isProfileValid || saving}
           onPress={() => setConfirm(true)}
@@ -903,10 +937,34 @@ function EditProfileView({
             <Text style={styles.saveBtnText}>Save Changes</Text>
           )}
         </TouchableOpacity>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10, gap: 5 }}>
-          <Ionicons name={isProfileValid ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={isProfileValid ? '#1B7A4A' : theme.textMuted} />
-          <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: isProfileValid ? '#1B7A4A' : theme.textMuted }}>
-            {isProfileValid ? "All set! Tap to save changes." : 'Name and email are required to continue.'}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: 10,
+            gap: 5,
+          }}
+        >
+          <Ionicons
+            name={
+              isProfileValid
+                ? "checkmark-circle-outline"
+                : "information-circle-outline"
+            }
+            size={13}
+            color={isProfileValid ? "#1B7A4A" : theme.textMuted}
+          />
+          <Text
+            style={{
+              fontFamily: Font.bodyRegular,
+              fontSize: 12,
+              color: isProfileValid ? "#1B7A4A" : theme.textMuted,
+            }}
+          >
+            {isProfileValid
+              ? "All set! Tap to save changes."
+              : "Name and email are required to continue."}
           </Text>
         </View>
 
@@ -952,16 +1010,22 @@ function EditProfileView({
 function HelpSupportView({ onBack }: { onBack: () => void }) {
   const { theme } = useAppTheme();
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-  const faqs = HELP_FAQS.filter((s) => s.type === 'faq');
+  const faqs = HELP_FAQS.filter((s) => s.type === "faq");
 
   return (
     <SafeAreaView
       style={[styles.safe, { backgroundColor: theme.headerBg }]}
-      edges={['top', 'left', 'right']}
+      edges={["top", "left", "right"]}
       {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
-      <View style={[styles.greenSection, styles.termsHeader, { backgroundColor: theme.headerBg }]}>
+      <View
+        style={[
+          styles.greenSection,
+          styles.termsHeader,
+          { backgroundColor: theme.headerBg },
+        ]}
+      >
         <NavHeader title="Help & Support" onBack={onBack} />
       </View>
 
@@ -975,25 +1039,36 @@ function HelpSupportView({ onBack }: { onBack: () => void }) {
           <View style={helpSt.heroIcon}>
             <Ionicons name="headset-outline" size={32} color="#fff" />
           </View>
-          <Text style={[helpSt.heroTitle, { color: theme.textPrimary }]}>How can we help?</Text>
+          <Text style={[helpSt.heroTitle, { color: theme.textPrimary }]}>
+            How can we help?
+          </Text>
           <Text style={[helpSt.heroSub, { color: theme.textSecondary }]}>
             Browse the guides below or check the FAQs for quick answers.
           </Text>
         </View>
 
         {/* Quick-start topics */}
-        <Text style={[helpSt.sectionLabel, { color: theme.textMuted }]}>GETTING STARTED</Text>
+        <Text style={[helpSt.sectionLabel, { color: theme.textMuted }]}>
+          GETTING STARTED
+        </Text>
         {HELP_TOPICS.map((topic, i) => (
           <View
             key={i}
-            style={[helpSt.topicCard, { backgroundColor: theme.surface, borderColor: theme.divider }]}
+            style={[
+              helpSt.topicCard,
+              { backgroundColor: theme.surface, borderColor: theme.divider },
+            ]}
           >
             <View style={helpSt.topicIconWrap}>
               <Ionicons name={topic.icon as any} size={20} color="#3ECBA8" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[helpSt.topicTitle, { color: theme.textPrimary }]}>{topic.title}</Text>
-              <Text style={[helpSt.topicBody, { color: theme.textSecondary }]}>{topic.body}</Text>
+              <Text style={[helpSt.topicTitle, { color: theme.textPrimary }]}>
+                {topic.title}
+              </Text>
+              <Text style={[helpSt.topicBody, { color: theme.textSecondary }]}>
+                {topic.body}
+              </Text>
             </View>
           </View>
         ))}
@@ -1001,7 +1076,9 @@ function HelpSupportView({ onBack }: { onBack: () => void }) {
         {/* FAQ divider */}
         <View style={helpSt.faqHeader}>
           <View style={[helpSt.faqLine, { backgroundColor: theme.divider }]} />
-          <Text style={[helpSt.faqHeaderText, { color: theme.textMuted }]}>FAQ</Text>
+          <Text style={[helpSt.faqHeaderText, { color: theme.textMuted }]}>
+            FAQ
+          </Text>
           <View style={[helpSt.faqLine, { backgroundColor: theme.divider }]} />
         </View>
 
@@ -1013,42 +1090,61 @@ function HelpSupportView({ onBack }: { onBack: () => void }) {
               key={i}
               style={[
                 helpSt.faqItem,
-                { backgroundColor: theme.surface, borderColor: open ? '#3ECBA8' : theme.divider },
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: open ? "#3ECBA8" : theme.divider,
+                },
               ]}
               activeOpacity={0.75}
               onPress={() => setExpandedFaq(open ? null : i)}
             >
               <View style={helpSt.faqRow}>
-                <Text style={[helpSt.faqQ, { color: theme.textPrimary }]}>{faq.title}</Text>
+                <Text style={[helpSt.faqQ, { color: theme.textPrimary }]}>
+                  {faq.title}
+                </Text>
                 <Ionicons
-                  name={open ? 'chevron-up' : 'chevron-down'}
+                  name={open ? "chevron-up" : "chevron-down"}
                   size={16}
-                  color={open ? '#3ECBA8' : theme.textMuted}
+                  color={open ? "#3ECBA8" : theme.textMuted}
                 />
               </View>
               {open && (
-                <Text style={[helpSt.faqA, { color: theme.textSecondary }]}>{faq.body}</Text>
+                <Text style={[helpSt.faqA, { color: theme.textSecondary }]}>
+                  {faq.body}
+                </Text>
               )}
             </TouchableOpacity>
           );
         })}
 
         {/* Contact */}
-        <View style={[helpSt.contactCard, { backgroundColor: 'rgba(62,203,168,0.08)', borderColor: 'rgba(62,203,168,0.25)' }]}>
+        <View
+          style={[
+            helpSt.contactCard,
+            {
+              backgroundColor: "rgba(62,203,168,0.08)",
+              borderColor: "rgba(62,203,168,0.25)",
+            },
+          ]}
+        >
           <Ionicons name="mail-outline" size={22} color="#3ECBA8" />
           <View style={{ flex: 1 }}>
-            <Text style={[helpSt.contactTitle, { color: theme.textPrimary }]}>Still need help?</Text>
+            <Text style={[helpSt.contactTitle, { color: theme.textPrimary }]}>
+              Still need help?
+            </Text>
             <Text style={[helpSt.contactBody, { color: theme.textSecondary }]}>
-              Reach us at{' '}
-              <Text style={{ color: '#3ECBA8', fontFamily: Font.bodySemiBold }}>
+              Reach us at{" "}
+              <Text style={{ color: "#3ECBA8", fontFamily: Font.bodySemiBold }}>
                 support@pennywiseph.app
-              </Text>
-              {' '}and we&apos;ll get back to you within 1–2 business days.
+              </Text>{" "}
+              and we&apos;ll get back to you within 1–2 business days.
             </Text>
           </View>
         </View>
 
-        <Text style={[helpSt.version, { color: theme.textMuted }]}>PennyWise · Version 2.0</Text>
+        <Text style={[helpSt.version, { color: theme.textMuted }]}>
+          PennyWise · Version 2.0
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -1056,7 +1152,7 @@ function HelpSupportView({ onBack }: { onBack: () => void }) {
 
 const helpSt = StyleSheet.create({
   hero: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 28,
     paddingHorizontal: 8,
     marginBottom: 4,
@@ -1065,9 +1161,9 @@ const helpSt = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 22,
-    backgroundColor: '#1B7A4A',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "#1B7A4A",
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 14,
   },
   heroTitle: {
@@ -1075,12 +1171,12 @@ const helpSt = StyleSheet.create({
     fontSize: 22,
     letterSpacing: 0.3,
     marginBottom: 6,
-    textAlign: 'center',
+    textAlign: "center",
   },
   heroSub: {
     fontFamily: Font.bodyRegular,
     fontSize: 13,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 19,
   },
   sectionLabel: {
@@ -1091,8 +1187,8 @@ const helpSt = StyleSheet.create({
     marginTop: 4,
   },
   topicCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 14,
     borderRadius: 14,
     borderWidth: 1,
@@ -1103,9 +1199,9 @@ const helpSt = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: 'rgba(62,203,168,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: "rgba(62,203,168,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
     flexShrink: 0,
   },
   topicTitle: {
@@ -1119,8 +1215,8 @@ const helpSt = StyleSheet.create({
     lineHeight: 20,
   },
   faqHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 8,
     marginBottom: 14,
     gap: 10,
@@ -1138,9 +1234,9 @@ const helpSt = StyleSheet.create({
     marginBottom: 10,
   },
   faqRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 8,
   },
   faqQ: {
@@ -1156,8 +1252,8 @@ const helpSt = StyleSheet.create({
     marginTop: 10,
   },
   contactCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: 14,
     borderRadius: 14,
     borderWidth: 1,
@@ -1178,7 +1274,7 @@ const helpSt = StyleSheet.create({
   version: {
     fontFamily: Font.bodyRegular,
     fontSize: 12,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 20,
     marginBottom: 8,
   },
@@ -1228,7 +1324,11 @@ function TermsView({ onBack }: { onBack: () => void }) {
               <Text
                 style={[
                   styles.termsText,
-                  { color: theme.textSecondary, fontStyle: "italic", marginBottom: 6 },
+                  {
+                    color: theme.textSecondary,
+                    fontStyle: "italic",
+                    marginBottom: 6,
+                  },
                 ]}
               >
                 {section.subtitle}
@@ -1289,7 +1389,11 @@ function PrivacyView({ onBack }: { onBack: () => void }) {
               <Text
                 style={[
                   styles.termsText,
-                  { color: theme.textSecondary, fontStyle: "italic", marginBottom: 6 },
+                  {
+                    color: theme.textSecondary,
+                    fontStyle: "italic",
+                    marginBottom: 6,
+                  },
                 ]}
               >
                 {section.subtitle}
@@ -1308,18 +1412,22 @@ function PrivacyView({ onBack }: { onBack: () => void }) {
 }
 
 // ── About Us view ─────────────────────────────────────────────────────────────
-function AboutView({ onBack, onMeetDevs }: { onBack: () => void; onMeetDevs: () => void }) {
+function AboutView({
+  onBack,
+  onMeetDevs,
+}: {
+  onBack: () => void;
+  onMeetDevs: () => void;
+}) {
   const { theme } = useAppTheme();
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
   const headerSection = ABOUT_SECTIONS.find((s) => s.type === "header")!;
   const contentSections = ABOUT_SECTIONS.filter((s) => s.type === "section");
   const faqHeader = ABOUT_SECTIONS.find(
-    (s) => s.type === "faq" && s.body === ""
+    (s) => s.type === "faq" && s.body === "",
   )!;
-  const faqs = ABOUT_SECTIONS.filter(
-    (s) => s.type === "faq" && s.body !== ""
-  );
+  const faqs = ABOUT_SECTIONS.filter((s) => s.type === "faq" && s.body !== "");
 
   return (
     <SafeAreaView
@@ -1402,9 +1510,7 @@ function AboutView({ onBack, onMeetDevs }: { onBack: () => void; onMeetDevs: () 
               onPress={() => setExpandedFaq(open ? null : i)}
             >
               <View style={aboutStyles.faqRow}>
-                <Text
-                  style={[aboutStyles.faqQ, { color: theme.textPrimary }]}
-                >
+                <Text style={[aboutStyles.faqQ, { color: theme.textPrimary }]}>
                   {faq.title}
                 </Text>
                 <Ionicons
@@ -1432,7 +1538,11 @@ function AboutView({ onBack, onMeetDevs }: { onBack: () => void; onMeetDevs: () 
         >
           <Ionicons name="people-outline" size={18} color="#fff" />
           <Text style={aboutStyles.meetBtnText}>Meet the Developers</Text>
-          <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.7)" />
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color="rgba(255,255,255,0.7)"
+          />
         </TouchableOpacity>
 
         {/* Footer */}
@@ -1577,9 +1687,21 @@ const DEVELOPERS = [
     cardHeight: 460,
     bio: "Goal-oriented developer with a background in project management and frontend engineering. Skilled in HTML, CSS, JavaScript, ReactJS, and VueJS. Led multiple software projects end-to-end. On PennyWise, stepping up as Full Stack Developer — handling database design, backend, and frontend for the first time.",
     socials: [
-      { icon: "mail-outline" as const,    label: "Email",     url: "mailto:dijamco.brian.abrenica@gmail.com" },
-      { icon: "logo-instagram" as const,  label: "Instagram", url: "https://www.instagram.com/defnotloki1/" },
-      { icon: "logo-github" as const,     label: "GitHub",    url: "https://github.com/Lokibot1" },
+      {
+        icon: "mail-outline" as const,
+        label: "Email",
+        url: "mailto:dijamco.brian.abrenica@gmail.com",
+      },
+      {
+        icon: "logo-instagram" as const,
+        label: "Instagram",
+        url: "https://www.instagram.com/defnotloki1/",
+      },
+      {
+        icon: "logo-github" as const,
+        label: "GitHub",
+        url: "https://github.com/Lokibot1",
+      },
     ],
   },
   {
@@ -1588,20 +1710,28 @@ const DEVELOPERS = [
     role: "Frontend Developer",
     photo: require("@/assets/images/sarahd.jpg"),
     photoOffset: 60,
-    cardHeight: 460,  // portrait photo — taller card
+    cardHeight: 460, // portrait photo — taller card
     bio: "BSIT student with hands-on experience building user-friendly websites and interfaces. Expanding into database management to strengthen her technical foundation. Motivated, research-driven, and eager to grow in a fast-paced development environment.",
     socials: [
-      { icon: "mail-outline" as const,  label: "Email",  url: "mailto:pedillaga.sarah.sunio@gmail.com" },
-      { icon: "logo-github" as const,   label: "GitHub", url: "https://github.com/sachiishimi" },
+      {
+        icon: "mail-outline" as const,
+        label: "Email",
+        url: "mailto:pedillaga.sarah.sunio@gmail.com",
+      },
+      {
+        icon: "logo-github" as const,
+        label: "GitHub",
+        url: "https://github.com/sachiishimi",
+      },
     ],
   },
 ];
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const CARD_H       = 460;
-const PARALLAX     = 60;
-const CARD_GAP     = 20;
-const CARD_HPAD    = 18;
+const CARD_H = 460;
+const PARALLAX = 60;
+const CARD_GAP = 20;
+const CARD_HPAD = 18;
 
 // ── Social button ─────────────────────────────────────────────────────────────
 function SocialButton({
@@ -1615,10 +1745,20 @@ function SocialButton({
 }) {
   const scale = useRef(new Animated.Value(1)).current;
   function onPressIn() {
-    Animated.spring(scale, { toValue: 0.88, useNativeDriver: true, speed: 40, bounciness: 6 }).start();
+    Animated.spring(scale, {
+      toValue: 0.88,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 6,
+    }).start();
   }
   function onPressOut() {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 28, bounciness: 14 }).start();
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 28,
+      bounciness: 14,
+    }).start();
   }
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
@@ -1636,8 +1776,6 @@ function SocialButton({
   );
 }
 
-
-
 // ── Parallax developer card (with flip) ──────────────────────────────────────
 const TOP_PADDING = 24; // matches contentContainerStyle paddingTop
 
@@ -1653,7 +1791,7 @@ function ParallaxDevCard({
   theme: ReturnType<typeof useAppTheme>["theme"];
 }) {
   const entryAnim = useRef(new Animated.Value(0)).current;
-  const flipAnim  = useRef(new Animated.Value(0)).current;
+  const flipAnim = useRef(new Animated.Value(0)).current;
   const [flipped, setFlipped] = useState(false);
 
   useEffect(() => {
@@ -1681,7 +1819,7 @@ function ParallaxDevCard({
   const cardW = DEV_SCREEN_W - CARD_HPAD * 2;
 
   // ── Parallax ────────────────────────────────────────────────────────────────
-  const cardTop  = TOP_PADDING + index * (cardH + CARD_GAP);
+  const cardTop = TOP_PADDING + index * (cardH + CARD_GAP);
   const parallaxY = scrollY.interpolate({
     inputRange: [cardTop - 500, cardTop + cardH],
     outputRange: [PARALLAX, -PARALLAX],
@@ -1689,13 +1827,28 @@ function ParallaxDevCard({
   });
 
   // ── Flip rotations ──────────────────────────────────────────────────────────
-  const frontRotateY = flipAnim.interpolate({ inputRange: [0, 1], outputRange: ["0deg",   "180deg"] });
-  const backRotateY  = flipAnim.interpolate({ inputRange: [0, 1], outputRange: ["180deg", "360deg"] });
+  const frontRotateY = flipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "180deg"],
+  });
+  const backRotateY = flipAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["180deg", "360deg"],
+  });
   // Opacity swap at midpoint for Android backfaceVisibility fallback
-  const frontOpacity = flipAnim.interpolate({ inputRange: [0, 0.49, 0.5, 1], outputRange: [1, 1, 0, 0] });
-  const backOpacity  = flipAnim.interpolate({ inputRange: [0, 0.49, 0.5, 1], outputRange: [0, 0, 1, 1] });
+  const frontOpacity = flipAnim.interpolate({
+    inputRange: [0, 0.49, 0.5, 1],
+    outputRange: [1, 1, 0, 0],
+  });
+  const backOpacity = flipAnim.interpolate({
+    inputRange: [0, 0.49, 0.5, 1],
+    outputRange: [0, 0, 1, 1],
+  });
 
-  const entryTransY = entryAnim.interpolate({ inputRange: [0, 1], outputRange: [72, 0] });
+  const entryTransY = entryAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [72, 0],
+  });
 
   return (
     <Animated.View
@@ -1710,14 +1863,21 @@ function ParallaxDevCard({
       {/* ── FRONT FACE ── */}
       <Animated.View
         style={{
-          position: "absolute", width: cardW, height: cardH,
+          position: "absolute",
+          width: cardW,
+          height: cardH,
           opacity: frontOpacity,
           transform: [{ perspective: 1200 }, { rotateY: frontRotateY }],
           backfaceVisibility: "hidden",
         }}
       >
         <TouchableOpacity
-          style={{ width: cardW, height: cardH, borderRadius: 22, overflow: "hidden" }}
+          style={{
+            width: cardW,
+            height: cardH,
+            borderRadius: 22,
+            overflow: "hidden",
+          }}
           activeOpacity={0.92}
           onPress={handleFlip}
         >
@@ -1739,13 +1899,19 @@ function ParallaxDevCard({
           <View style={devStyles.cardContent}>
             <Text style={devStyles.devName}>
               {dev.name}
-              {dev.nickname ? <Text style={devStyles.devNick}> ({dev.nickname})</Text> : null}
+              {dev.nickname ? (
+                <Text style={devStyles.devNick}> ({dev.nickname})</Text>
+              ) : null}
             </Text>
             <View style={[devStyles.rolePill, { marginTop: 8 }]}>
               <Text style={devStyles.roleText}>{dev.role}</Text>
             </View>
             <View style={devStyles.readMoreRow}>
-              <Ionicons name="sync-outline" size={13} color="rgba(255,255,255,0.7)" />
+              <Ionicons
+                name="sync-outline"
+                size={13}
+                color="rgba(255,255,255,0.7)"
+              />
               <Text style={devStyles.readMoreText}>Tap to flip</Text>
             </View>
           </View>
@@ -1755,28 +1921,65 @@ function ParallaxDevCard({
       {/* ── BACK FACE ── */}
       <Animated.View
         style={{
-          position: "absolute", width: cardW, height: cardH,
+          position: "absolute",
+          width: cardW,
+          height: cardH,
           opacity: backOpacity,
           transform: [{ perspective: 1200 }, { rotateY: backRotateY }],
           backfaceVisibility: "hidden",
         }}
       >
         <TouchableOpacity
-          style={[devStyles.backFace, { width: cardW, height: cardH, backgroundColor: theme.surface }]}
+          style={[
+            devStyles.backFace,
+            { width: cardW, height: cardH, backgroundColor: theme.surface },
+          ]}
           activeOpacity={1}
           onPress={handleFlip}
         >
           {/* ── Fixed header ── */}
-          <View style={{ alignItems: "center", paddingTop: 20, paddingHorizontal: 22 }}>
-            <Image source={dev.photo} style={devStyles.backPhoto} resizeMode="cover" />
-            <Text style={[devStyles.backName, { color: theme.textPrimary, marginTop: 10 }]}>
+          <View
+            style={{
+              alignItems: "center",
+              paddingTop: 20,
+              paddingHorizontal: 22,
+            }}
+          >
+            <Image
+              source={dev.photo}
+              style={devStyles.backPhoto}
+              resizeMode="cover"
+            />
+            <Text
+              style={[
+                devStyles.backName,
+                { color: theme.textPrimary, marginTop: 10 },
+              ]}
+            >
               {dev.name}
-              {dev.nickname ? <Text style={[devStyles.devNick, { color: theme.textMuted, textShadowColor: "transparent" }]}> ({dev.nickname})</Text> : null}
+              {dev.nickname ? (
+                <Text
+                  style={[
+                    devStyles.devNick,
+                    { color: theme.textMuted, textShadowColor: "transparent" },
+                  ]}
+                >
+                  {" "}
+                  ({dev.nickname})
+                </Text>
+              ) : null}
             </Text>
-            <View style={[devStyles.rolePill, { alignSelf: "center", marginTop: 7 }]}>
+            <View
+              style={[
+                devStyles.rolePill,
+                { alignSelf: "center", marginTop: 7 },
+              ]}
+            >
               <Text style={devStyles.roleText}>{dev.role}</Text>
             </View>
-            <View style={[devStyles.backSep, { backgroundColor: theme.divider }]} />
+            <View
+              style={[devStyles.backSep, { backgroundColor: theme.divider }]}
+            />
           </View>
 
           {/* ── Bio ── */}
@@ -1791,15 +1994,42 @@ function ParallaxDevCard({
           </ScrollView>
 
           {/* ── Fixed footer ── */}
-          <View style={{ alignItems: "center", paddingHorizontal: 22, paddingBottom: 18 }}>
-            <View style={[devStyles.socialsRow, { justifyContent: "center", flexWrap: "nowrap", marginBottom: 10 }]}>
+          <View
+            style={{
+              alignItems: "center",
+              paddingHorizontal: 22,
+              paddingBottom: 18,
+            }}
+          >
+            <View
+              style={[
+                devStyles.socialsRow,
+                {
+                  justifyContent: "center",
+                  flexWrap: "nowrap",
+                  marginBottom: 10,
+                },
+              ]}
+            >
               {dev.socials.map((s, j) => (
-                <SocialButton key={j} icon={s.icon} label={s.label} url={s.url} />
+                <SocialButton
+                  key={j}
+                  icon={s.icon}
+                  label={s.label}
+                  url={s.url}
+                />
               ))}
             </View>
             <View style={[devStyles.readMoreRow, { justifyContent: "center" }]}>
               <Ionicons name="sync-outline" size={13} color={theme.textMuted} />
-              <Text style={[devStyles.readMoreText, { color: theme.textMuted, textShadowColor: "transparent" }]}>Tap to flip back</Text>
+              <Text
+                style={[
+                  devStyles.readMoreText,
+                  { color: theme.textMuted, textShadowColor: "transparent" },
+                ]}
+              >
+                Tap to flip back
+              </Text>
             </View>
           </View>
         </TouchableOpacity>
@@ -1820,7 +2050,13 @@ function DevelopersView({ onBack }: { onBack: () => void }) {
       {...({ filterTouchesWhenObscured: true } as any)}
     >
       <StatusBar style={theme.statusBar} />
-      <View style={[styles.greenSection, styles.termsHeader, { backgroundColor: theme.headerBg }]}>
+      <View
+        style={[
+          styles.greenSection,
+          styles.termsHeader,
+          { backgroundColor: theme.headerBg },
+        ]}
+      >
         <NavHeader title="Meet the Developers" onBack={onBack} />
       </View>
 
@@ -1835,7 +2071,7 @@ function DevelopersView({ onBack }: { onBack: () => void }) {
         scrollEventThrottle={16}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
+          { useNativeDriver: true },
         )}
       >
         {DEVELOPERS.map((dev, i) => (
@@ -1861,7 +2097,9 @@ const devStyles = StyleSheet.create({
   },
   cardContent: {
     position: "absolute",
-    bottom: 0, left: 0, right: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 20,
     paddingBottom: 22,
     paddingTop: 20,
@@ -1958,7 +2196,8 @@ const devStyles = StyleSheet.create({
     flexDirection: "column",
   },
   backPhoto: {
-    width: 76, height: 76,
+    width: 76,
+    height: 76,
     borderRadius: 38,
     borderWidth: 2.5,
     borderColor: "#3ECBA8",
@@ -2234,12 +2473,17 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
     { label: "One special character", met: /[^A-Za-z0-9]/.test(newPassword) },
   ];
   const allRulesMet = pwRules.every((r) => r.met);
-  const confirmMatches = confirmPassword.length > 0 && confirmPassword === newPassword;
-
+  const confirmMatches =
+    confirmPassword.length > 0 && confirmPassword === newPassword;
 
   async function handleChangePassword() {
     if (!isOnline) {
-      setErrModal({ visible: true, title: 'No Internet Connection', message: 'You\'re offline. Connect to the internet to change your password.' });
+      setErrModal({
+        visible: true,
+        title: "No Internet Connection",
+        message:
+          "You're offline. Connect to the internet to change your password.",
+      });
       return;
     }
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -2270,7 +2514,9 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
     setSaving(true);
     loadingBar.start();
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user?.email) {
       loadingBar.finish();
       setSaving(false);
@@ -2297,11 +2543,13 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
     // Send email BEFORE updateUser — pass data as query params to avoid RN body serialization issues
     const emailParams = new URLSearchParams({
       email: user.email,
-      name:  user.user_metadata?.full_name ?? "",
+      name: user.user_metadata?.full_name ?? "",
     });
     supabase.functions
       .invoke(`send-password-changed-email?${emailParams.toString()}`)
-      .then(({ error }) => { if (error) console.warn("[email] error:", error.message); })
+      .then(({ error }) => {
+        if (error) console.warn("[email] error:", error.message);
+      })
       .catch((err) => console.warn("[email] failed:", err));
 
     const { error: updateError } = await supabase.auth.updateUser({
@@ -2391,7 +2639,9 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
                   }}
                   secureTextEntry={!showCurrent}
                   placeholder="Enter current password"
-                  placeholderTextColor={currentPwError ? "#E05555" : theme.textMuted}
+                  placeholderTextColor={
+                    currentPwError ? "#E05555" : theme.textMuted
+                  }
                   autoCapitalize="none"
                 />
               </View>
@@ -2474,7 +2724,11 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
             {/* Confirm New Password */}
             <View style={[styles.formField, { flexWrap: "wrap" }]}>
               <View style={styles.formFieldIcon}>
-                <Ionicons name="checkmark-circle-outline" size={16} color="#1B7A4A" />
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={16}
+                  color="#1B7A4A"
+                />
               </View>
               <View style={styles.formFieldBody}>
                 <Text
@@ -2503,7 +2757,9 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
                 <View style={styles.pwRulesContainer}>
                   <View style={styles.pwRuleRow}>
                     <Ionicons
-                      name={confirmMatches ? "checkmark-circle" : "close-circle"}
+                      name={
+                        confirmMatches ? "checkmark-circle" : "close-circle"
+                      }
                       size={14}
                       color={confirmMatches ? "#1B7A4A" : "#E05555"}
                     />
@@ -2513,7 +2769,9 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
                         { color: confirmMatches ? "#1B7A4A" : "#E05555" },
                       ]}
                     >
-                      {confirmMatches ? "Passwords match" : "Passwords do not match"}
+                      {confirmMatches
+                        ? "Passwords match"
+                        : "Passwords do not match"}
                     </Text>
                   </View>
                 </View>
@@ -2522,7 +2780,10 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
           </View>
 
           <TouchableOpacity
-            style={[styles.saveBtn, { opacity: (!allRulesMet || !confirmMatches || saving) ? 0.45 : 1 }]}
+            style={[
+              styles.saveBtn,
+              { opacity: !allRulesMet || !confirmMatches || saving ? 0.45 : 1 },
+            ]}
             onPress={handleChangePassword}
             disabled={!allRulesMet || !confirmMatches || saving}
             activeOpacity={0.85}
@@ -2533,10 +2794,37 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
               <Text style={styles.saveBtnText}>Update Password</Text>
             )}
           </TouchableOpacity>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10, gap: 5 }}>
-            <Ionicons name={(allRulesMet && confirmMatches) ? 'checkmark-circle-outline' : 'information-circle-outline'} size={13} color={(allRulesMet && confirmMatches) ? '#1B7A4A' : theme.textMuted} />
-            <Text style={{ fontFamily: Font.bodyRegular, fontSize: 12, color: (allRulesMet && confirmMatches) ? '#1B7A4A' : theme.textMuted }}>
-              {(allRulesMet && confirmMatches) ? "All set! Tap to update password." : 'Meet all password requirements to continue.'}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 10,
+              gap: 5,
+            }}
+          >
+            <Ionicons
+              name={
+                allRulesMet && confirmMatches
+                  ? "checkmark-circle-outline"
+                  : "information-circle-outline"
+              }
+              size={13}
+              color={
+                allRulesMet && confirmMatches ? "#1B7A4A" : theme.textMuted
+              }
+            />
+            <Text
+              style={{
+                fontFamily: Font.bodyRegular,
+                fontSize: 12,
+                color:
+                  allRulesMet && confirmMatches ? "#1B7A4A" : theme.textMuted,
+              }}
+            >
+              {allRulesMet && confirmMatches
+                ? "All set! Tap to update password."
+                : "Meet all password requirements to continue."}
             </Text>
           </View>
         </ScrollView>
@@ -2548,9 +2836,16 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
         message={errModal.message}
         onClose={() => setErrModal((e) => ({ ...e, visible: false }))}
       />
-      <Modal visible={successModal} transparent animationType="fade" statusBarTranslucent>
+      <Modal
+        visible={successModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+      >
         <View style={styles.pwSuccessOverlay}>
-          <View style={[styles.pwSuccessCard, { backgroundColor: theme.surface }]}>
+          <View
+            style={[styles.pwSuccessCard, { backgroundColor: theme.surface }]}
+          >
             <View style={styles.pwSuccessIconWrap}>
               <Ionicons name="checkmark-circle" size={56} color="#1B7A4A" />
             </View>
@@ -2558,9 +2853,15 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
               Password Changed!
             </Text>
             <Text style={[styles.pwSuccessBody, { color: theme.textMuted }]}>
-              Your password has been updated successfully. For your security, you&apos;ll be signed out automatically.
+              Your password has been updated successfully. For your security,
+              you&apos;ll be signed out automatically.
             </Text>
-            <View style={[styles.pwSuccessBarTrack, { backgroundColor: theme.divider }]}>
+            <View
+              style={[
+                styles.pwSuccessBarTrack,
+                { backgroundColor: theme.divider },
+              ]}
+            >
               <Animated.View
                 style={[
                   styles.pwSuccessBarFill,
@@ -2573,7 +2874,9 @@ function ChangePasswordView({ onBack }: { onBack: () => void }) {
                 ]}
               />
             </View>
-            <Text style={[styles.pwSuccessCountdown, { color: theme.textMuted }]}>
+            <Text
+              style={[styles.pwSuccessCountdown, { color: theme.textMuted }]}
+            >
               Signing out in{" "}
               <Text style={{ color: "#1B7A4A", fontFamily: Font.headerBold }}>
                 {countdown}s
@@ -2629,7 +2932,8 @@ function SettingsView({
 
     if (!isOnline) {
       await MutationQueue.add({
-        op: 'update', table: 'profiles',
+        op: "update",
+        table: "profiles",
         payload: { budget_limit: newLimit },
         match: { id: uid },
       });
@@ -2647,7 +2951,12 @@ function SettingsView({
 
   async function confirmDelete() {
     if (!isOnline) {
-      setErrModal({ visible: true, title: 'No Internet Connection', message: 'You\'re offline. Connect to the internet to delete your account.' });
+      setErrModal({
+        visible: true,
+        title: "No Internet Connection",
+        message:
+          "You're offline. Connect to the internet to delete your account.",
+      });
       return;
     }
     loadingBar.start();
@@ -2656,7 +2965,8 @@ function SettingsView({
         data: { user },
         error: uErr,
       } = await supabase.auth.getUser();
-      if (uErr || !user) throw new Error(uErr?.message ?? "Could not retrieve user.");
+      if (uErr || !user)
+        throw new Error(uErr?.message ?? "Could not retrieve user.");
 
       // Delete avatar from storage if it exists
       const { data: profileData } = await supabase
@@ -2667,7 +2977,7 @@ function SettingsView({
 
       if (profileData?.avatar_url) {
         const parts = profileData.avatar_url.split(
-          "/storage/v1/object/public/avatars/"
+          "/storage/v1/object/public/avatars/",
         );
         if (parts[1]) {
           await supabase.storage.from("avatars").remove([parts[1]]);
@@ -3026,17 +3336,25 @@ function NotificationSettingsView({ onBack }: { onBack: () => void }) {
             <View
               style={[
                 styles.menuIconCircle,
-                { backgroundColor: "#1B7A4A", marginRight: 14, alignSelf: "flex-start", marginTop: 2 },
+                {
+                  backgroundColor: "#1B7A4A",
+                  marginRight: 14,
+                  alignSelf: "flex-start",
+                  marginTop: 2,
+                },
               ]}
             >
               <Ionicons name="phone-portrait-outline" size={18} color="#fff" />
             </View>
             <View style={{ flex: 1, marginRight: 12 }}>
-              <Text style={[styles.notifRowLabel, { color: theme.textPrimary }]}>
+              <Text
+                style={[styles.notifRowLabel, { color: theme.textPrimary }]}
+              >
                 Device Push Notifications
               </Text>
               <Text style={[styles.notifRowDesc, { color: theme.textMuted }]}>
-                Show OS banner notifications when new alerts appear. Individual types below control which alerts are generated.
+                Show OS banner notifications when new alerts appear. Individual
+                types below control which alerts are generated.
               </Text>
             </View>
             <Switch
@@ -3124,17 +3442,22 @@ export default function ProfileScreen() {
   const { isOnline } = useNetwork();
 
   const loadProfile = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); return; }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     profileUserIdRef.current = user.id;
-    const meta      = (user.user_metadata ?? {}) as Record<string, string>;
+    const meta = (user.user_metadata ?? {}) as Record<string, string>;
     const authEmail = user.email ?? "";
     const cached = await DataCache.fetchProfile(user.id);
     if (cached) {
       setProfile({
-        full_name:  cached.full_name  || meta.full_name || "",
-        email:      cached.email      || authEmail      || "",
-        phone:      cached.phone      || meta.phone     || "",
+        full_name: cached.full_name || meta.full_name || "",
+        email: cached.email || authEmail || "",
+        phone: cached.phone || meta.phone || "",
         avatar_url: cached.avatar_url ?? undefined,
       });
     } else {
@@ -3144,9 +3467,9 @@ export default function ProfileScreen() {
         .eq("id", user.id)
         .single();
       setProfile({
-        full_name:  data?.full_name  || meta.full_name || "",
-        email:      data?.email      || authEmail      || "",
-        phone:      data?.phone      || meta.phone     || "",
+        full_name: data?.full_name || meta.full_name || "",
+        email: data?.email || authEmail || "",
+        phone: data?.phone || meta.phone || "",
         avatar_url: data?.avatar_url ?? undefined,
       });
     }
@@ -3186,7 +3509,12 @@ export default function ProfileScreen() {
   if (screen === "privacy")
     return <PrivacyView onBack={() => setScreen("profile")} />;
   if (screen === "about")
-    return <AboutView onBack={() => setScreen("profile")} onMeetDevs={() => setScreen("developers")} />;
+    return (
+      <AboutView
+        onBack={() => setScreen("profile")}
+        onMeetDevs={() => setScreen("developers")}
+      />
+    );
   if (screen === "developers")
     return <DevelopersView onBack={() => setScreen("about")} />;
   if (screen === "notif-settings")
@@ -3542,5 +3870,4 @@ const styles = StyleSheet.create({
     marginRight: 14,
   },
   photoSheetLabel: { fontFamily: Font.bodySemiBold, fontSize: 15 },
-
 });

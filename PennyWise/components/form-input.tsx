@@ -21,6 +21,7 @@ interface FormInputProps {
   isPassword?: boolean;
   keyboardType?: KeyboardTypeOptions;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  maxLength?: number;
 }
 
 export function FormInput({
@@ -32,6 +33,7 @@ export function FormInput({
   isPassword = false,
   keyboardType = 'default',
   autoCapitalize = 'none',
+  maxLength,
 }: FormInputProps) {
   const [showPassword, setShowPassword] = useState(false);
   const { theme } = useAppTheme();
@@ -51,6 +53,7 @@ export function FormInput({
           keyboardType={keyboardType}
           autoCapitalize={autoCapitalize}
           autoCorrect={false}
+          maxLength={maxLength}
         />
         {isPassword && (
           <TouchableOpacity

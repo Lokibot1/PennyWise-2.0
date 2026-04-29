@@ -108,6 +108,7 @@ function TermsModal({
         )}
 
         <ScrollView
+          testID="terms-modal-scroll"
           style={[tStyles.scroll, { backgroundColor: theme.cardBg }]}
           contentContainerStyle={tStyles.content}
           showsVerticalScrollIndicator={false}
@@ -149,6 +150,7 @@ function TermsModal({
           ))}
 
           <TouchableOpacity
+            testID="terms-modal-checkbox"
             style={tStyles.checkRow}
             onPress={() => scrolledToEnd && setAccepted((v) => !v)}
             activeOpacity={scrolledToEnd ? 0.8 : 1}
@@ -179,6 +181,7 @@ function TermsModal({
           )}
 
           <TouchableOpacity
+            testID="terms-modal-accept"
             style={[
               tStyles.acceptBtn,
               (!scrolledToEnd || !accepted) && tStyles.acceptBtnOff,
@@ -273,7 +276,7 @@ export default function CreateAccountScreen() {
     fullName.trim().length > 0 &&
     email.trim().length > 0 &&
     validateEmail(email) &&
-    phone.trim().length > 0 &&
+    validatePhone(phone.trim()) &&
     !!dob &&
     password.length >= 6 &&
     password === confirmPassword &&
@@ -333,6 +336,7 @@ export default function CreateAccountScreen() {
                 setError("");
               }}
               keyboardType="phone-pad"
+              maxLength={13}
             />
             <View style={styles.fieldContainer}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>
@@ -417,6 +421,7 @@ export default function CreateAccountScreen() {
 
           {/* Terms & Conditions row */}
           <Pressable
+            testID="terms-row"
             style={[
               styles.termsRow,
               {
@@ -457,12 +462,13 @@ export default function CreateAccountScreen() {
           </Pressable>
 
           <TouchableOpacity
+            testID="sign-up-btn"
             style={[
               styles.primaryButton,
               { opacity: (!isValid || loading) ? 0.45 : 1 },
             ]}
             activeOpacity={0.85}
-            disabled={!isValid || loading}
+            disabled={loading}
             onPress={handleSignUp}
           >
             {loading ? (

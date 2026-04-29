@@ -11,12 +11,13 @@ export type PrivacySection = {
 export const PRIVACY_SECTIONS: PrivacySection[] = [
   {
     title: "Privacy Policy",
-    subtitle: "Effective Date: April 8, 2026  |  Governing Law: Republic of the Philippines",
+    subtitle:
+      "Effective Date: April 8, 2026  |  Governing Law: Republic of the Philippines",
     body: null,
   },
   {
     title: "1. Introduction",
-    body: "PennyWise (\"we,\" \"us,\" or \"our\") is committed to protecting your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your data when you use the PennyWise mobile application (\"App\").\n\nThis policy is in compliance with Republic Act No. 10173, otherwise known as the Data Privacy Act of 2012 (\"DPA\") and its Implementing Rules and Regulations, as enforced by the National Privacy Commission (NPC) of the Philippines.",
+    body: 'PennyWise ("we," "us," or "our") is committed to protecting your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your data when you use the PennyWise mobile application ("App").\n\nThis policy is in compliance with Republic Act No. 10173, otherwise known as the Data Privacy Act of 2012 ("DPA") and its Implementing Rules and Regulations, as enforced by the National Privacy Commission (NPC) of the Philippines.',
   },
   {
     title: "2. Personal Information We Collect",
@@ -44,7 +45,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
   },
   {
     title: "8. Your Rights Under the Data Privacy Act",
-    body: "As a data subject under Republic Act No. 10173, you have the following rights:\n\n• Right to be informed — you have the right to know how your data is being collected and processed\n• Right to access — you may request a copy of the personal data we hold about you\n• Right to rectification — you may correct inaccurate or incomplete data\n• Right to erasure (\"right to be forgotten\") — you may request deletion of your personal data, subject to legal retention requirements\n• Right to data portability — you may request your data in a commonly used, machine-readable format\n• Right to object — you may object to processing of your data for certain purposes\n• Right to lodge a complaint — you may file a complaint with the National Privacy Commission at www.privacy.gov.ph\n\nTo exercise any of these rights, contact us at support@pennywiseph.com.",
+    body: 'As a data subject under Republic Act No. 10173, you have the following rights:\n\n• Right to be informed — you have the right to know how your data is being collected and processed\n• Right to access — you may request a copy of the personal data we hold about you\n• Right to rectification — you may correct inaccurate or incomplete data\n• Right to erasure ("right to be forgotten") — you may request deletion of your personal data, subject to legal retention requirements\n• Right to data portability — you may request your data in a commonly used, machine-readable format\n• Right to object — you may object to processing of your data for certain purposes\n• Right to lodge a complaint — you may file a complaint with the National Privacy Commission at www.privacy.gov.ph\n\nTo exercise any of these rights, contact us at support@pennywiseph.com.',
   },
   {
     title: "9. Children's Privacy",
@@ -60,7 +61,7 @@ export const PRIVACY_SECTIONS: PrivacySection[] = [
   },
   {
     title: "12. Changes to This Privacy Policy",
-    body: "We may update this Privacy Policy from time to time. When we make material changes, we will notify you through the App with a prompt requiring you to review and accept the updated policy before continuing to use the App.\n\nThe \"Effective Date\" at the top of this policy indicates when it was last revised. Continued use of the App after any changes constitutes your acceptance of the updated policy.",
+    body: 'We may update this Privacy Policy from time to time. When we make material changes, we will notify you through the App with a prompt requiring you to review and accept the updated policy before continuing to use the App.\n\nThe "Effective Date" at the top of this policy indicates when it was last revised. Continued use of the App after any changes constitutes your acceptance of the updated policy.',
   },
   {
     title: "13. Data Protection Officer",

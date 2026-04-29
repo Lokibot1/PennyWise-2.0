@@ -79,8 +79,8 @@ describe('sanitizeEmail', () => {
 // ─── sanitizePhone ───────────────────────────────────────────────────────────
 
 describe('sanitizePhone', () => {
-  it('keeps digits, +, spaces, hyphens, and parentheses', () => {
-    expect(sanitizePhone('+63 (912) 345-6789')).toBe('+63 (912) 345-6789');
+  it('normalises formatted numbers to digits and + only', () => {
+    expect(sanitizePhone('+63 (912) 345-6789')).toBe('+639123456789');
   });
 
   it('strips letters and invalid special characters', () => {
@@ -95,9 +95,9 @@ describe('sanitizePhone', () => {
     expect(sanitizePhone('  09123456789  ')).toBe('09123456789');
   });
 
-  it('truncates to 20 characters', () => {
+  it('truncates to 13 characters', () => {
     const long = '1'.repeat(30);
-    expect(sanitizePhone(long)).toHaveLength(20);
+    expect(sanitizePhone(long)).toHaveLength(13);
   });
 
   it('returns empty string for empty input', () => {
@@ -288,8 +288,8 @@ describe('filterEmail', () => {
 // ─── filterPhone ──────────────────────────────────────────────────────────────
 
 describe('filterPhone', () => {
-  it('allows digits, +, spaces, hyphens, and parentheses', () => {
-    expect(filterPhone('+63 (912) 345-6789')).toBe('+63 (912) 345-6789');
+  it('normalises formatted numbers to digits and + only', () => {
+    expect(filterPhone('+63 (912) 345-6789')).toBe('+639123456789');
   });
 
   it('strips emoji characters', () => {
