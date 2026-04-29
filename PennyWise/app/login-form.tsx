@@ -21,13 +21,15 @@ import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 import { loadingBar } from '@/components/GlobalLoadingBar';
 import { sanitizeEmail } from '@/lib/sanitize';
+import { socialAuth } from '@/lib/socialAuth';
 
 export default function LoginFormScreen() {
   const { theme } = useAppTheme();
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
+  const [email, setEmail]             = useState('');
+  const [password, setPassword]       = useState('');
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
+  const [socialLoading, setSocialLoading] = useState<'google' | 'facebook' | null>(null);
 
   const btnScale = useSharedValue(1);
   const btnStyle = useAnimatedStyle(() => ({ transform: [{ scale: btnScale.value }] }));
@@ -56,6 +58,30 @@ export default function LoginFormScreen() {
       }
     } else {
       router.replace('/(tabs)');
+    }
+  }
+
+  async function handleSocialSignIn(provider: 'google' | 'facebook') {
+    if (socialLoading) return;
+    setSocialLoading(provider);
+    setError('');
+
+    const { error: authError, cancelled } = await socialAuth[provider]();
+
+    setSocialLoading(null);
+
+    if (cancelled) return;
+
+    if (authError) {
+      setError(authError);
+      return;
+    }
+
+    // Session is now set — route based on onboarding status
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const onboarded = session.user.user_metadata?.onboarding_completed !== false;
+      router.replace(onboarded ? '/(tabs)' : '/onboarding');
     }
   }
 
@@ -151,11 +177,27 @@ export default function LoginFormScreen() {
 
           {/* Social buttons */}
           <View style={styles.socialRow}>
-            <TouchableOpacity style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]} activeOpacity={0.7}>
-              <Ionicons name="logo-facebook" size={22} color="#1877F2" />
+            <TouchableOpacity
+              style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]}
+              activeOpacity={0.7}
+              disabled={!!socialLoading}
+              onPress={() => handleSocialSignIn('facebook')}
+            >
+              {socialLoading === 'facebook'
+                ? <ActivityIndicator size="small" color="#1877F2" />
+                : <Ionicons name="logo-facebook" size={22} color="#1877F2" />
+              }
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]} activeOpacity={0.7}>
-              <Ionicons name="logo-google" size={20} color="#EA4335" />
+            <TouchableOpacity
+              style={[styles.socialButton, { backgroundColor: theme.surface, borderColor: theme.inputBorder }]}
+              activeOpacity={0.7}
+              disabled={!!socialLoading}
+              onPress={() => handleSocialSignIn('google')}
+            >
+              {socialLoading === 'google'
+                ? <ActivityIndicator size="small" color="#EA4335" />
+                : <Ionicons name="logo-google" size={20} color="#EA4335" />
+              }
             </TouchableOpacity>
           </View>
 
