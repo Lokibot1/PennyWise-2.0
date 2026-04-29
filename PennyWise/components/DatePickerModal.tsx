@@ -3,8 +3,10 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -64,6 +66,8 @@ function CustomCalendar({
 }) {
   const [cursorYear,  setCursorYear]  = useState(selected.getFullYear());
   const [cursorMonth, setCursorMonth] = useState(selected.getMonth());
+  const [viewMode,    setViewMode]    = useState<'calendar' | 'year'>('calendar');
+  const [yearSearch,  setYearSearch]  = useState('');
 
   const firstDow    = new Date(cursorYear, cursorMonth, 1).getDay();
   const daysInMonth = new Date(cursorYear, cursorMonth + 1, 0).getDate();
@@ -86,6 +90,76 @@ function CustomCalendar({
 
   const today = new Date();
 
+  // Year selection range: from minDate year to maxDate year (default 2000-2100)
+  const minYear = minimumDate.getFullYear();
+  const maxYear = maximumDate.getFullYear();
+  const yearOptions = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i).reverse();
+
+  if (viewMode === 'year') {
+    return (
+      <View style={[cal.root, { minHeight: 320 }]}>
+        <View style={cal.navRow}>
+          <TouchableOpacity onPress={() => { setViewMode('calendar'); setYearSearch(''); }} style={cal.navBtn}>
+            <Ionicons name="chevron-back" size={22} color={theme.textPrimary} />
+          </TouchableOpacity>
+          <Text style={[cal.monthYear, { color: theme.textPrimary }]}>Select Year</Text>
+          <View style={cal.navBtn} />
+        </View>
+
+        <View style={[cal.yearSearchRow, { backgroundColor: theme.inputBg }]}>
+          <Ionicons name="search-outline" size={18} color={theme.textMuted} />
+          <TextInput
+            style={[cal.yearInput, { color: theme.textPrimary }]}
+            placeholder="Type year..."
+            placeholderTextColor={theme.textMuted}
+            keyboardType="number-pad"
+            value={yearSearch}
+            onChangeText={v => {
+              setYearSearch(v);
+              if (v.length === 4) {
+                const y = parseInt(v);
+                if (y >= minYear && y <= maxYear) {
+                  setCursorYear(y);
+                  setViewMode('calendar');
+                  setYearSearch('');
+                }
+              }
+            }}
+            maxLength={4}
+          />
+        </View>
+
+        <ScrollView style={cal.yearList} showsVerticalScrollIndicator={false}>
+          <View style={cal.yearGrid}>
+            {yearOptions
+              .filter(y => !yearSearch || y.toString().includes(yearSearch))
+              .map(y => (
+                <TouchableOpacity
+                  key={y}
+                  style={[
+                    cal.yearItem,
+                    y === cursorYear && { backgroundColor: '#1B7A4A' },
+                  ]}
+                  onPress={() => {
+                    setCursorYear(y);
+                    setViewMode('calendar');
+                    setYearSearch('');
+                  }}
+                >
+                  <Text style={[
+                    cal.yearItemText,
+                    { color: y === cursorYear ? '#fff' : theme.textPrimary }
+                  ]}>
+                    {y}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={cal.root}>
       {/* Month / year navigation */}
@@ -93,9 +167,16 @@ function CustomCalendar({
         <TouchableOpacity onPress={prevMonth} hitSlop={12} activeOpacity={0.6} style={cal.navBtn}>
           <Ionicons name="chevron-back" size={22} color={theme.textPrimary} />
         </TouchableOpacity>
-        <Text style={[cal.monthYear, { color: theme.textPrimary }]}>
-          {MONTH_NAMES[cursorMonth]} {cursorYear}
-        </Text>
+        <TouchableOpacity 
+          style={cal.monthYearContainer} 
+          onPress={() => setViewMode('year')}
+          activeOpacity={0.6}
+        >
+          <Text style={[cal.monthYear, { color: theme.textPrimary }]}>
+            {MONTH_NAMES[cursorMonth]} {cursorYear}
+          </Text>
+          <Ionicons name="caret-down" size={12} color={theme.textMuted} style={{ marginLeft: 4 }} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={nextMonth} hitSlop={12} activeOpacity={0.6} style={cal.navBtn}>
           <Ionicons name="chevron-forward" size={22} color={theme.textPrimary} />
         </TouchableOpacity>
@@ -355,6 +436,13 @@ const cal = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  monthYearContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
   monthYear: {
     fontFamily: Font.headerBold,
     fontSize: 16,
@@ -392,4 +480,40 @@ const cal = StyleSheet.create({
   dayCircleSelected: {
     backgroundColor: '#1B7A4A',
   },
+  yearSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginHorizontal: 8,
+    marginBottom: 12,
+  },
+  yearInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontFamily: Font.bodyMedium,
+    fontSize: 14,
+    padding: 0,
+  },
+  yearList: {
+    maxHeight: 220,
+  },
+  yearGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 4,
+  },
+  yearItem: {
+    width: '25%',
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  yearItemText: {
+    fontFamily: Font.bodyMedium,
+    fontSize: 15,
+  },
 });
+
