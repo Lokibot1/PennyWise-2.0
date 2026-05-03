@@ -263,6 +263,10 @@ export default function CreateAccountScreen() {
 
     if (authError) {
       setError(authError.message);
+    } else if (data.user?.identities?.length === 0) {
+      // Supabase returns a fake success (no error) when email confirmation is on and
+      // the email is already taken — identities being empty reveals this case.
+      setError("An account with this email already exists. Please log in or use a different email.");
     } else if (!data.session) {
       // Email confirmation is enabled — user must verify before proceeding
       router.replace({ pathname: '/check-email', params: { email: cleanEmail } });
