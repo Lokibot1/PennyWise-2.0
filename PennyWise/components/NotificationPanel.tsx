@@ -186,7 +186,7 @@ export default function NotificationPanel() {
   const { theme } = useAppTheme();
   const {
     notifications, readIds, panelVisible, bellLayout,
-    closePanel, markAllRead, unreadCount, loading,
+    closePanel, markAllRead, loading,
   } = useNotifications();
 
   const progress = useSharedValue(0);
@@ -327,7 +327,7 @@ export default function NotificationPanel() {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            {!loading && unreadCount > 0 && (
+            {!loading && unread > 0 && (
               <TouchableOpacity
                 onPress={() => { sfx.success(); markAllRead(); }}
                 activeOpacity={0.7}

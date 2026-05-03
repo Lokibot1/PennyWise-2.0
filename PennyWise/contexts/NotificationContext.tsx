@@ -14,6 +14,7 @@ import {
 import { syncPushNotifications } from '@/lib/pushNotifications';
 
 const READ_KEY = 'pw_notif_read_v1';
+const SEEN_KEY = 'pw_notif_seen_v1';
 
 export type BellLayout = { pageX: number; pageY: number; width: number; height: number };
 
@@ -52,23 +53,33 @@ const NotificationContext = createContext<NotificationCtx>({
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [readIds, setReadIds]             = useState<Set<string>>(new Set());
+  const [seenIds, setSeenIds]             = useState<Set<string>>(new Set());
   const [loading, setLoading]             = useState(false);
   const [panelVisible, setPanelVisible]   = useState(false);
   const [bellLayout, setBellLayout]       = useState<BellLayout | null>(null);
   const [prefs, setPrefs]                 = useState<NotifPrefs>(DEFAULT_PREFS);
   const userIdRef = useRef<string | null>(null);
 
-  // ── Restore persisted read set (local) ────────────────────────────────────
+  // ── Restore persisted read + seen sets (local) ───────────────────────────
   useEffect(() => {
     AsyncStorage.getItem(READ_KEY).then(raw => {
       if (raw) {
         try { setReadIds(new Set(JSON.parse(raw) as string[])); } catch {}
       }
     });
+    AsyncStorage.getItem(SEEN_KEY).then(raw => {
+      if (raw) {
+        try { setSeenIds(new Set(JSON.parse(raw) as string[])); } catch {}
+      }
+    });
   }, []);
 
   const persistRead = useCallback((ids: Set<string>) => {
     AsyncStorage.setItem(READ_KEY, JSON.stringify([...ids]));
+  }, []);
+
+  const persistSeen = useCallback((ids: Set<string>) => {
+    AsyncStorage.setItem(SEEN_KEY, JSON.stringify([...ids]));
   }, []);
 
   // ── Fetch notifications + prefs from Supabase ─────────────────────────────
@@ -97,6 +108,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       if (event === 'SIGNED_IN')  refresh();
       if (event === 'SIGNED_OUT') {
         setNotifications([]);
+        setReadIds(new Set());
+        setSeenIds(new Set());
         setPrefs(DEFAULT_PREFS);
         userIdRef.current = null;
       }
@@ -104,8 +117,22 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, [refresh]);
 
+  // ── Mark all as seen whenever the panel is open ───────────────────────────
+  // Fires on open and again after any refresh that brings new notifications,
+  // so the badge clears as soon as the user has seen the panel.
+  useEffect(() => {
+    if (!panelVisible || notifications.length === 0) return;
+    setSeenIds(prev => {
+      const next = new Set(prev);
+      notifications.forEach(n => next.add(n.id));
+      persistSeen(next);
+      return next;
+    });
+  }, [panelVisible, notifications, persistSeen]);
+
   // ── Derived ────────────────────────────────────────────────────────────────
-  const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
+  // Badge count: notifications the user has never seen (panel not yet opened).
+  const unreadCount = notifications.filter(n => !seenIds.has(n.id)).length;
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const markRead = useCallback((id: string) => {
