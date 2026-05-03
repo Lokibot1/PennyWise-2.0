@@ -207,7 +207,7 @@ export default function LoginFormScreen() {
           {/* Social divider */}
           <View style={styles.dividerRow}>
             <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
-            <Text style={[styles.dividerText, { color: theme.textMuted }]}>or sign up with</Text>
+            <Text style={[styles.dividerText, { color: theme.textMuted }]}>or sign in / sign up with</Text>
             <View style={[styles.dividerLine, { backgroundColor: theme.divider }]} />
           </View>
 

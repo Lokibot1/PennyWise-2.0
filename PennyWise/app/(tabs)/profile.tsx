@@ -2903,6 +2903,7 @@ function SettingsView({
   const [deleteVisible, setDeleteVisible] = useState(false);
   const [budgetVisible, setBudgetVisible] = useState(false);
   const [budgetLimit, setBudgetLimit] = useState(20000);
+  const [isOAuthUser, setIsOAuthUser] = useState(false);
   const [errModal, setErrModal] = useState({
     visible: false,
     title: "",
@@ -2913,6 +2914,8 @@ function SettingsView({
     supabase.auth.getUser().then(({ data: { user }, error: uErr }) => {
       if (uErr || !user) return;
       userIdRef.current = user.id;
+      const provider = user.app_metadata?.provider ?? 'email';
+      setIsOAuthUser(provider === 'google' || provider === 'facebook');
       supabase
         .from("profiles")
         .select("budget_limit")
@@ -2988,6 +2991,7 @@ function SettingsView({
       const { error: deleteError } = await supabase.rpc("delete_user");
       if (deleteError) throw deleteError;
 
+      loadingBar.finish();
       // Clear local session
       await supabase.auth.signOut();
       Cache.clearAll();
@@ -3100,24 +3104,28 @@ function SettingsView({
           />
         </View>
 
-        {/* Security */}
-        <Text
-          style={[
-            styles.formSectionTitle,
-            { color: theme.textMuted, marginTop: 24 },
-          ]}
-        >
-          SECURITY
-        </Text>
-        <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
-          <MenuItem
-            icon="lock-closed-outline"
-            iconBg="#115533"
-            label="Change Password"
-            last
-            onPress={() => navigate("change-password")}
-          />
-        </View>
+        {/* Security — hidden for OAuth (Google / Facebook) accounts */}
+        {!isOAuthUser && (
+          <>
+            <Text
+              style={[
+                styles.formSectionTitle,
+                { color: theme.textMuted, marginTop: 24 },
+              ]}
+            >
+              SECURITY
+            </Text>
+            <View style={[styles.menuCard, { backgroundColor: theme.surface }]}>
+              <MenuItem
+                icon="lock-closed-outline"
+                iconBg="#115533"
+                label="Change Password"
+                last
+                onPress={() => navigate("change-password")}
+              />
+            </View>
+          </>
+        )}
 
         {/* Danger zone */}
         <Text
