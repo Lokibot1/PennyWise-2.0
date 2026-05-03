@@ -92,6 +92,21 @@ export default function LoginFormScreen() {
       const hasExistingAvatar = !!existing?.avatar_url;
       const profileMissing    = !existing;
 
+      // If Supabase created a brand-new OAuth account (no profile yet),
+      // verify the email isn't already owned by a different active account.
+      // This catches the case where auto-linking is disabled and a user who
+      // already registered via email/password tries to sign in via OAuth.
+      if (profileMissing && session.user.email) {
+        const { data: emailTaken } = await supabase.rpc('is_email_registered_by_other', {
+          p_email: session.user.email,
+        });
+        if (emailTaken) {
+          await supabase.auth.signOut();
+          setError('An account with this email already exists. Please log in with your original sign-in method or use a different account.');
+          return;
+        }
+      }
+
       await supabase.from('profiles').upsert({
         id:        session.user.id,
         full_name: meta.full_name ?? meta.name ?? '',
