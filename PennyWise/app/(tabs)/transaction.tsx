@@ -40,7 +40,7 @@ import ErrorModal from '@/components/ErrorModal';
 import HeaderDecor from '@/components/HeaderDecor';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-type FilterType = 'All' | 'Income' | 'Expenses' | 'Savings';
+type FilterType = 'All' | 'Income' | 'Expenses' | 'Goals' | 'Archives' | 'Restores';
 
 type RawTransaction = {
   id:             string;
@@ -54,6 +54,7 @@ type RawTransaction = {
   category_label: string;
   is_recurring:   boolean;
   frequency:      string | null;
+  is_archived:    boolean;
 };
 
 type ActivityItem = {
@@ -65,6 +66,7 @@ type ActivityItem = {
   icon:        string;
   created_at:  string;
   category_id?: string;
+  is_archived?: boolean;
   _raw?:        RawTransaction;
 };
 
@@ -74,7 +76,7 @@ type Section = {
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const FILTERS: FilterType[] = ['All', 'Income', 'Expenses', 'Savings'];
+const FILTERS: FilterType[] = ['All', 'Income', 'Expenses', 'Goals', 'Archives', 'Restores'];
 
 const LOG_ONLY_ACTIONS = [
   'INCOME_SOURCE_UPDATED',
@@ -248,6 +250,7 @@ async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
       icon:        cat?.icon ?? 'cash-outline',
       created_at:  (r as any).created_at,
       category_id: cat?.id,
+      is_archived: r.is_archived,
       _raw: {
         id:             r.id,
         table:          'income_sources',
@@ -260,6 +263,7 @@ async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
         category_label: cat?.label ?? 'Income',
         is_recurring:   r.is_recurring,
         frequency:      r.frequency,
+        is_archived:    r.is_archived,
       },
     });
   }
@@ -276,6 +280,7 @@ async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
       icon:        cat?.icon ?? 'receipt-outline',
       created_at:  (r as any).created_at,
       category_id: cat?.id,
+      is_archived: r.is_archived,
       _raw: {
         id:             r.id,
         table:          'expenses',
@@ -288,6 +293,7 @@ async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
         category_label: cat?.label ?? 'Expense',
         is_recurring:   r.is_recurring,
         frequency:      r.frequency,
+        is_archived:    r.is_archived,
       },
     });
   }
@@ -313,6 +319,7 @@ async function fetchAllActivity(userId: string): Promise<ActivityItem[]> {
       description: `Target: ${fmtAmount(r.target_amount)}`,
       icon:        r.icon ?? 'flag-outline',
       created_at:  r.created_at,
+      is_archived: r.is_archived,
     });
   }
 
@@ -985,13 +992,22 @@ export default function TransactionHistoryScreen() {
     All:      [],
     Income:   ['income_source', 'income_category'],
     Expenses: ['expense', 'expense_category'],
-    Savings:  ['savings_goal'],
+    Goals:    ['savings_goal'],
+    Archives: [],
+    Restores: [],
   };
 
   const filtered = all.filter(item => {
-    const types       = ENTITY_TYPES[activeFilter];
-    const matchFilter = activeFilter === 'All' || types.includes(item.entity_type);
-    const q           = debouncedSearch.toLowerCase().trim();
+    let matchFilter: boolean;
+    if (activeFilter === 'Archives') {
+      matchFilter = !!item.is_archived || item.action_type.includes('ARCHIVED');
+    } else if (activeFilter === 'Restores') {
+      matchFilter = item.action_type.includes('RESTORED');
+    } else {
+      const types = ENTITY_TYPES[activeFilter];
+      matchFilter = activeFilter === 'All' || types.includes(item.entity_type);
+    }
+    const q = debouncedSearch.toLowerCase().trim();
     const matchSearch = q === '' ||
       item.title.toLowerCase().includes(q) ||
       item.description.toLowerCase().includes(q);
@@ -1000,9 +1016,12 @@ export default function TransactionHistoryScreen() {
 
   const sections = groupByDate(filtered);
 
-  const incomeCount  = all.filter(i => i.entity_type === 'income_source').length;
-  const expenseCount = all.filter(i => i.entity_type === 'expense').length;
-  const savingsCount = all.filter(i => i.entity_type === 'savings_goal').length;
+  // Count only actual record creations — log-only entries (updates, deletes, archives)
+  // share the same entity_type and would inflate the numbers if we filtered by entity_type.
+  const incomeCount  = all.filter(i => i.action_type === 'INCOME_SOURCE_ADDED').length;
+  const expenseCount = all.filter(i => i.action_type === 'EXPENSE_ADDED').length;
+  const savingsCount = all.filter(i => i.action_type === 'SAVINGS_GOAL_CREATED').length;
+  const totalCount   = incomeCount + expenseCount + savingsCount;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
@@ -1060,7 +1079,7 @@ export default function TransactionHistoryScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{all.length}</Text>
+            <Text style={styles.statValue}>{totalCount}</Text>
             <Text style={styles.statLabel}>Total</Text>
           </View>
         </View>
@@ -1085,15 +1104,20 @@ export default function TransactionHistoryScreen() {
           </View>
         </View>
 
+        {/* Filters — outside the card so overflow:hidden doesn't block horizontal scroll */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          style={styles.filterScrollView}
+        >
+          {FILTERS.map(f => (
+            <FilterChip key={f} label={f} active={activeFilter === f} onPress={() => setActiveFilter(f)} theme={theme} />
+          ))}
+        </ScrollView>
+
         {/* Card */}
         <View style={[styles.card, { backgroundColor: theme.cardBg }]}>
-          {/* Filters */}
-          <View style={styles.filterRow}>
-            {FILTERS.map(f => (
-              <FilterChip key={f} label={f} active={activeFilter === f} onPress={() => setActiveFilter(f)} theme={theme} />
-            ))}
-          </View>
-
           {/* Count + export hint */}
           {!loading && (
             <View style={styles.countRow}>
@@ -1252,12 +1276,13 @@ const styles = StyleSheet.create({
 
   card: {
     flex: 1, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    paddingTop: 20, overflow: 'hidden',
+    paddingTop: 12, overflow: 'hidden',
   },
-  filterRow:   { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8 },
-  filterChip:  { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 50 },
+  filterScrollView: { flexGrow: 0, flexShrink: 0 },
+  filterRow:   { flexDirection: 'row', paddingHorizontal: 16, paddingBottom: 12, gap: 8 },
+  filterChip:  { paddingHorizontal: 13, paddingVertical: 6, borderRadius: 50 },
   filterChipActive:     { backgroundColor: '#3ECBA8' },
-  filterChipText:       { fontFamily: Font.bodyMedium, fontSize: 13 },
+  filterChipText:       { fontFamily: Font.bodyMedium, fontSize: 12 },
   filterChipTextActive: { fontFamily: Font.bodySemiBold, color: '#fff' },
 
   countRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 4, gap: 6 },

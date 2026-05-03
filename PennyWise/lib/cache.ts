@@ -24,6 +24,11 @@ interface CacheEntry<T> {
 // ── In-memory store ────────────────────────────────────────────────────────────
 const memStore = new Map<string, CacheEntry<unknown>>();
 
+// Keys that have been invalidated but whose AsyncStorage removal is still in flight.
+// Cache.get skips AsyncStorage for any key in this set to prevent stale data
+// from being re-promoted into memory before the removal completes.
+const pendingInvalidations = new Set<string>();
+
 function isExpired(entry: CacheEntry<unknown>): boolean {
   return Date.now() > entry.expiresAt;
 }
@@ -41,6 +46,11 @@ export const Cache = {
       if (!isExpired(mem)) return mem.data;
       memStore.delete(key);
     }
+
+    // Skip AsyncStorage while an invalidation is still in flight for this key.
+    // Without this guard, the stale entry would be re-promoted into memory
+    // before AsyncStorage.removeItem resolves.
+    if (pendingInvalidations.has(key)) return null;
 
     // 2. AsyncStorage
     try {
@@ -102,7 +112,10 @@ export const Cache = {
   /** Remove a single cache entry from both layers. */
   invalidate(key: string): void {
     memStore.delete(key);
-    AsyncStorage.removeItem(STORAGE_PREFIX + key).catch(() => {});
+    pendingInvalidations.add(key);
+    AsyncStorage.removeItem(STORAGE_PREFIX + key)
+      .catch(() => {})
+      .finally(() => pendingInvalidations.delete(key));
   },
 
   /**
@@ -112,15 +125,22 @@ export const Cache = {
    */
   invalidatePrefix(prefix: string): void {
     for (const key of memStore.keys()) {
-      if (key.startsWith(prefix)) memStore.delete(key);
+      if (key.startsWith(prefix)) {
+        memStore.delete(key);
+        pendingInvalidations.add(key);
+      }
     }
     // Best-effort AsyncStorage sweep (keys are enumerated)
     AsyncStorage.getAllKeys()
-      .then(keys => {
-        const toRemove = keys.filter(k =>
-          k.startsWith(STORAGE_PREFIX + prefix)
-        );
-        if (toRemove.length) AsyncStorage.multiRemove(toRemove).catch(() => {});
+      .then(allKeys => {
+        const toRemove = allKeys.filter(k => k.startsWith(STORAGE_PREFIX + prefix));
+        if (!toRemove.length) return;
+        // Mark storage keys as pending so get() skips them during removal
+        const bareKeys = toRemove.map(k => k.slice(STORAGE_PREFIX.length));
+        bareKeys.forEach(k => pendingInvalidations.add(k));
+        AsyncStorage.multiRemove(toRemove)
+          .catch(() => {})
+          .finally(() => bareKeys.forEach(k => pendingInvalidations.delete(k)));
       })
       .catch(() => {});
   },

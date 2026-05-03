@@ -151,34 +151,57 @@ export default function HomeScreen() {
     weekAgo.setDate(now.getDate() - 7);
     const weekAgoStr = weekAgo.toISOString().slice(0, 10);
 
-    const dashboard = await DataCache.fetchDashboard(userId);
-    if (!dashboard) {
+    // Use individual cache keys for every resource so each screen's invalidation
+    // is authoritative. The combined dashboard key had an AsyncStorage race
+    // condition where removeItem (async/fire-and-forget) hadn't completed before
+    // the next Cache.get read the stale entry.
+    const [profile, incSources, incCats, expSources, expCats, rawGoals] = await Promise.all([
+      DataCache.fetchProfile(userId),
+      DataCache.fetchIncomeSources(userId),
+      DataCache.fetchIncomeCategories(userId),
+      DataCache.fetchExpenses(userId),
+      DataCache.fetchExpenseCategories(userId),
+      DataCache.fetchSavingsGoals(userId),
+    ]);
+
+    if (!profile) {
       // Profile row missing — user may have been re-routed to onboarding
       setLoading(false);
       return;
     }
 
-    setUserName(dashboard.profile.full_name);
-    setBudgetLimit(dashboard.profile.budget_limit);
-    setSavingsGoals(dashboard.savingsGoals as SavingsGoalRow[]);
+    setUserName(profile.full_name);
+    setBudgetLimit(profile.budget_limit);
+    setSavingsGoals(
+      rawGoals
+        .filter(g => !g.is_completed && !g.is_archived)
+        .map(g => ({ id: g.id, icon: g.icon, title: g.title, target_amount: g.target_amount, current_amount: g.current_amount }))
+    );
 
-    const incomeTxs: TxRow[] = dashboard.incomeSources.map(r => ({
+    // Build category lookup maps for O(1) joins
+    const incCatMap = Object.fromEntries(incCats.map(c => [c.id, c]));
+    const expCatMap = Object.fromEntries(expCats.map(c => [c.id, c]));
+
+    const activeSources = incSources.filter(r => !r.is_archived);
+    const activeExpenses = expSources.filter(r => !r.is_archived);
+
+    const incomeTxs: TxRow[] = activeSources.map(r => ({
       id:       `inc-${r.id}`,
-      icon:     r.category_icon,
+      icon:     incCatMap[r.category_id]?.icon  ?? 'cash-outline',
       title:    r.title,
       time:     r.time,
       date:     r.date,
-      category: r.category_label,
+      category: incCatMap[r.category_id]?.label ?? 'Income',
       value:    r.amount,
     }));
 
-    const expenseTxs: TxRow[] = dashboard.expenses.map(r => ({
+    const expenseTxs: TxRow[] = activeExpenses.map(r => ({
       id:       `exp-${r.id}`,
-      icon:     r.category_icon,
+      icon:     expCatMap[r.category_id]?.icon  ?? 'receipt-outline',
       title:    r.title,
       time:     r.time,
       date:     r.date,
-      category: r.category_label,
+      category: expCatMap[r.category_id]?.label ?? 'Expense',
       value:    -r.amount,
     }));
 
@@ -189,11 +212,11 @@ export default function HomeScreen() {
     setAllTransactions(merged);
 
     let totalInc = 0, totalExp = 0, revWeek = 0, expWeek = 0;
-    for (const r of dashboard.incomeSources) {
+    for (const r of activeSources) {
       totalInc += r.amount;
       if (r.date >= weekAgoStr) revWeek += r.amount;
     }
-    for (const r of dashboard.expenses) {
+    for (const r of activeExpenses) {
       totalExp += r.amount;
       if (r.date >= weekAgoStr) expWeek += r.amount;
     }
