@@ -546,12 +546,19 @@ export default function HomeScreen() {
               </View>
               <View style={[styles.periodSummaryDivider, { backgroundColor: theme.divider }]} />
               <View style={styles.periodSummaryItem}>
-                <Text style={[styles.periodSummaryLabel, { color: theme.textMuted }]}>Net</Text>
+                <Text style={[styles.periodSummaryLabel, { color: theme.textMuted }]}>Saved</Text>
+                <Text style={[styles.periodSummaryValue, { color: '#F59E0B' }]}>
+                  -{formatCurrency(totalSaved)}
+                </Text>
+              </View>
+              <View style={[styles.periodSummaryDivider, { backgroundColor: theme.divider }]} />
+              <View style={styles.periodSummaryItem}>
+                <Text style={[styles.periodSummaryLabel, { color: theme.textMuted }]}>Balance</Text>
                 <Text style={[
                   styles.periodSummaryValue,
-                  { color: periodIncome - periodExpense >= 0 ? theme.textPrimary : '#E85D5D' },
+                  { color: periodIncome - periodExpense - totalSaved >= 0 ? theme.textPrimary : '#E85D5D' },
                 ]}>
-                  {formatCurrency(periodIncome - periodExpense)}
+                  {formatCurrency(periodIncome - periodExpense - totalSaved)}
                 </Text>
               </View>
             </View>
@@ -946,11 +953,11 @@ const styles = StyleSheet.create({
   },
   periodSummaryLabel: {
     fontFamily: Font.bodyRegular,
-    fontSize: 11,
+    fontSize: 10,
   },
   periodSummaryValue: {
     fontFamily: Font.headerBold,
-    fontSize: 14,
+    fontSize: 12,
     letterSpacing: -0.2,
   },
   periodSummaryDivider: {
