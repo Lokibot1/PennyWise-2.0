@@ -159,10 +159,13 @@ export default function RootLayout() {
         clearPushedSet().catch(() => {});
         router.replace("/login-form");
       }
-      // Check T&C version whenever a session becomes active
+      // Check T&C version whenever a session becomes active.
+      // Only show the update modal for users who have already completed onboarding —
+      // new users handle T&C acceptance as the first step of the onboarding flow.
       if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session?.user) {
-        const acceptedVersion = session.user.user_metadata?.terms_accepted_version;
-        if (acceptedVersion !== TERMS_VERSION) {
+        const acceptedVersion     = session.user.user_metadata?.terms_accepted_version;
+        const completedOnboarding = session.user.user_metadata?.onboarding_completed === true;
+        if (completedOnboarding && acceptedVersion !== TERMS_VERSION) {
           setShowTermsUpdate(true);
         }
         // Fire-and-forget: request OS push permission + auto-generate recurring entries.

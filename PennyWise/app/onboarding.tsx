@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   ScrollView,
   StyleSheet,
@@ -23,6 +25,7 @@ import Animated, {
 import { router } from 'expo-router';
 
 import { Font } from '@/constants/fonts';
+import { TERMS_SECTIONS, TERMS_VERSION } from '@/constants/terms';
 import { useAppTheme } from '@/contexts/AppTheme';
 import { supabase } from '@/lib/supabase';
 
@@ -65,6 +68,11 @@ export default function OnboardingScreen() {
   const [budgetStr, setBudgetStr] = useState('20000');
   const [finishing, setFinishing] = useState(false);
 
+  // T&C gate: null = still checking, false = must accept, true = already accepted
+  const [termsAccepted,      setTermsAccepted]      = useState<boolean | null>(null);
+  const [termsScrolledToEnd, setTermsScrolledToEnd] = useState(false);
+  const [termsChecked,       setTermsChecked]       = useState(false);
+
   // ── Animations ──────────────────────────────────────────────────────────────
   const opacity    = useSharedValue(0);
   const translateY = useSharedValue(24);
@@ -98,14 +106,27 @@ export default function OnboardingScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
-  // ── Load user name ──────────────────────────────────────────────────────────
+  // ── Load user name + check T&C acceptance ───────────────────────────────────
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+      if (!user) { setTermsAccepted(true); return; }
       const name = (user.user_metadata?.full_name as string) ?? '';
       setFirstName(name.split(' ')[0] ?? '');
+      const accepted = user.user_metadata?.terms_accepted_version === TERMS_VERSION;
+      setTermsAccepted(accepted);
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── T&C helpers ─────────────────────────────────────────────────────────────
+  function isCloseToBottom({ layoutMeasurement, contentOffset, contentSize }: NativeScrollEvent) {
+    return layoutMeasurement.height + contentOffset.y >= contentSize.height - 40;
+  }
+
+  async function handleAcceptTerms() {
+    await supabase.auth.updateUser({ data: { terms_accepted_version: TERMS_VERSION } });
+    setTermsAccepted(true);
+  }
 
   // ── Actions ─────────────────────────────────────────────────────────────────
   function handleNext() {
@@ -331,6 +352,86 @@ export default function OnboardingScreen() {
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
+  // Still checking whether T&C has been accepted — show nothing to avoid flicker
+  if (termsAccepted === null) return null;
+
+  // T&C gate: user must accept before entering onboarding
+  if (termsAccepted === false) {
+    return (
+      <SafeAreaView style={[s.safe, { backgroundColor: '#1B3D2B' }]} edges={['top', 'left', 'right']}>
+        <StatusBar style="light" />
+        <View style={s.termsHeader}>
+          <Ionicons name="document-text-outline" size={22} color="#fff" />
+          <Text style={s.termsHeaderTitle}>Terms &amp; Conditions</Text>
+        </View>
+        <Text style={s.termsSubText}>
+          Please read and accept our Terms &amp; Conditions to continue using PennyWise.
+        </Text>
+        {!termsScrolledToEnd && (
+          <View style={s.termsHint}>
+            <Ionicons name="arrow-down-circle-outline" size={15} color="rgba(255,255,255,0.7)" />
+            <Text style={s.termsHintText}>Scroll to the bottom to accept</Text>
+          </View>
+        )}
+        <ScrollView
+          style={s.termsScroll}
+          contentContainerStyle={s.termsContent}
+          showsVerticalScrollIndicator={false}
+          onScroll={(e: NativeSyntheticEvent<NativeScrollEvent>) => {
+            if (isCloseToBottom(e.nativeEvent)) setTermsScrolledToEnd(true);
+          }}
+          scrollEventThrottle={16}
+        >
+          {TERMS_SECTIONS.map((section, i) => (
+            <View key={i} style={{ marginBottom: 20 }}>
+              <Text style={[s.termsSectionTitle, { fontSize: i === 0 ? 17 : 14 }]}>
+                {section.title}
+              </Text>
+              {section.subtitle ? (
+                <Text style={[s.termsBody, { fontStyle: 'italic', marginTop: 2, color: '#555' }]}>
+                  {section.subtitle}
+                </Text>
+              ) : null}
+              {section.body ? (
+                <Text style={s.termsBody}>{section.body}</Text>
+              ) : null}
+            </View>
+          ))}
+
+          <TouchableOpacity
+            style={s.termsCheckRow}
+            onPress={() => termsScrolledToEnd && setTermsChecked(v => !v)}
+            activeOpacity={termsScrolledToEnd ? 0.8 : 1}
+          >
+            <View style={[
+              s.termsCheckbox,
+              { borderColor: termsScrolledToEnd ? '#1B7A4A' : '#ccc' },
+              termsChecked && s.termsCheckboxOn,
+            ]}>
+              {termsChecked && <Ionicons name="checkmark" size={13} color="#fff" />}
+            </View>
+            <Text style={[s.termsCheckLabel, { color: termsScrolledToEnd ? '#122A1E' : '#aaa' }]}>
+              I have read and agree to the Terms &amp; Conditions
+            </Text>
+          </TouchableOpacity>
+
+          {!termsScrolledToEnd && (
+            <Text style={s.termsScrollNote}>Please scroll to the bottom before accepting.</Text>
+          )}
+
+          <TouchableOpacity
+            style={[s.termsAcceptBtn, (!termsScrolledToEnd || !termsChecked) && s.termsAcceptBtnOff]}
+            disabled={!termsScrolledToEnd || !termsChecked}
+            activeOpacity={termsScrolledToEnd && termsChecked ? 0.85 : 1}
+            onPress={handleAcceptTerms}
+          >
+            <Text style={s.termsAcceptBtnText}>Accept &amp; Continue</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={[s.safe, { backgroundColor: theme.headerBg }]} edges={['top', 'left', 'right']}>
       <StatusBar style="light" />
@@ -533,6 +634,114 @@ const s = StyleSheet.create({
   readyRowText: {
     fontFamily: Font.bodyRegular,
     fontSize:   13.5,
+  },
+
+  // T&C gate screen
+  termsHeader: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    gap:            10,
+    paddingHorizontal: 20,
+    paddingTop:     16,
+    paddingBottom:  8,
+  },
+  termsHeaderTitle: {
+    fontFamily: Font.headerBold,
+    fontSize:   20,
+    color:      '#fff',
+    flex:       1,
+  },
+  termsSubText: {
+    fontFamily:        Font.bodyRegular,
+    fontSize:          13,
+    color:             'rgba(255,255,255,0.8)',
+    lineHeight:        19,
+    paddingHorizontal: 20,
+    paddingBottom:     12,
+  },
+  termsHint: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               6,
+    paddingHorizontal: 20,
+    paddingBottom:     10,
+  },
+  termsHintText: {
+    fontFamily: Font.bodyRegular,
+    fontSize:   12,
+    color:      'rgba(255,255,255,0.7)',
+  },
+  termsScroll: {
+    borderTopLeftRadius:  28,
+    borderTopRightRadius: 28,
+    flex:                 1,
+    backgroundColor:      '#fff',
+  },
+  termsContent: {
+    paddingHorizontal: 22,
+    paddingTop:        24,
+    paddingBottom:     44,
+  },
+  termsSectionTitle: {
+    fontFamily:   Font.headerBold,
+    color:        '#122A1E',
+    marginBottom: 4,
+  },
+  termsBody: {
+    fontFamily: Font.bodyRegular,
+    fontSize:   13,
+    lineHeight: 22,
+    color:      '#444',
+    marginTop:  2,
+  },
+  termsCheckRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           10,
+    marginTop:     8,
+    marginBottom:  16,
+  },
+  termsCheckbox: {
+    width:           20,
+    height:          20,
+    borderRadius:    5,
+    borderWidth:     1.5,
+    alignItems:      'center',
+    justifyContent:  'center',
+  },
+  termsCheckboxOn: {
+    backgroundColor: '#1B7A4A',
+    borderColor:     '#1B7A4A',
+  },
+  termsCheckLabel: {
+    fontFamily: Font.bodyRegular,
+    fontSize:   13,
+    flex:       1,
+  },
+  termsScrollNote: {
+    fontFamily:   Font.bodyRegular,
+    fontSize:     12,
+    color:        '#aaa',
+    textAlign:    'center',
+    marginBottom: 12,
+  },
+  termsAcceptBtn: {
+    backgroundColor: '#1B7A4A',
+    borderRadius:    50,
+    paddingVertical: 16,
+    alignItems:      'center',
+    shadowColor:     '#1B7A4A',
+    shadowOffset:    { width: 0, height: 6 },
+    shadowOpacity:   0.32,
+    shadowRadius:    12,
+    elevation:       5,
+  },
+  termsAcceptBtnOff: { opacity: 0.4 },
+  termsAcceptBtnText: {
+    fontFamily:    Font.bodySemiBold,
+    fontSize:      16,
+    color:         '#fff',
+    letterSpacing: 0.4,
   },
 
   // Buttons
